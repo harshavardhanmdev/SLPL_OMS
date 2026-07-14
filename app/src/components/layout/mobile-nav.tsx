@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, LayoutGrid, ShoppingCart, User } from "lucide-react";
 
+import { CartBadge } from "@/components/store/cart-badge";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -34,12 +35,7 @@ export function MobileBottomNav() {
               )}
             >
               {href === "/cart" && (
-                <span
-                  data-cart-badge
-                  className="absolute right-[22%] top-1.5 hidden size-4 items-center justify-center rounded-full bg-saffron text-[10px] font-bold text-navy"
-                >
-                  0
-                </span>
+                <CartBadge className="absolute right-[22%] top-1.5 size-4 text-[10px]" />
               )}
               <Icon className="size-5" strokeWidth={active ? 2.4 : 2} />
               {label}

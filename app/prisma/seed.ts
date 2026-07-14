@@ -68,6 +68,9 @@ async function upsertProduct(p: ProductSeed) {
     samplePdf: p.samplePdf,
     isNewRelease: p.isNewRelease ?? false,
     isFeatured: p.isFeatured ?? false,
+    // Visible with placeholder prices so the store demos end-to-end.
+    // OWNER_GUIDE: set real prices in /admin before pointing the public domain.
+    isVisible: true,
   };
   return db.product.upsert({
     where: { slug: p.slug },

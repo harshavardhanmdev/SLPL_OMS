@@ -4,7 +4,7 @@ import { Search, ShoppingCart, User } from "lucide-react";
 
 import { mainNav, site } from "@/lib/site";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { CartBadge } from "@/components/store/cart-badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export function SiteHeader() {
@@ -67,12 +67,7 @@ export function SiteHeader() {
             <Link href="/cart" aria-label="Cart">
               <ShoppingCart className="size-5" />
               <span className="text-sm font-medium">Cart</span>
-              <Badge
-                data-cart-badge
-                className="absolute -right-1 -top-1 hidden size-5 justify-center rounded-full bg-saffron p-0 text-xs font-bold text-navy"
-              >
-                0
-              </Badge>
+              <CartBadge className="absolute -right-1 -top-1 size-5 text-xs" />
             </Link>
           </Button>
         </div>

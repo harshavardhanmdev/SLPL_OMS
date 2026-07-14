@@ -15,6 +15,7 @@ import {
 import { db } from "@/lib/db";
 import { markOrderPaid, restockOrder } from "@/lib/orders";
 import { emailDelivered, emailOutForDelivery, emailShipped } from "@/lib/shipment-notify";
+import { createShipmentForOrder, isShiprocketConfigured } from "@/lib/shipping/shiprocket";
 import { isRazorpayConfigured, refundPayment } from "@/lib/razorpay";
 import { renderEmail, sendEmail } from "@/lib/email";
 import { formatINR } from "@/lib/money";
@@ -423,6 +424,84 @@ export async function orderShip(
   ]);
   await emailShipped(order, { courierName: d.courierName, awb: d.awb, trackingUrl, etaDays: d.etaDays ?? null });
   return { ok: true };
+}
+
+/** One click: create the Shiprocket order, get an AWB, schedule pickup, email the customer. */
+export async function orderShipViaShiprocket(orderNumber: string): Promise<Result> {
+  const denied = await ensureAdmin();
+  if (denied) return { error: denied };
+  if (!isShiprocketConfigured()) {
+    return { error: "Shiprocket is not configured yet — add the API credentials in .env (see docs/INTEGRATIONS.md)." };
+  }
+  const order = await db.order.findUnique({
+    where: { orderNumber },
+    include: { items: { include: { product: { select: { weightGrams: true } } } }, shipment: true },
+  });
+  if (!order) return { error: "Order not found." };
+  if (!["PAID", "CONFIRMED", "PROCESSING"].includes(order.status)) {
+    return { error: "This order is not ready to ship." };
+  }
+  if (order.shipment?.awb) return { error: "This order already has an AWB." };
+
+  const weightGrams = order.items.reduce(
+    (sum, i) => sum + (i.product?.weightGrams ?? 350) * i.quantity,
+    0,
+  );
+
+  try {
+    const sr = await createShipmentForOrder({
+      orderNumber: order.orderNumber,
+      createdAt: order.createdAt,
+      paymentMethod: order.paymentMethod,
+      subtotal: order.subtotal,
+      total: order.total,
+      customerEmail: order.customerEmail,
+      shippingAddress: order.shippingAddress as Parameters<typeof createShipmentForOrder>[0]["shippingAddress"],
+      items: order.items.map((i) => ({
+        title: i.title,
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+        productId: i.productId,
+      })),
+      weightGrams,
+    });
+
+    const shipment = await db.shipment.upsert({
+      where: { orderId: order.id },
+      update: {
+        provider: "shiprocket",
+        status: "PICKUP_SCHEDULED",
+        courierName: sr.courierName,
+        awb: sr.awb,
+        trackingUrl: sr.trackingUrl,
+        shiprocketOrderId: sr.shiprocketOrderId,
+        shiprocketShipmentId: sr.shiprocketShipmentId,
+      },
+      create: {
+        orderId: order.id,
+        provider: "shiprocket",
+        status: "PICKUP_SCHEDULED",
+        courierName: sr.courierName,
+        awb: sr.awb,
+        trackingUrl: sr.trackingUrl,
+        shiprocketOrderId: sr.shiprocketOrderId,
+        shiprocketShipmentId: sr.shiprocketShipmentId,
+      },
+    });
+    await db.$transaction([
+      db.order.update({ where: { id: order.id }, data: { status: "SHIPPED" } }),
+      db.orderEvent.create({
+        data: { orderId: order.id, status: "SHIPPED", note: `Shiprocket · ${sr.courierName} · AWB ${sr.awb}` },
+      }),
+      db.shipmentEvent.create({
+        data: { shipmentId: shipment.id, status: "PICKUP_SCHEDULED", description: "Shipment created, pickup requested" },
+      }),
+    ]);
+    await emailShipped(order, { courierName: sr.courierName, awb: sr.awb, trackingUrl: sr.trackingUrl, etaDays: null });
+    return { ok: true };
+  } catch (err) {
+    return { error: `Shiprocket error: ${err instanceof Error ? err.message : String(err)}` };
+  }
 }
 
 export async function orderOutForDelivery(orderNumber: string): Promise<Result> {

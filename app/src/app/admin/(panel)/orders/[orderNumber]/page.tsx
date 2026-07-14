@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { OrderActions } from "@/components/admin/order-actions";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { isShiprocketConfigured } from "@/lib/shipping/shiprocket";
 
 export const metadata: Metadata = { title: "Admin · Order", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -61,7 +62,11 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         <Badge className="bg-primary text-primary-foreground">{order.status.replaceAll("_", " ")}</Badge>
       </div>
 
-      <OrderActions orderNumber={order.orderNumber} status={order.status} />
+      <OrderActions
+        orderNumber={order.orderNumber}
+        status={order.status}
+        shiprocketEnabled={isShiprocketConfigured()}
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-2xl border bg-card p-4">

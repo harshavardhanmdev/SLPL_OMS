@@ -23,9 +23,18 @@ import {
   orderMarkProcessing,
   orderOutForDelivery,
   orderShip,
+  orderShipViaShiprocket,
 } from "@/lib/admin-actions";
 
-export function OrderActions({ orderNumber, status }: { orderNumber: string; status: string }) {
+export function OrderActions({
+  orderNumber,
+  status,
+  shiprocketEnabled = false,
+}: {
+  orderNumber: string;
+  status: string;
+  shiprocketEnabled?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [shipOpen, setShipOpen] = React.useState(false);
@@ -66,6 +75,12 @@ export function OrderActions({ orderNumber, status }: { orderNumber: string; sta
 
       {["PAID", "CONFIRMED"].includes(status) &&
         btn("processing", "Start packing", <PackageCheck className="size-4" />, () => orderMarkProcessing(orderNumber))}
+
+      {["PAID", "CONFIRMED", "PROCESSING"].includes(status) &&
+        shiprocketEnabled &&
+        btn("shiprocket", "Ship via Shiprocket (auto AWB)", <Send className="size-4" />, () =>
+          orderShipViaShiprocket(orderNumber),
+        )}
 
       {["PAID", "CONFIRMED", "PROCESSING"].includes(status) && (
         <Dialog open={shipOpen} onOpenChange={setShipOpen}>

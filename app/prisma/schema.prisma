@@ -1,0 +1,390 @@
+// SLPL Store data model.
+// All money fields are integers in paise (₹1 = 100) — never floats.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Customers ────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  phone         String?
+  passwordHash  String
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses Address[]
+  orders    Order[]
+  cart      Cart?
+}
+
+enum AddressLabel {
+  HOME
+  OFFICE
+  OTHER
+}
+
+model Address {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     AddressLabel @default(HOME)
+  fullName  String
+  phone     String
+  line1     String
+  line2     String?
+  landmark  String?
+  city      String
+  state     String
+  pincode   String
+  lat       Float?
+  lng       Float?
+  isDefault Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  @@index([userId])
+}
+
+// ─── Catalog ──────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  description String?
+  image       String?
+  sortOrder   Int       @default(0)
+  products    Product[]
+}
+
+enum ProductKind {
+  BOOK
+  NOVEL
+  POEMS
+  BUNDLE
+}
+
+model Product {
+  id           String      @id @default(cuid())
+  slug         String      @unique
+  title        String
+  kind         ProductKind @default(BOOK)
+  categoryId   String
+  category     Category    @relation(fields: [categoryId], references: [id])
+  series       String?
+  gradeLabel   String?
+  description  String
+  mrp          Int
+  price        Int
+  salePrice    Int?
+  saleStart    DateTime?
+  saleEnd      DateTime?
+  stock        Int         @default(0)
+  weightGrams  Int         @default(350)
+  coverImage   String?
+  gallery      String[]    @default([])
+  samplePdf    String?
+  isNewRelease Boolean     @default(false)
+  isFeatured   Boolean     @default(false)
+  isVisible    Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  bundleItems BundleItem[] @relation("bundle")
+  memberOf    BundleItem[] @relation("member")
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+
+  @@index([categoryId, isVisible])
+  @@index([isNewRelease, isVisible])
+}
+
+model BundleItem {
+  id        String  @id @default(cuid())
+  bundleId  String
+  bundle    Product @relation("bundle", fields: [bundleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation("member", fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int     @default(1)
+
+  @@unique([bundleId, productId])
+}
+
+// ─── Cart ─────────────────────────────────────────────────────────────────────
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int     @default(1)
+
+  @@unique([cartId, productId])
+}
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  AWAITING_PAYMENT
+  COD_PENDING_OTP
+  PAID
+  CONFIRMED // COD confirmed via OTP
+  PAYMENT_FAILED
+  EXPIRED
+  PROCESSING
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  COD
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  orderNumber     String        @unique
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  status          OrderStatus   @default(AWAITING_PAYMENT)
+  paymentMethod   PaymentMethod
+  subtotal        Int
+  discount        Int           @default(0)
+  couponCode      String?
+  shippingFee     Int           @default(0)
+  total           Int
+  // Snapshot of the delivery address at order time (source Address may change later)
+  shippingAddress Json
+  customerName    String
+  customerEmail   String
+  customerPhone   String
+  notes           String?
+  reservedUntil   DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items    OrderItem[]
+  payment  Payment?
+  shipment Shipment?
+  events   OrderEvent[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  title     String
+  unitPrice Int
+  quantity  Int
+  image     String?
+}
+
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String        @unique
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider          String // "razorpay" | "cod"
+  status            PaymentStatus @default(CREATED)
+  amount            Int
+  refundedAmount    Int           @default(0)
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?
+  method            String? // upi | card | netbanking | wallet
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  events PaymentEvent[]
+}
+
+model PaymentEvent {
+  id        String   @id @default(cuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  // Razorpay event id (or synthetic id for local transitions) — dedupes webhook retries
+  eventId   String   @unique
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+}
+
+// ─── Shipping ─────────────────────────────────────────────────────────────────
+
+enum ShipmentStatus {
+  PENDING
+  CREATED
+  PICKUP_SCHEDULED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  RTO
+  CANCELLED
+}
+
+model Shipment {
+  id                   String         @id @default(cuid())
+  orderId              String         @unique
+  order                Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider             String // "shiprocket" | "manual"
+  status               ShipmentStatus @default(PENDING)
+  courierName          String?
+  awb                  String?
+  trackingUrl          String?
+  labelUrl             String?
+  shiprocketOrderId    String?
+  shiprocketShipmentId String?
+  etaDays              Int?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  events ShipmentEvent[]
+
+  @@index([status])
+}
+
+model ShipmentEvent {
+  id          String   @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status      String
+  location    String?
+  description String?
+  occurredAt  DateTime @default(now())
+  raw         Json?
+
+  @@index([shipmentId])
+}
+
+model DeliveryEstimateCache {
+  // key = `${pincode}:${weightBandGrams}`
+  key       String   @id
+  etaDays   Int
+  charge    Int
+  courier   String?
+  expiresAt DateTime
+}
+
+// ─── Promotions ───────────────────────────────────────────────────────────────
+
+enum DiscountType {
+  PERCENT
+  FLAT
+}
+
+model Coupon {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  type        DiscountType
+  value       Int // percent (1-100) or paise
+  minOrder    Int          @default(0)
+  maxDiscount Int?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  usageLimit  Int?
+  usedCount   Int          @default(0)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+}
+
+model SaleEvent {
+  id           String       @id @default(cuid())
+  name         String
+  bannerText   String
+  discountType DiscountType
+  value        Int
+  categoryIds  String[]     @default([]) // empty = sitewide
+  startsAt     DateTime
+  endsAt       DateTime
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+}
+
+// ─── Misc ─────────────────────────────────────────────────────────────────────
+
+model OtpToken {
+  id         String    @id @default(cuid())
+  identifier String // email address
+  code       String
+  purpose    String // BULK_ORDER | COD_CONFIRM | EMAIL_VERIFY
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([identifier, purpose])
+}
+
+model Setting {
+  key   String @id
+  value Json
+}
+
+model ServicePage {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  tagline     String?
+  description String
+  bannerImage String?
+  externalUrl String?
+  sortOrder   Int     @default(0)
+  isVisible   Boolean @default(true)
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  template  String
+  status    String // SENT | FAILED
+  error     String?
+  createdAt DateTime @default(now())
+}

@@ -1,10 +1,18 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { createSession, destroySession, hashPassword, verifyPassword } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
+
+async function ipKey(scope: string): Promise<string> {
+  const h = await headers();
+  const ip = h.get("cf-connecting-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  return `${scope}:${ip}`;
+}
 
 export type AuthFormState = { error?: string };
 
@@ -30,6 +38,9 @@ export async function signupAction(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  if (!rateLimit(await ipKey("signup"), 10, 60 * 60 * 1000)) {
+    return { error: "Too many attempts — please try again later." };
+  }
   const parsed = signupSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -62,6 +73,9 @@ export async function loginAction(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  if (!rateLimit(await ipKey("login"), 20, 15 * 60 * 1000)) {
+    return { error: "Too many attempts — please try again in 15 minutes." };
+  }
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),

@@ -1,0 +1,118 @@
+# ==========================================================
+#  SLPL STORE (OMS) — production stack
+#  Web on host port 4300 → point a Cloudflare tunnel route at
+#  http://localhost:4300 when ready to go public.
+#  Usage (on the server, from ~/oms/deploy):
+#      docker compose --env-file .env up -d --build
+# ==========================================================
+services:
+  oms-db:
+    image: postgres:16-alpine
+    container_name: oms-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-oms}
+    volumes:
+      - oms-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oms} -d ${POSTGRES_DB:-oms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # One-shot: applies pending Prisma migrations, then exits.
+  oms-migrate:
+    build:
+      context: ../app
+      target: builder
+    container_name: oms-migrate
+    command: npx prisma migrate deploy
+    env_file: .env
+    depends_on:
+      oms-db:
+        condition: service_healthy
+    restart: "no"
+    logging: *logging
+
+  oms-web:
+    build:
+      context: ../app
+      target: runner
+    container_name: oms-web
+    restart: always
+    ports:
+      - "4300:3000"
+    env_file: .env
+    environment:
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      - oms-uploads:/app/uploads
+    depends_on:
+      oms-db:
+        condition: service_healthy
+      oms-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging: *logging
+
+  # Payment reconciliation, stock-reservation expiry, tracking sync.
+  oms-worker:
+    build:
+      context: ../app
+      target: builder
+    container_name: oms-worker
+    restart: always
+    command: sh -c "NODE_OPTIONS=--conditions=react-server npx tsx scripts/worker.ts"
+    env_file: .env
+    depends_on:
+      oms-db:
+        condition: service_healthy
+      oms-migrate:
+        condition: service_completed_successfully
+    logging: *logging
+
+  # Outgoing-mail viewer until real SMTP (Brevo/Hostinger) is configured.
+  # UI: ssh -L 8026:127.0.0.1:8026 slplserver@… → http://localhost:8026
+  oms-mailpit:
+    image: axllent/mailpit:latest
+    container_name: oms-mailpit
+    restart: always
+    ports:
+      - "127.0.0.1:8026:8025"
+    logging: *logging
+
+  # Nightly pg_dump with retention (7 daily + 4 weekly), see backup/backup.sh
+  oms-backup:
+    image: postgres:16-alpine
+    container_name: oms-backup
+    restart: always
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    environment:
+      PGHOST: oms-db
+      PGUSER: ${POSTGRES_USER:-oms}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set in deploy/.env}
+      PGDATABASE: ${POSTGRES_DB:-oms}
+    volumes:
+      - ./backup/backup.sh:/backup.sh:ro
+      - oms-backups:/backups
+    depends_on:
+      oms-db:
+        condition: service_healthy
+    logging: *logging
+
+volumes:
+  oms-db:
+  oms-uploads:
+  oms-backups:

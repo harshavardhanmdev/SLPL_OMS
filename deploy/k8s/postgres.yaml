@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oms-db
+  namespace: oms
+spec:
+  selector:
+    app: oms-db
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: oms-db
+  namespace: oms
+spec:
+  serviceName: oms-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oms-db
+  template:
+    metadata:
+      labels:
+        app: oms-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: oms-env
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "oms"]
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi

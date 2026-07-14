@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oms-worker
+  namespace: oms
+spec:
+  replicas: 1 # MUST stay 1 — cron jobs must not double-fire
+  selector:
+    matchLabels:
+      app: oms-worker
+  template:
+    metadata:
+      labels:
+        app: oms-worker
+    spec:
+      containers:
+        - name: worker
+          image: oms-worker:latest
+          command: ["sh", "-c", "NODE_OPTIONS=--conditions=react-server npx tsx scripts/worker.ts"]
+          envFrom:
+            - secretRef:
+                name: oms-env
+          resources:
+            requests:
+              memory: 192Mi
+            limits:
+              memory: 512Mi

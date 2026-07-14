@@ -1,0 +1,21 @@
+# Only needed if exposing via the k3s Traefik ingress.
+# If you keep the Cloudflare tunnel pattern, skip this file and point
+# cloudflared at http://oms-web.oms.svc.cluster.local (run cloudflared
+# in-cluster) or port-forward the service to a host port instead.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oms-web
+  namespace: oms
+spec:
+  rules:
+    - host: store.theslpl.in # match whichever subdomain you choose
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: oms-web
+                port:
+                  number: 80

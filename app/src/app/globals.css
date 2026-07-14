@@ -1,0 +1,161 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-heading);
+  --color-saffron: var(--saffron);
+  --color-saffron-deep: var(--saffron-deep);
+  --color-navy: var(--navy);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* SLPL brand: navy + saffron-orange (from company brochures). Light is the default shopping theme. */
+:root {
+  --navy: #1e2a5a;
+  --saffron: #f5a623;
+  --saffron-deep: #d98a00;
+  --background: #ffffff;
+  --foreground: #16213e;
+  --card: #ffffff;
+  --card-foreground: #16213e;
+  --popover: #ffffff;
+  --popover-foreground: #16213e;
+  --primary: #1e2a5a;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2fa;
+  --secondary-foreground: #1e2a5a;
+  --muted: #f4f6fb;
+  --muted-foreground: #5a6478;
+  --accent: #fff4e0;
+  --accent-foreground: #7c4a00;
+  --destructive: #dc2626;
+  --border: #e3e8f2;
+  --input: #e3e8f2;
+  --ring: #1e2a5a;
+  --chart-1: #1e2a5a;
+  --chart-2: #f5a623;
+  --chart-3: #2a9d8f;
+  --chart-4: #7c8db5;
+  --chart-5: #e76f51;
+  --radius: 0.8rem;
+  --sidebar: #f7f9fd;
+  --sidebar-foreground: #16213e;
+  --sidebar-primary: #1e2a5a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef2fa;
+  --sidebar-accent-foreground: #1e2a5a;
+  --sidebar-border: #e3e8f2;
+  --sidebar-ring: #1e2a5a;
+}
+
+.dark {
+  --navy: #1e2a5a;
+  --saffron: #f5a623;
+  --saffron-deep: #ffbe4d;
+  --background: #0b1222;
+  --foreground: #e8ecf7;
+  --card: #121a30;
+  --card-foreground: #e8ecf7;
+  --popover: #121a30;
+  --popover-foreground: #e8ecf7;
+  --primary: #b9c6f2;
+  --primary-foreground: #101830;
+  --secondary: #1a2340;
+  --secondary-foreground: #e8ecf7;
+  --muted: #1a2340;
+  --muted-foreground: #93a0bd;
+  --accent: #26304f;
+  --accent-foreground: #ffd58a;
+  --destructive: #f87171;
+  --border: rgb(255 255 255 / 12%);
+  --input: rgb(255 255 255 / 16%);
+  --ring: #93a0bd;
+  --chart-1: #b9c6f2;
+  --chart-2: #f5a623;
+  --chart-3: #4fd1c5;
+  --chart-4: #7c8db5;
+  --chart-5: #f0936e;
+  --sidebar: #121a30;
+  --sidebar-foreground: #e8ecf7;
+  --sidebar-primary: #b9c6f2;
+  --sidebar-primary-foreground: #101830;
+  --sidebar-accent: #1a2340;
+  --sidebar-accent-foreground: #e8ecf7;
+  --sidebar-border: rgb(255 255 255 / 12%);
+  --sidebar-ring: #93a0bd;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+  }
+}
+
+@layer utilities {
+  /* Horizontal scrollers (new-releases rail) hide the scrollbar but stay swipeable */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Keep content clear of the fixed mobile bottom nav + iOS home indicator */
+  .pb-safe-nav {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+}

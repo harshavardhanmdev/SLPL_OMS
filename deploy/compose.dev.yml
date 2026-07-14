@@ -1,0 +1,32 @@
+# Local development services for SLPL Store.
+# Usage: docker compose -f deploy/compose.dev.yml up -d
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: oms-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: oms
+      POSTGRES_PASSWORD: oms_dev_password
+      POSTGRES_DB: oms
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - oms-dev-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oms -d oms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Catches every email the app sends in dev — UI at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: oms-dev-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  oms-dev-db:

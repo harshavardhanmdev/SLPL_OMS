@@ -42,6 +42,54 @@ function write(lines: CartLine[]) {
   snapshot = lines;
   window.localStorage.setItem(KEY, JSON.stringify(lines));
   window.dispatchEvent(new Event(EVENT));
+  scheduleServerSync();
+}
+
+function isAuthed(): boolean {
+  return typeof document !== "undefined" && document.cookie.includes("slpl_authed=1");
+}
+
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Push the cart to the DB (logged-in users only) so it survives devices. */
+function scheduleServerSync() {
+  if (!isAuthed()) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    void fetch("/api/cart", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lines: snapshot.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+      }),
+    }).catch(() => {});
+  }, 800);
+}
+
+let hydrated = false;
+
+/** Merge the server cart into the local one after login (max quantity wins). */
+async function hydrateFromServer() {
+  if (hydrated || !isAuthed()) return;
+  hydrated = true;
+  try {
+    const res = await fetch("/api/cart");
+    const { lines: serverLines } = (await res.json()) as { lines: CartLine[] };
+    if (!Array.isArray(serverLines) || serverLines.length === 0) {
+      scheduleServerSync(); // local may have items collected pre-login
+      return;
+    }
+    ensureLoaded();
+    const merged = new Map(serverLines.map((l) => [l.productId, { ...l }]));
+    for (const local of snapshot) {
+      const existing = merged.get(local.productId);
+      if (existing) existing.quantity = Math.max(existing.quantity, local.quantity);
+      else merged.set(local.productId, { ...local });
+    }
+    write([...merged.values()]);
+  } catch {
+    hydrated = false;
+  }
 }
 
 export const cartStore = {
@@ -78,6 +126,7 @@ export const cartStore = {
     };
     window.addEventListener(EVENT, onChange);
     window.addEventListener("storage", onChange); // cross-tab
+    void hydrateFromServer();
     return () => {
       window.removeEventListener(EVENT, onChange);
       window.removeEventListener("storage", onChange);

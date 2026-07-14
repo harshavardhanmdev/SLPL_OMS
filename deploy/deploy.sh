@@ -8,12 +8,12 @@ SERVER="${OMS_SERVER:-slplserver@100.109.145.97}"
 REMOTE_DIR="~/oms"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "── Syncing code to $SERVER:$REMOTE_DIR"
+echo "── Syncing code to $SERVER:$REMOTE_DIR (tar over ssh — server has no rsync)"
 ssh "$SERVER" "mkdir -p $REMOTE_DIR"
-rsync -az --delete \
-  --exclude node_modules --exclude .next --exclude .git \
-  --exclude app/.env --exclude uploads \
-  "$ROOT/app" "$ROOT/deploy" "$ROOT/docs" "$SERVER:$REMOTE_DIR/"
+tar -C "$ROOT" -czf - \
+  --exclude='app/node_modules' --exclude='app/.next' --exclude='.git' \
+  --exclude='app/.env' --exclude='app/uploads' \
+  app deploy docs | ssh "$SERVER" "cd $REMOTE_DIR && tar xzf -"
 
 echo "── Checking deploy/.env on the server"
 if ! ssh "$SERVER" "test -f $REMOTE_DIR/deploy/.env"; then

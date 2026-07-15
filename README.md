@@ -65,4 +65,4 @@ The stack publishes a single port (4300) behind a Cloudflare tunnel. See `docs/D
 
 ## License
 
-Proprietary. All rights reserved by Saaradaa Learknowations Pvt Ltd.
+MIT (see LICENSE). Brand assets, book content and the SLPL name remain the property of Saaradaa Learknowations Pvt Ltd.

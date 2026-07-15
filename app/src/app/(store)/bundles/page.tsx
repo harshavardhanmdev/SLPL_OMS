@@ -8,7 +8,7 @@ import { getActiveSale, getCategoryWithProducts } from "@/lib/catalog";
 
 export const metadata: Metadata = {
   title: "Class Bundles",
-  description: "Complete SLPL book sets for each class at a bundled price — one order, one delivery, school-ready.",
+  description: "Complete SLPL book sets for each class at a bundled price - one order, one delivery, school-ready.",
 };
 
 export default async function BundlesPage() {
@@ -24,13 +24,13 @@ export default async function BundlesPage() {
         <h1 className="font-heading text-3xl font-bold">Complete class kits</h1>
         <p className="mt-2 text-muted-foreground">
           Every SLPL book a class needs for the year, packed as one kit at a
-          bundled price — cheaper than buying titles one by one.
+          bundled price - cheaper than buying titles one by one.
         </p>
       </header>
 
       {products.length === 0 ? (
         <p className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
-          Bundles are being prepared — check back soon.
+          Bundles are being prepared - check back soon.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">

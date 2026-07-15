@@ -23,7 +23,7 @@ export async function GET(
   const { file } = await params;
   const name = file.join("/");
 
-  // Filenames are server-generated — anything outside [a-z0-9.-] is hostile
+  // Filenames are server-generated - anything outside [a-z0-9.-] is hostile
   if (!/^[a-z0-9][a-z0-9.-]*$/i.test(name) || name.includes("..")) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

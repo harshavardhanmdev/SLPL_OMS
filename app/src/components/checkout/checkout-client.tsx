@@ -179,7 +179,7 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
       if (res.razorpay) {
         const ok = await loadRazorpayScript();
         if (!ok || !window.Razorpay) {
-          toast.error("Could not load the payment window — open the order from My Orders to retry.");
+          toast.error("Could not load the payment window - open the order from My Orders to retry.");
           router.push(`/account/orders/${orderNumber}`);
           return;
         }
@@ -198,7 +198,7 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
           theme: { color: "#1e2a5a" },
           modal: {
             ondismiss: () => {
-              toast.info("Payment window closed — your order is saved as pending.");
+              toast.info("Payment window closed - your order is saved as pending.");
               router.push(`/account/orders/${orderNumber}`);
             },
           },
@@ -218,7 +218,7 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
                 router.push(`/account/orders/${orderNumber}?placed=1`);
               } else {
                 toast.error(
-                  "We are confirming your payment — check the order page in a minute. Your money is safe.",
+                  "We are confirming your payment - check the order page in a minute. Your money is safe.",
                 );
                 router.push(`/account/orders/${orderNumber}`);
               }
@@ -246,7 +246,7 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
       }
       setBulkToken(res.token);
       setBulkOtpOpen(false);
-      toast.success("Verified — placing your order…");
+      toast.success("Verified - placing your order…");
       await submitOrder(res.token); // pass directly: state update is async
     } finally {
       setBulkBusy(false);
@@ -368,7 +368,7 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
                     <p className="mt-1 font-medium">{a.fullName}</p>
                     <p className="text-sm text-muted-foreground">
                       {a.line1}
-                      {a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} — {a.pincode}
+                      {a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} - {a.pincode}
                     </p>
                     <p className="mt-0.5 text-sm text-muted-foreground">{a.phone}</p>
                   </button>
@@ -516,7 +516,7 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
         </div>
         {quote?.couponCode && (
           <p className="text-sm font-medium text-green-700 dark:text-green-400">
-            Coupon {quote.couponCode} applied — you save {formatINR(quote.discount)}
+            Coupon {quote.couponCode} applied - you save {formatINR(quote.discount)}
           </p>
         )}
 
@@ -543,7 +543,7 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
             {quote.etaDaysMin != null && selectedAddress && (
               <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
                 <Truck className="size-3.5 text-saffron-deep" />
-                Estimated delivery to {selectedAddress.pincode}: {quote.etaDaysMin}–{quote.etaDaysMax} days
+                Estimated delivery to {selectedAddress.pincode}: {quote.etaDaysMin}-{quote.etaDaysMax} days
               </p>
             )}
             <Separator className="my-2" />
@@ -569,7 +569,7 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
         )}
         <p className="text-center text-xs text-muted-foreground">
           Payments are processed securely. If a payment is interrupted, it is
-          auto-confirmed or auto-refunded — never lost.
+          auto-confirmed or auto-refunded - never lost.
         </p>
       </aside>
     </div>

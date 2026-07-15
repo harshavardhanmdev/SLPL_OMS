@@ -12,7 +12,7 @@ function secretKey() {
 
 /**
  * Production: set ADMIN_PASSWORD_HASH (bcrypt). Dev fallback: ADMIN_PASSWORD
- * plain. Rotate by changing the env value and restarting — no DB involved.
+ * plain. Rotate by changing the env value and restarting - no DB involved.
  */
 export async function checkAdminPassword(password: string): Promise<boolean> {
   const hash = process.env.ADMIN_PASSWORD_HASH;

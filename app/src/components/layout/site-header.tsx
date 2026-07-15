@@ -35,7 +35,7 @@ export async function SiteHeader() {
     <header className="sticky top-0 z-40 bg-navy text-white shadow-md">
       {/* Row 1 */}
       <div className="mx-auto flex h-[60px] max-w-[1500px] items-center gap-2 px-3 sm:gap-3 sm:px-4">
-        {/* Branding — top LEFT */}
+        {/* Branding - top LEFT */}
         <Link
           href="/"
           aria-label={`${site.name} home`}
@@ -59,7 +59,7 @@ export async function SiteHeader() {
           <DeliverTo />
         </div>
 
-        {/* Search — center */}
+        {/* Search - center */}
         <SearchBar className="mx-2 hidden flex-1 md:block xl:mx-6" />
 
         {/* Right cluster */}
@@ -84,7 +84,7 @@ export async function SiteHeader() {
             <span className="text-sm font-semibold">& Orders</span>
           </Link>
 
-          {/* Cart — top RIGHT */}
+          {/* Cart - top RIGHT */}
           <Link
             href="/cart"
             aria-label="Cart"
@@ -104,7 +104,7 @@ export async function SiteHeader() {
         <SearchBar />
       </div>
 
-      {/* Row 2 — category strip */}
+      {/* Row 2 - category strip */}
       <nav aria-label="Categories" className="bg-white/10">
         <div className="no-scrollbar mx-auto flex max-w-[1500px] items-center gap-1 overflow-x-auto px-2 py-1 sm:px-3">
           <Link

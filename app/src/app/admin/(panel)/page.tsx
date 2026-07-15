@@ -66,7 +66,7 @@ export default async function AdminDashboard() {
                 <Link href={`/admin/products/${p.id}`} className="underline-offset-2 hover:underline">
                   {p.title}
                 </Link>{" "}
-                — <b>{p.stock} left</b>
+                - <b>{p.stock} left</b>
               </li>
             ))}
           </ul>
@@ -81,7 +81,7 @@ export default async function AdminDashboard() {
           </Link>
         </div>
         {recent.length === 0 ? (
-          <p className="p-6 text-sm text-muted-foreground">No orders yet — they will appear here.</p>
+          <p className="p-6 text-sm text-muted-foreground">No orders yet - they will appear here.</p>
         ) : (
           <ul className="divide-y">
             {recent.map((o) => (

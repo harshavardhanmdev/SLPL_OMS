@@ -52,12 +52,12 @@ docker compose logs -f oms-web                 # watch logs
 
 ## Environment (`deploy/.env` on the server)
 
-See `.env.example` — every key documented. Highlights:
-- `DATABASE_URL`, `POSTGRES_*` — internal DB.
-- `SESSION_SECRET` — 64 hex chars; rotating it logs everyone out.
-- `ADMIN_PASSWORD_HASH` — bcrypt hash of the admin password.
-- `RAZORPAY_*`, `SHIPROCKET_*`, `SMTP_*` — filled as you finish INTEGRATIONS.md.
-- `ALLOW_MOCK_PAYMENTS=1` — demo-mode payments; **delete when Razorpay keys go in**.
+See `.env.example` - every key documented. Highlights:
+- `DATABASE_URL`, `POSTGRES_*` - internal DB.
+- `SESSION_SECRET` - 64 hex chars; rotating it logs everyone out.
+- `ADMIN_PASSWORD_HASH` - bcrypt hash of the admin password.
+- `RAZORPAY_*`, `SHIPROCKET_*`, `SMTP_*` - filled as you finish INTEGRATIONS.md.
+- `ALLOW_MOCK_PAYMENTS=1` - demo-mode payments; **delete when Razorpay keys go in**.
 
 ## Local development (this machine)
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 
-// GET handlers without dynamic APIs get executed at build time — this one
+// GET handlers without dynamic APIs get executed at build time - this one
 // needs the runtime database.
 export const dynamic = "force-dynamic";
 

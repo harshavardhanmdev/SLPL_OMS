@@ -3,7 +3,7 @@ export const site = {
   company: "Saaradaa Learknowations Pvt Ltd",
   tagline: "Many publish books. We build futures.",
   description:
-    "Official store of Saaradaa Learknowations — school textbooks from Pre-Primary to Grade 12, novels, poem books and class bundles, delivered across India.",
+    "Official store of Saaradaa Learknowations - school textbooks from Pre-Primary to Grade 12, novels, poem books and class bundles, delivered across India.",
   contact: {
     person: "Mohammad Ismail",
     phone: "+91 79891 91962",
@@ -20,9 +20,9 @@ export const site = {
 
 export const bookCategories = [
   { slug: "pre-primary", name: "Pre-Primary", series: "Baby Steps", grades: "Nursery · LKG · UKG" },
-  { slug: "primary", name: "Primary", series: "Little Leaps", grades: "Grade 1 – 5" },
-  { slug: "high-school", name: "High School", series: "Skill Builders", grades: "Grade 6 – 10" },
-  { slug: "senior-secondary", name: "Senior Secondary", series: "Ascent", grades: "Grade 11 – 12" },
+  { slug: "primary", name: "Primary", series: "Little Leaps", grades: "Grade 1 - 5" },
+  { slug: "high-school", name: "High School", series: "Skill Builders", grades: "Grade 6 - 10" },
+  { slug: "senior-secondary", name: "Senior Secondary", series: "Ascent", grades: "Grade 11 - 12" },
   { slug: "novels-poems", name: "Novels & Poems", series: "", grades: "" },
 ] as const;
 

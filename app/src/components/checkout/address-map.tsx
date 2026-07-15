@@ -7,7 +7,7 @@ import "leaflet/dist/leaflet.css";
 
 import { Button } from "@/components/ui/button";
 
-/** Inline SVG pin — avoids leaflet's broken default marker asset paths under bundlers. */
+/** Inline SVG pin - avoids leaflet's broken default marker asset paths under bundlers. */
 const pinIcon = L.divIcon({
   className: "",
   html: `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="#1e2a5a" stroke="#f5a623" stroke-width="1.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3" fill="#f5a623" stroke="none"/></svg>`,

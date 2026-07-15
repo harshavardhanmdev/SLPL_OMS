@@ -1,7 +1,7 @@
 /**
  * Seed the SLPL Store catalog.
  *
- * Idempotent (upserts by slug/key) — safe to re-run.
+ * Idempotent (upserts by slug/key) - safe to re-run.
  * Every product starts isVisible=false: the owner sets real prices in the
  * admin panel and flips visibility when ready. Prices below are placeholders
  * in paise (₹349 = 34900).
@@ -84,37 +84,37 @@ async function main() {
   const prePrimary = await upsertCategory(
     "pre-primary",
     "Pre-Primary",
-    "Baby Steps series for Nursery, LKG and UKG — a joyful first step into letters, numbers and the world around.",
+    "Baby Steps series for Nursery, LKG and UKG - a joyful first step into letters, numbers and the world around.",
     1,
   );
   const primary = await upsertCategory(
     "primary",
     "Primary",
-    "Little Leaps series for Grades 1–5 — concept-first learning aligned with state and national curricula.",
+    "Little Leaps series for Grades 1-5 - concept-first learning aligned with state and national curricula.",
     2,
   );
   const highSchool = await upsertCategory(
     "high-school",
     "High School",
-    "Skill Builders series for Grades 6–10 — rigorous practice modules that bridge school syllabus and competitive readiness.",
+    "Skill Builders series for Grades 6-10 - rigorous practice modules that bridge school syllabus and competitive readiness.",
     3,
   );
   const seniorSec = await upsertCategory(
     "senior-secondary",
     "Senior Secondary",
-    "Focused material for Grades 11–12 — clarity, depth and exam-ready practice.",
+    "Focused material for Grades 11-12 - clarity, depth and exam-ready practice.",
     4,
   );
   const novelsPoems = await upsertCategory(
     "novels-poems",
     "Novels & Poems",
-    "Stories and verse from SLPL — reading that builds language and character.",
+    "Stories and verse from SLPL - reading that builds language and character.",
     5,
   );
   const bundles = await upsertCategory(
     "bundles",
     "Class Bundles",
-    "Everything a class needs in one box — complete book sets at a bundled price.",
+    "Everything a class needs in one box - complete book sets at a bundled price.",
     6,
   );
 
@@ -127,7 +127,7 @@ async function main() {
     ] as const
   ).map(([slug, grade, focus], i) => ({
     slug: `baby-steps-${slug}`,
-    title: `Baby Steps — ${grade}`,
+    title: `Baby Steps - ${grade}`,
     categoryId: prePrimary.id,
     series: "Baby Steps",
     gradeLabel: grade,
@@ -142,15 +142,15 @@ async function main() {
     coverImage: cover(i),
   }));
 
-  // ── Little Leaps (Grades 1–5 ×5) ────────────────────────────────────────
+  // ── Little Leaps (Grades 1-5 ×5) ────────────────────────────────────────
   const littleLeaps: ProductSeed[] = [1, 2, 3, 4, 5].map((g, i) => ({
     slug: `little-leaps-grade-${g}`,
-    title: `Little Leaps — Grade ${g}`,
+    title: `Little Leaps - Grade ${g}`,
     categoryId: primary.id,
     series: "Little Leaps",
     gradeLabel: `Grade ${g}`,
     description:
-      `The complete Little Leaps companion for Grade ${g} — concepts explained the way children actually think. ` +
+      `The complete Little Leaps companion for Grade ${g} - concepts explained the way children actually think. ` +
       `Every chapter moves from a real-life hook to guided examples to independent practice, with skill-check boxes throughout. ` +
       `Includes term-wise revision maps and QR-linked concept videos on the SLPL LMS. ` +
       `Progressively revised to suit heterogeneous learners at state and national levels.`,
@@ -161,15 +161,15 @@ async function main() {
     isNewRelease: g === 5,
   }));
 
-  // ── Skill Builders (Grades 6–10 ×5) ─────────────────────────────────────
+  // ── Skill Builders (Grades 6-10 ×5) ─────────────────────────────────────
   const skillBuilders: ProductSeed[] = [6, 7, 8, 9, 10].map((g, i) => ({
     slug: `skill-builders-grade-${g}`,
-    title: `Skill Builders — Grade ${g}`,
+    title: `Skill Builders - Grade ${g}`,
     categoryId: highSchool.id,
     series: "Skill Builders",
     gradeLabel: `Grade ${g}`,
     description:
-      `Skill Builders for Grade ${g} turns the syllabus into mastery — module-wise practice that fills the gap between textbook and exam hall. ` +
+      `Skill Builders for Grade ${g} turns the syllabus into mastery - module-wise practice that fills the gap between textbook and exam hall. ` +
       `Graded exercise sets (basic → standard → challenge), previous-year style questions and UPSC-pattern concept probes. ` +
       `Answer keys with worked solutions help students self-correct, not just check. ` +
       `Trusted by partner schools across Telangana and Andhra Pradesh.`,
@@ -188,7 +188,7 @@ async function main() {
     kind: "NOVEL",
     categoryId: novelsPoems.id,
     description:
-      `A heartfelt novel that walks through the everyday battles of a student — friendships, failures, marks, dreams and the quiet courage it takes to keep going. ` +
+      `A heartfelt novel that walks through the everyday battles of a student - friendships, failures, marks, dreams and the quiet courage it takes to keep going. ` +
       `Written in simple, honest prose that young readers see themselves in. ` +
       `A book meant to be passed from one school bag to another. ` +
       `From the SLPL publishing house.`,
@@ -202,11 +202,11 @@ async function main() {
 
   const poems: ProductSeed = {
     slug: "poems-collection-vol-1",
-    title: "SLPL Poems Collection — Volume 1",
+    title: "SLPL Poems Collection - Volume 1",
     kind: "POEMS",
     categoryId: novelsPoems.id,
     description:
-      `A curated collection of poems for young readers — rhythm, wonder and values in verses short enough to memorise and deep enough to discuss. ` +
+      `A curated collection of poems for young readers - rhythm, wonder and values in verses short enough to memorise and deep enough to discuss. ` +
       `Ideal for recitation practice, morning assemblies and quiet reading alike. ` +
       `Includes a reading guide for teachers and parents.`,
     mrp: 19900,
@@ -223,7 +223,7 @@ async function main() {
     created[p.slug] = { id: row.id, price: row.price };
   }
 
-  // ── Bundles (placeholder members — owner attaches the real set in admin) ─
+  // ── Bundles (placeholder members - owner attaches the real set in admin) ─
   const bundleDefs = [
     { slug: "nursery-kit", grade: "Nursery", member: "baby-steps-nursery" },
     { slug: "lkg-kit", grade: "LKG", member: "baby-steps-lkg" },
@@ -243,7 +243,7 @@ async function main() {
         `Every SLPL book your child needs for ${b.grade}, packed as one kit at a bundled price. ` +
         `Covers language, numbers and activity work for the full academic year. ` +
         `One order, one delivery, school-ready. ` +
-        `(Kit contents are being finalised — the list below will grow.)`,
+        `(Kit contents are being finalised - the list below will grow.)`,
       mrp: 34900,
       price: Math.round((member.price * 0.9) / 100) * 100, // 10% under member total, rounded to a rupee
       weightGrams: 900,
@@ -261,9 +261,9 @@ async function main() {
     {
       slug: "sl-radio",
       title: "SL Radio",
-      tagline: "Your school's voice — live and on-demand",
+      tagline: "Your school's voice - live and on-demand",
       description:
-        "A private internet radio station your school owns. Students and teachers go live to the whole school — announcements, news, talk shows, music — heard on any phone, computer or browser, and recorded automatically. No licence, no transmitter, no wiring.",
+        "A private internet radio station your school owns. Students and teachers go live to the whole school - announcements, news, talk shows, music - heard on any phone, computer or browser, and recorded automatically. No licence, no transmitter, no wiring.",
       bannerImage: "/banners/sl-radio.png",
       externalUrl: "https://theslpl.in",
       sortOrder: 1,
@@ -273,14 +273,14 @@ async function main() {
       title: "English Communication Workshops",
       tagline: "Every child has a voice. We help them find it.",
       description:
-        "Immersive, activity-based workshops that transform hesitant learners into confident speakers — listening, speaking, reading and writing with clarity and courage. Programs for students, teacher capacity building, and school-wide communication initiatives.",
+        "Immersive, activity-based workshops that transform hesitant learners into confident speakers - listening, speaking, reading and writing with clarity and courage. Programs for students, teacher capacity building, and school-wide communication initiatives.",
       bannerImage: "/banners/english-workshop.png",
       externalUrl: "https://theslpl.in",
       sortOrder: 2,
     },
     {
       slug: "sjis-journal",
-      title: "SJIS — Saaradaa Journal of Interdisciplinary Studies",
+      title: "SJIS - Saaradaa Journal of Interdisciplinary Studies",
       tagline: "Peer-reviewed, open-access, biannual (ISSN 3139-4019)",
       description:
         "A peer-reviewed multidisciplinary open-access journal publishing high-quality research across science, technology, humanities, education and more. Students and teachers can publish their work through a double-blind review process.",
@@ -293,7 +293,7 @@ async function main() {
       title: "SL Learning Management System",
       tagline: "Learn smarter, not harder",
       description:
-        "A complete LMS for schools — video classes, shorts, quizzes, assignments and student progress in one dashboard, linked to every SLPL textbook through QR codes.",
+        "A complete LMS for schools - video classes, shorts, quizzes, assignments and student progress in one dashboard, linked to every SLPL textbook through QR codes.",
       bannerImage: null,
       externalUrl: "https://study.theslpl.in",
       sortOrder: 4,
@@ -314,7 +314,7 @@ async function main() {
     contact_us_threshold: 2000000, // above ₹20,000 → institutional contact flow
     free_shipping_threshold: 0, // 0 = disabled
     shipping_flat_fee: 6000, // ₹60 fallback when courier API is unavailable
-    origin_pincode: "500068", // Nagole, Hyderabad — confirm in admin settings
+    origin_pincode: "500068", // Nagole, Hyderabad - confirm in admin settings
     store_notice: "",
     contact_phone: "+91 79891 91962",
     contact_email: "saradapublications18@gmail.com",

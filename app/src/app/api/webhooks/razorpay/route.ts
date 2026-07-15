@@ -5,7 +5,7 @@ import { markOrderPaid, markPaymentFailed } from "@/lib/orders";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 
 /**
- * Razorpay webhook receiver — the authoritative confirmation channel.
+ * Razorpay webhook receiver - the authoritative confirmation channel.
  * Idempotent via the x-razorpay-event-id header stored on PaymentEvent.
  * Enable events in the Razorpay dashboard: payment.captured, payment.failed, order.paid.
  */

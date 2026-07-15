@@ -90,7 +90,7 @@ export async function getQuote(
   const session = await getSession();
   if (!session) return { error: "AUTH" };
   const parsed = linesSchema.safeParse(lines);
-  if (!parsed.success) return { error: "Your cart looks invalid — refresh and try again." };
+  if (!parsed.success) return { error: "Your cart looks invalid - refresh and try again." };
   try {
     // Opportunistic cleanup keeps stock honest even if the worker is down
     await releaseExpiredOrders();
@@ -113,7 +113,7 @@ export async function requestBulkOtp(): Promise<{ ok: boolean; error?: string }>
   const sent = await issueOtp(session.email, "BULK_ORDER");
   return sent
     ? { ok: true }
-    : { ok: false, error: "Too many codes requested — try again in an hour." };
+    : { ok: false, error: "Too many codes requested - try again in an hour." };
 }
 
 export async function verifyBulkOtp(code: string): Promise<{ token?: string; error?: string }> {
@@ -167,7 +167,7 @@ export async function placeOrder(input: {
   if (!session) return { error: "AUTH" };
 
   const parsedLines = linesSchema.safeParse(input.lines);
-  if (!parsedLines.success) return { error: "Your cart looks invalid — refresh and try again." };
+  if (!parsedLines.success) return { error: "Your cart looks invalid - refresh and try again." };
 
   const address = await db.address.findFirst({
     where: { id: input.addressId, userId: session.uid },
@@ -185,11 +185,11 @@ export async function placeOrder(input: {
   if (quote.contactRequired) {
     return {
       error:
-        "Orders of this size are handled personally — please contact us on +91 79891 91962 (call/WhatsApp) for institutional pricing and secure delivery.",
+        "Orders of this size are handled personally - please contact us on +91 79891 91962 (call/WhatsApp) for institutional pricing and secure delivery.",
     };
   }
   if (input.method === "COD" && !quote.codAllowed) {
-    return { error: "Cash on Delivery is not available for this order value — please pay online." };
+    return { error: "Cash on Delivery is not available for this order value - please pay online." };
   }
   if (quote.otpRequired && !(await bulkTokenValid(input.bulkToken, session.email))) {
     return { error: "BULK_OTP_REQUIRED" };
@@ -247,7 +247,7 @@ export async function placeOrder(input: {
       return {
         orderNumber,
         error:
-          "We could not start the payment — your order is saved. Open it from My Orders to retry.",
+          "We could not start the payment - your order is saved. Open it from My Orders to retry.",
       };
     }
   }
@@ -259,7 +259,7 @@ export async function placeOrder(input: {
   return {
     orderNumber,
     error:
-      "Online payment is not configured yet — your order is saved as pending. Please contact us to complete it.",
+      "Online payment is not configured yet - your order is saved as pending. Please contact us to complete it.",
   };
 }
 
@@ -289,5 +289,5 @@ export async function resendCodOtp(orderNumber: string): Promise<{ ok: boolean; 
   });
   if (!order) return { ok: false, error: "This order is not awaiting confirmation." };
   const sent = await issueOtp(order.customerEmail, "COD_CONFIRM");
-  return sent ? { ok: true } : { ok: false, error: "Too many codes requested — try later." };
+  return sent ? { ok: true } : { ok: false, error: "Too many codes requested - try later." };
 }

@@ -89,7 +89,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
             {addr.line2 ? `, ${addr.line2}` : ""}
             {addr.landmark ? `, near ${addr.landmark}` : ""}
             <br />
-            {addr.city}, {addr.state} — <b className="text-foreground">{addr.pincode}</b>
+            {addr.city}, {addr.state} - <b className="text-foreground">{addr.pincode}</b>
           </p>
           {addr.lat != null && addr.lng != null && (
             <a
@@ -178,7 +178,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
               <span className="mt-1.5 size-2 shrink-0 rounded-full bg-saffron" />
               <span>
                 <b>{ev.status.replaceAll("_", " ")}</b>
-                {ev.note && <span className="text-muted-foreground"> — {ev.note}</span>}
+                {ev.note && <span className="text-muted-foreground"> - {ev.note}</span>}
                 <span className="block text-xs text-muted-foreground">
                   {ev.createdAt.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                 </span>

@@ -6,7 +6,7 @@ import Razorpay from "razorpay";
  * Razorpay wrapper.
  *
  * - Configured mode: RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET set (test or live).
- * - Mock mode: keys absent AND ALLOW_MOCK_PAYMENTS=1 — checkout shows a
+ * - Mock mode: keys absent AND ALLOW_MOCK_PAYMENTS=1 - checkout shows a
  *   simulate button so the full order flow works before the owner finishes
  *   Razorpay KYC. Never enable ALLOW_MOCK_PAYMENTS once real keys exist.
  */
@@ -43,7 +43,7 @@ export async function createRazorpayOrder(params: {
   return { id: order.id, keyId: process.env.RAZORPAY_KEY_ID! };
 }
 
-/** Checkout handler returns (order_id, payment_id, signature) — verify HMAC. */
+/** Checkout handler returns (order_id, payment_id, signature) - verify HMAC. */
 export function verifyCheckoutSignature(params: {
   razorpayOrderId: string;
   razorpayPaymentId: string;

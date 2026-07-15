@@ -60,10 +60,10 @@ Inner+outer shadows (subtle, no hard lines), soft press (200ms ease-out), fluffy
 
 ---
 
-## SLPL Brand Overrides (authoritative — supersedes generated palette above)
+## SLPL Brand Overrides (authoritative - supersedes generated palette above)
 
 The generated Claymorphism/indigo direction is kept only for *shape language*
-(rounded 12–16px, soft shadows, playful cards). Colors and type follow the
+(rounded 12-16px, soft shadows, playful cards). Colors and type follow the
 actual company brochures:
 
 | Role | Light | Dark |
@@ -73,7 +73,7 @@ actual company brochures:
 | Background | `#FFFFFF` | `#0B1222` |
 | Foreground | `#16213E` | `#E8ECF7` |
 
-- Headings: **Bricolage Grotesque** (`--font-heading`) — confident, warm grotesque matching brochure headline weight. Body: **Inter** (`--font-sans`).
+- Headings: **Bricolage Grotesque** (`--font-heading`) - confident, warm grotesque matching brochure headline weight. Body: **Inter** (`--font-sans`).
 - Light theme is default (shopping trust); dark available via header toggle.
 - Saffron is exposed as Tailwind `saffron` / `saffron-deep` / `navy` color tokens.
 - CTA buttons: saffron bg + navy text (contrast-safe), or primary navy + white.

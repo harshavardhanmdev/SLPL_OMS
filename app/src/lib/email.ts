@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 /**
  * SMTP from env. Dev: Mailpit (tunnel localhost:11025 → server). Prod: Brevo /
- * Hostinger mailbox — see docs/INTEGRATIONS.md.
+ * Hostinger mailbox - see docs/INTEGRATIONS.md.
  */
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST ?? "127.0.0.1",

@@ -1,5 +1,5 @@
 # ==========================================================
-#  SLPL STORE (OMS) — production stack
+#  SLPL STORE (OMS) - production stack
 #  Web on host port 4300 → point a Cloudflare tunnel route at
 #  http://localhost:4300 when ready to go public.
 #  Usage (on the server, from ~/oms/deploy):

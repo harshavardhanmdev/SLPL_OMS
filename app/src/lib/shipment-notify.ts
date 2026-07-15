@@ -38,7 +38,7 @@ export async function emailShipped(order: OrderLite, shipment: ShipmentLite): Pr
 export async function emailOutForDelivery(order: OrderLite, shipment: ShipmentLite): Promise<void> {
   await sendEmail({
     to: order.customerEmail,
-    subject: `Out for delivery — order ${order.orderNumber} 🚚`,
+    subject: `Out for delivery - order ${order.orderNumber} 🚚`,
     template: "order-out-for-delivery",
     html: renderEmail(
       "Arriving today!",
@@ -52,7 +52,7 @@ export async function emailOutForDelivery(order: OrderLite, shipment: ShipmentLi
 export async function emailDelivered(order: OrderLite): Promise<void> {
   await sendEmail({
     to: order.customerEmail,
-    subject: `Delivered — order ${order.orderNumber} ✅`,
+    subject: `Delivered - order ${order.orderNumber} ✅`,
     template: "order-delivered",
     html: renderEmail(
       "Your order has been delivered",

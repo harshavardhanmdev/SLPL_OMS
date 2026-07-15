@@ -1,4 +1,4 @@
-# Integrations — accounts only you can create
+# Integrations - accounts only you can create
 
 Each section ends with the exact lines to put in `deploy/.env` on the server,
 followed by: `cd ~/oms/deploy && docker compose --env-file .env up -d` to apply.
@@ -12,7 +12,7 @@ your bank in T+2 days. No setup fee.
 
 ### Steps
 1. Go to https://razorpay.com → **Sign Up**. Use the company email.
-2. Verify email/phone. You land in **Test Mode** — this already works with the
+2. Verify email/phone. You land in **Test Mode** - this already works with the
    store for testing (test keys, no KYC needed).
 3. **Test keys first:** Dashboard → Settings → API Keys → *Generate Test Keys*.
    Put them in `.env` (below), remove `ALLOW_MOCK_PAYMENTS`, restart, and place
@@ -22,7 +22,7 @@ your bank in T+2 days. No setup fee.
      registered address proof, director KYC.
    - Business category: *Education* → *Books & publications*.
    - Website: your store URL (point the subdomain first, §4).
-   - Approval typically takes 2–4 working days.
+   - Approval typically takes 2-4 working days.
 5. Once approved: Settings → API Keys → **Generate Live Keys** → replace in `.env`.
 6. **Webhook (required):** Settings → Webhooks → *Add New Webhook*:
    - URL: `https://<your-subdomain>/api/webhooks/razorpay`
@@ -42,7 +42,7 @@ RAZORPAY_WEBHOOK_SECRET=the-secret-you-typed-in-step-6
 ## 2. Shiprocket (courier)
 
 **What it gives you:** one account → BlueDart, Delhivery, DTDC, Xpressbees,
-India Post + more. Pay-per-shipment from a wallet (~₹32–45 per 500 g), no
+India Post + more. Pay-per-shipment from a wallet (~₹32-45 per 500 g), no
 monthly commitment on the free plan. Automatic buyer SMS/WhatsApp tracking,
 COD collection (remitted to your bank), pickup from your address.
 
@@ -55,7 +55,7 @@ COD collection (remitted to your bank), pickup from your address.
 4. Recharge the wallet (₹500 is enough to start).
 5. **API user:** Settings → API → *Create API User* → any email that is NOT
    your login email (e.g. `api@theslpl.in`) + a password. These are the two
-   values below — not your normal login!
+   values below - not your normal login!
 6. After this, the admin panel's **"Ship via Shiprocket (auto AWB)"** button
    goes live, and pincode delivery estimates switch from the built-in zone
    table to live courier quotes automatically.
@@ -71,12 +71,12 @@ your bank on a D+7ish cycle. Enable *Early COD* later if cash flow needs it.
 
 ---
 
-## 3. Real email (Brevo — free 300 emails/day)
+## 3. Real email (Brevo - free 300 emails/day)
 
 Until this is done, emails only land in the private Mailpit viewer.
 
 1. https://www.brevo.com → sign up free.
-2. **Senders & Domains** → add domain `theslpl.in` → it shows 2–3 DNS records
+2. **Senders & Domains** → add domain `theslpl.in` → it shows 2-3 DNS records
    (DKIM/DMARC) → add them in **Cloudflare → theslpl.in → DNS** → verify.
 3. **SMTP & API** → SMTP tab → note server/port/login → *Generate SMTP key*.
 
@@ -89,7 +89,7 @@ SMTP_PASS=<the SMTP key>
 SMTP_FROM="SLPL Store <store@theslpl.in>"
 ```
 
-(Alternative: a Hostinger mailbox works too — host `smtp.hostinger.com`,
+(Alternative: a Hostinger mailbox works too - host `smtp.hostinger.com`,
 port 465, `SMTP_SECURE=1`, the mailbox address + password.)
 
 ---
@@ -115,9 +115,9 @@ Razorpay/Shiprocket profiles.
   Requires DLT registration (TRAI): register the Pvt Ltd on a DLT portal
   (e.g. Jio/Airtel DLT), get Entity ID, register sender ID (e.g. `SLPLST`)
   and message templates, then plug MSG91 keys in. Budget ~₹0.20/SMS.
-  The OTP plumbing already exists — only the "send" transport changes.
+  The OTP plumbing already exists - only the "send" transport changes.
 - **GST invoices:** printed books are generally GST-exempt (nil rate); the
   order emails serve as receipts today. Confirm with your CA whether you
   need formal invoice PDFs; the data model already stores everything needed.
 - **Google login**, **direct BlueDart contract** (once volumes justify a
-  rate negotiation — the adapter seam is `src/lib/shipping/estimate-source.ts`).
+  rate negotiation - the adapter seam is `src/lib/shipping/estimate-source.ts`).

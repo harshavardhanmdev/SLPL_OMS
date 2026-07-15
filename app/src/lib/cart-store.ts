@@ -2,7 +2,7 @@
 
 /**
  * Guest cart, persisted in localStorage. Prices stored here are display
- * snapshots — the server recomputes everything at checkout. After login the
+ * snapshots - the server recomputes everything at checkout. After login the
  * cart is merged into the DB cart (M4) and this store mirrors the server.
  */
 import { useSyncExternalStore } from "react";

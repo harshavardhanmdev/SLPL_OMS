@@ -48,7 +48,7 @@ export function DeliveryEstimate({ weightGrams = 350 }: { weightGrams?: number }
       setEstimate(data);
       if (data.ok) window.localStorage.setItem(PIN_KEY, pin);
     } catch {
-      setEstimate({ ok: false, error: "Could not check right now — please try again" });
+      setEstimate({ ok: false, error: "Could not check right now - please try again" });
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ export function DeliveryEstimate({ weightGrams = 350 }: { weightGrams?: number }
           <p className="mt-2.5 flex items-center gap-2 text-sm">
             <Truck className="size-4 shrink-0 text-green-700 dark:text-green-400" />
             <span>
-              Delivery in <b>{estimate.etaDaysMin}–{estimate.etaDaysMax} days</b>
+              Delivery in <b>{estimate.etaDaysMin}-{estimate.etaDaysMax} days</b>
               {" · "}
               {estimate.charge === 0 ? (
                 <b className="text-green-700 dark:text-green-400">Free shipping</b>

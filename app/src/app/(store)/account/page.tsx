@@ -110,7 +110,7 @@ export default async function AccountPage() {
           <MapPin className="size-5 text-saffron-deep" /> Addresses
         </h2>
         <p className="text-sm text-muted-foreground">
-          Delivery addresses are managed during checkout — your saved addresses will be offered there.
+          Delivery addresses are managed during checkout - your saved addresses will be offered there.
         </p>
       </section>
     </div>

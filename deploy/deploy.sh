@@ -8,7 +8,7 @@ SERVER="${OMS_SERVER:-slplserver@100.109.145.97}"
 REMOTE_DIR="~/oms"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "── Syncing code to $SERVER:$REMOTE_DIR (tar over ssh — server has no rsync)"
+echo "── Syncing code to $SERVER:$REMOTE_DIR (tar over ssh - server has no rsync)"
 ssh "$SERVER" "mkdir -p $REMOTE_DIR"
 tar -C "$ROOT" -czf - \
   --exclude='app/node_modules' --exclude='app/.next' --exclude='.git' \

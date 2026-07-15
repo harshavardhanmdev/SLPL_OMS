@@ -58,15 +58,15 @@ export async function verifyOtp(
     where: { identifier: email, purpose, consumedAt: null },
     orderBy: { createdAt: "desc" },
   });
-  if (!token) return { ok: false, error: "No active code — request a new one." };
-  if (token.expiresAt < new Date()) return { ok: false, error: "Code expired — request a new one." };
+  if (!token) return { ok: false, error: "No active code - request a new one." };
+  if (token.expiresAt < new Date()) return { ok: false, error: "Code expired - request a new one." };
   if (token.attempts >= MAX_ATTEMPTS) {
-    return { ok: false, error: "Too many attempts — request a new code." };
+    return { ok: false, error: "Too many attempts - request a new code." };
   }
 
   if (token.code !== code.trim()) {
     await db.otpToken.update({ where: { id: token.id }, data: { attempts: { increment: 1 } } });
-    return { ok: false, error: "Incorrect code — check and try again." };
+    return { ok: false, error: "Incorrect code - check and try again." };
   }
 
   await db.otpToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } });

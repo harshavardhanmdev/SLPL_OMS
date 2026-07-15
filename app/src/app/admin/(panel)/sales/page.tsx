@@ -35,7 +35,7 @@ export default async function AdminSalesPage() {
         <div>
           <h1 className="font-heading text-2xl font-bold">Festival sales</h1>
           <p className="text-sm text-muted-foreground">
-            Scheduled discounts with a home-page banner — they switch on and off automatically.
+            Scheduled discounts with a home-page banner - they switch on and off automatically.
           </p>
         </div>
         <SaleEditor categories={categories} />

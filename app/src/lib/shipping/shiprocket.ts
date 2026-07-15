@@ -3,7 +3,7 @@ import "server-only";
 /**
  * Shiprocket API client (https://apidocs.shiprocket.in).
  * Configured via SHIPROCKET_EMAIL / SHIPROCKET_PASSWORD (an "API user" created
- * in the Shiprocket dashboard — see docs/INTEGRATIONS.md). Every function
+ * in the Shiprocket dashboard - see docs/INTEGRATIONS.md). Every function
  * no-ops gracefully while unconfigured so the store works pre-signup.
  */
 
@@ -166,13 +166,13 @@ export async function createShipmentForOrder(order: {
   });
   const awb = assigned.response?.data?.awb_code ?? assigned.awb_code;
   const courierName = assigned.response?.data?.courier_name ?? assigned.courier_name ?? "Courier";
-  if (!awb) throw new Error("Shiprocket did not return an AWB — assign one from their dashboard.");
+  if (!awb) throw new Error("Shiprocket did not return an AWB - assign one from their dashboard.");
 
   await api(`/courier/generate/pickup`, {
     method: "POST",
     body: JSON.stringify({ shipment_id: [created.shipment_id] }),
   }).catch(() => {
-    // pickup scheduling can fail outside working hours — AWB is still valid
+    // pickup scheduling can fail outside working hours - AWB is still valid
   });
 
   return {

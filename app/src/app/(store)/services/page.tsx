@@ -11,7 +11,7 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Services",
   description:
-    "The SLPL academic ecosystem — SL Radio, English communication workshops, the SJIS journal and the SL Learning Management System.",
+    "The SLPL academic ecosystem - SL Radio, English communication workshops, the SJIS journal and the SL Learning Management System.",
 };
 
 export default async function ServicesPage() {

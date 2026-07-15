@@ -36,7 +36,7 @@ export function OrderLive({
         const data = (await res.json()) as { status?: string };
         if (data.status && data.status !== status) router.refresh();
       } catch {
-        // transient network issues are fine — next tick retries
+        // transient network issues are fine - next tick retries
       }
     }, 5000);
     return () => clearInterval(timer);

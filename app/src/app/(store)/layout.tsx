@@ -10,7 +10,7 @@ export default async function StoreLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // The notice bar reads the DB — bail out of build-time prerendering first
+  // The notice bar reads the DB - bail out of build-time prerendering first
   // (the Docker build has no database).
   await connection();
   const notice = await getSetting<string>("store_notice", "");

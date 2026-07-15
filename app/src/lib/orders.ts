@@ -68,7 +68,7 @@ export async function quoteCart(
       throw new OrderError(
         p.stock === 0
           ? `“${p.title}” just went out of stock.`
-          : `Only ${p.stock} left of “${p.title}” — reduce the quantity.`,
+          : `Only ${p.stock} left of “${p.title}” - reduce the quantity.`,
       );
     }
     items.push({
@@ -167,7 +167,7 @@ export async function generateOrderNumber(): Promise<string> {
     const clash = await db.order.findUnique({ where: { orderNumber: candidate } });
     if (!clash) return candidate;
   }
-  throw new OrderError("Could not allocate an order number — please retry.");
+  throw new OrderError("Could not allocate an order number - please retry.");
 }
 
 type AddressSnapshot = {
@@ -297,7 +297,7 @@ function orderEmailBody(order: {
       <tr><td style="padding:2px 0">Shipping</td><td align="right" style="padding:2px 0">${order.shippingFee === 0 ? "Free" : formatINR(order.shippingFee)}</td></tr>
       <tr><td style="padding:8px 0;font-weight:bold;font-size:16px">Total</td><td align="right" style="padding:8px 0;font-weight:bold;font-size:16px">${formatINR(order.total)}</td></tr>
     </table>
-    <p style="margin:14px 0 0;font-size:13px;color:#5a6478">Delivering to: ${addr.fullName}, ${addr.line1}${addr.line2 ? ", " + addr.line2 : ""}, ${addr.city}, ${addr.state} — ${addr.pincode}</p>`;
+    <p style="margin:14px 0 0;font-size:13px;color:#5a6478">Delivering to: ${addr.fullName}, ${addr.line1}${addr.line2 ? ", " + addr.line2 : ""}, ${addr.city}, ${addr.state} - ${addr.pincode}</p>`;
 }
 
 /** Idempotent: flips an order to PAID once, restores nothing, emails both sides. */
@@ -312,7 +312,7 @@ export async function markOrderPaid(
   if (!order || order.status === "PAID") return;
   if (!["AWAITING_PAYMENT", "PAYMENT_FAILED", "EXPIRED"].includes(order.status)) return;
 
-  // EXPIRED and PAYMENT_FAILED already restocked the items — re-reserve before paying
+  // EXPIRED and PAYMENT_FAILED already restocked the items - re-reserve before paying
   if (order.status === "EXPIRED" || order.status === "PAYMENT_FAILED") {
     await db.$transaction(async (tx) => {
       for (const item of order.items) {
@@ -351,12 +351,12 @@ export async function markOrderPaid(
 
   await sendEmail({
     to: order.customerEmail,
-    subject: `Order ${order.orderNumber} confirmed — SLPL Store`,
+    subject: `Order ${order.orderNumber} confirmed - SLPL Store`,
     template: "order-paid",
     html: renderEmail("Your order is confirmed 🎉", orderEmailBody(order)),
   });
   await notifyOwner(
-    `New paid order ${order.orderNumber} — ${formatINR(order.total)}`,
+    `New paid order ${order.orderNumber} - ${formatINR(order.total)}`,
     renderEmail(
       "New order received",
       orderEmailBody(order) +
@@ -386,7 +386,7 @@ export async function confirmCodOrder(orderId: string): Promise<void> {
 
   await sendEmail({
     to: order.customerEmail,
-    subject: `Order ${order.orderNumber} confirmed (Cash on Delivery) — SLPL Store`,
+    subject: `Order ${order.orderNumber} confirmed (Cash on Delivery) - SLPL Store`,
     template: "order-cod-confirmed",
     html: renderEmail(
       "Your COD order is confirmed",
@@ -395,7 +395,7 @@ export async function confirmCodOrder(orderId: string): Promise<void> {
     ),
   });
   await notifyOwner(
-    `New COD order ${order.orderNumber} — ${formatINR(order.total)}`,
+    `New COD order ${order.orderNumber} - ${formatINR(order.total)}`,
     renderEmail("New COD order", orderEmailBody(order)),
     "owner-new-order",
   );
@@ -422,7 +422,7 @@ export async function releaseExpiredOrders(): Promise<number> {
     await db.$transaction([
       db.order.update({ where: { id }, data: { status: "EXPIRED" } }),
       db.orderEvent.create({
-        data: { orderId: id, status: "EXPIRED", note: "Payment window elapsed — stock released" },
+        data: { orderId: id, status: "EXPIRED", note: "Payment window elapsed - stock released" },
       }),
     ]);
     await restockOrder(id);
@@ -468,11 +468,11 @@ export async function reconcilePendingPayments(): Promise<void> {
           await db.order.update({ where: { id: order.id }, data: { status: "REFUNDED" } });
           await sendEmail({
             to: order.customerEmail,
-            subject: `Order ${order.orderNumber} — payment refunded`,
+            subject: `Order ${order.orderNumber} - payment refunded`,
             template: "late-payment-refund",
             html: renderEmail(
               "Your payment was refunded",
-              `<p>Your payment for order ${order.orderNumber} arrived after the reservation window closed, so it has been auto-refunded in full. The amount returns to your account within 5–7 working days. Please place the order again.</p>`,
+              `<p>Your payment for order ${order.orderNumber} arrived after the reservation window closed, so it has been auto-refunded in full. The amount returns to your account within 5-7 working days. Please place the order again.</p>`,
             ),
           });
         } else {

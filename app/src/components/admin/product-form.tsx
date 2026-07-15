@@ -100,7 +100,7 @@ export function ProductForm({
         isVisible: v.isVisible,
       });
       if (res.error) {
-        toast.error(res.error === "UNAUTHORIZED" ? "Session expired — log in again." : res.error);
+        toast.error(res.error === "UNAUTHORIZED" ? "Session expired - log in again." : res.error);
         return;
       }
       if (v.kind === "BUNDLE" && res.id) {
@@ -189,7 +189,7 @@ export function ProductForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label>Description (3–5 lines shown on the product page)</Label>
+          <Label>Description (3-5 lines shown on the product page)</Label>
           <Textarea
             required
             rows={5}
@@ -211,7 +211,7 @@ export function ProductForm({
             <Label>
               Sale price (₹) <span className="text-muted-foreground">(optional)</span>
             </Label>
-            <Input inputMode="decimal" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} placeholder="—" />
+            <Input inputMode="decimal" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} placeholder="-" />
           </div>
         </div>
 
@@ -251,7 +251,7 @@ export function ProductForm({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Weight (grams — used for shipping)</Label>
+            <Label>Weight (grams - used for shipping)</Label>
             <Input
               required
               type="number"

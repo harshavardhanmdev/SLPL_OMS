@@ -36,7 +36,7 @@ export default async function AdminCouponsPage() {
 
       {coupons.length === 0 ? (
         <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No coupons yet — create one for your next festival sale.
+          No coupons yet - create one for your next festival sale.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-2xl border bg-card">
@@ -62,15 +62,15 @@ export default async function AdminCouponsPage() {
                       <span className="block text-xs text-muted-foreground">cap {formatINR(c.maxDiscount)}</span>
                     )}
                   </td>
-                  <td className="p-3">{c.minOrder > 0 ? formatINR(c.minOrder) : "—"}</td>
+                  <td className="p-3">{c.minOrder > 0 ? formatINR(c.minOrder) : "-"}</td>
                   <td className="p-3">
                     {c.usedCount}
                     {c.usageLimit != null ? ` / ${c.usageLimit}` : ""}
                   </td>
                   <td className="p-3 text-xs text-muted-foreground">
-                    {c.startsAt ? c.startsAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
+                    {c.startsAt ? c.startsAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "-"}
                     {" → "}
-                    {c.endsAt ? c.endsAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
+                    {c.endsAt ? c.endsAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "-"}
                   </td>
                   <td className="p-3">
                     <Badge variant={c.isActive ? "default" : "secondary"}>{c.isActive ? "active" : "off"}</Badge>

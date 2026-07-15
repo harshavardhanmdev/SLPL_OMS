@@ -5,7 +5,7 @@ volumes = the entire store. Two routes; both keep the same Cloudflare tunnel
 pattern (install `cloudflared` on the R640 and move the tunnel, or run both
 machines during cutover).
 
-## Route A — Docker Compose on the R640 (recommended first step)
+## Route A - Docker Compose on the R640 (recommended first step)
 
 Downtime: ~5 minutes, done at night.
 
@@ -14,7 +14,7 @@ Downtime: ~5 minutes, done at night.
 curl -fsSL https://get.docker.com | sh
 
 # 2. Copy code + env from the laptop
-rsync -az ~/oms/ r640:~/oms/            # includes deploy/.env — keep it 0600
+rsync -az ~/oms/ r640:~/oms/            # includes deploy/.env - keep it 0600
 
 # 3. On the laptop: stop writes, take a final backup, export volumes
 cd ~/oms/deploy && docker compose stop oms-web oms-worker
@@ -39,7 +39,7 @@ docker compose --env-file .env up -d --build
 
 Verify: `curl localhost:4300/api/health`, log into `/admin`, check an order page.
 
-## Route B — k3s (Kubernetes) on the R640
+## Route B - k3s (Kubernetes) on the R640
 
 Once Route A runs happily, or directly if you prefer:
 
@@ -51,7 +51,7 @@ Once Route A runs happily, or directly if you prefer:
    postgres → web → worker).
 4. Restore the DB dump into the postgres pod the same way as Route A step 5.
 5. Traffic: run cloudflared as a Deployment in-cluster pointing at
-   `http://oms-web.oms.svc` — or keep it simple with a hostPort.
+   `http://oms-web.oms.svc` - or keep it simple with a hostPort.
 
 Why k3s only on the R640: the laptop already runs ~16 compose containers and
 swap is full; k8s adds overhead with zero benefit at this scale. On the R640

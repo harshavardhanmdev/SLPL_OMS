@@ -18,12 +18,26 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProductCard } from "@/components/store/product-card";
 import { ProductRail } from "@/components/store/product-rail";
+import DomeGallery from "@/components/store/dome-gallery";
+import { db } from "@/lib/db";
 import { getHomeData } from "@/lib/catalog";
 import { site } from "@/lib/site";
 
 export default async function HomePage() {
   const { newReleases, categories, bundleProducts, services, sale } = await getHomeData();
-  const heroCovers = newReleases.filter((p) => p.coverImage).slice(0, 3);
+  // Every visible product with a cover feeds the dome, so books added in the
+  // admin panel show up here automatically.
+  const domeProducts = await db.product.findMany({
+    where: { isVisible: true, coverImage: { not: null } },
+    select: { slug: true, title: true, coverImage: true },
+    orderBy: { updatedAt: "desc" },
+    take: 48,
+  });
+  const domeImages = domeProducts.map((p) => ({
+    src: p.coverImage!,
+    alt: p.title,
+    href: `/product/${p.slug}`,
+  }));
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -35,11 +49,10 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* Hero */}
-      <section className="relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-secondary via-background to-accent/50 ring-1 ring-border dark:from-card dark:via-background dark:to-card">
-        <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-saffron/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-20 size-80 rounded-full bg-primary/10 blur-3xl dark:bg-saffron/5" />
-        <div className="relative grid items-center gap-10 p-8 sm:p-12 lg:grid-cols-[1.1fr_0.9fr] lg:p-16">
+      {/* Hero. The panel is the solid --dome-overlay color so the dome's
+          radial fade blends into it seamlessly. */}
+      <section className="relative mt-4 overflow-hidden rounded-3xl bg-[color:var(--dome-overlay)] ring-1 ring-border">
+        <div className="relative grid items-center gap-6 p-8 sm:p-12 lg:grid-cols-[1fr_1fr] lg:py-10 lg:pl-16 lg:pr-6">
           <div className="space-y-6">
             <span className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-4 py-1.5 text-xs font-medium backdrop-blur">
               <Sparkles className="size-3.5 text-saffron-deep" />
@@ -52,7 +65,7 @@ export default async function HomePage() {
             </h1>
             <p className="max-w-lg text-pretty text-muted-foreground sm:text-lg">
               Skill-based textbooks from Pre-Primary to Grade 12, novels and
-              class bundles — crafted by educators, delivered to your door
+              class bundles - crafted by educators, delivered to your door
               anywhere in India.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -80,35 +93,15 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Cover collage */}
-          <div className="relative mx-auto hidden h-80 w-full max-w-sm lg:block">
-            {heroCovers.map((p, i) => (
-              <Link
-                key={p.id}
-                href={`/product/${p.slug}`}
-                className="absolute block w-44 overflow-hidden rounded-xl shadow-xl ring-1 ring-border transition-transform duration-300 hover:z-20 hover:scale-105"
-                style={{
-                  left: `${i * 26}%`,
-                  top: `${i % 2 === 0 ? 8 : 22}%`,
-                  transform: `rotate(${(i - 1) * 7}deg)`,
-                  zIndex: 10 - i,
-                }}
-              >
-                <Image
-                  src={p.coverImage!}
-                  alt={p.title}
-                  width={176}
-                  height={235}
-                  className="aspect-[3/4] object-cover"
-                  priority={i === 0}
-                />
-              </Link>
-            ))}
+          {/* Rotating product dome. Hover to pause, drag to spin, click a
+              cover to open the book. */}
+          <div className="relative hidden h-[480px] w-full lg:block">
+            {domeImages.length > 0 && <DomeGallery images={domeImages} />}
           </div>
         </div>
       </section>
 
-      {/* New releases — horizontally scrollable */}
+      {/* New releases - horizontally scrollable */}
       {newReleases.length > 0 && (
         <section className="mt-14">
           <div className="mb-5 flex items-end justify-between">
@@ -162,7 +155,7 @@ export default async function HomePage() {
             <div>
               <h2 className="font-heading text-2xl font-bold sm:text-3xl">Complete class kits</h2>
               <p className="text-sm text-muted-foreground">
-                Every book for the year in one box — at a bundled price
+                Every book for the year in one box - at a bundled price
               </p>
             </div>
             <Button variant="ghost" className="gap-1.5" asChild>

@@ -30,7 +30,7 @@ export async function adminLogin(
 ): Promise<AdminLoginState> {
   const ip = await clientIp();
   if (isLockedOut(ip)) {
-    return { error: "Too many wrong attempts — locked for 15 minutes." };
+    return { error: "Too many wrong attempts - locked for 15 minutes." };
   }
   const password = String(formData.get("password") ?? "");
   const ok = await checkAdminPassword(password);
@@ -145,7 +145,7 @@ export async function deleteProduct(id: string): Promise<Result> {
   if (denied) return { error: denied };
   const inBundles = await db.bundleItem.count({ where: { productId: id } });
   if (inBundles > 0) {
-    return { error: "This book is inside a bundle — remove it from the bundle first." };
+    return { error: "This book is inside a bundle - remove it from the bundle first." };
   }
   await db.product.delete({ where: { id } }); // order items keep their snapshot (SetNull)
   return { ok: true };
@@ -184,7 +184,7 @@ const couponSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^[A-Z0-9]{3,20}$/, "Code: 3–20 letters/numbers"),
+    .regex(/^[A-Z0-9]{3,20}$/, "Code: 3-20 letters/numbers"),
   type: z.enum(["PERCENT", "FLAT"]),
   value: z.number().int().min(1),
   minOrder: z.number().int().min(0),
@@ -431,7 +431,7 @@ export async function orderShipViaShiprocket(orderNumber: string): Promise<Resul
   const denied = await ensureAdmin();
   if (denied) return { error: denied };
   if (!isShiprocketConfigured()) {
-    return { error: "Shiprocket is not configured yet — add the API credentials in .env (see docs/INTEGRATIONS.md)." };
+    return { error: "Shiprocket is not configured yet - add the API credentials in .env (see docs/INTEGRATIONS.md)." };
   }
   const order = await db.order.findUnique({
     where: { orderNumber },
@@ -579,7 +579,7 @@ export async function orderCancel(orderNumber: string): Promise<Result> {
         data: { orderId: order.id, status: "REFUNDED", note: "Auto-refund issued on cancellation" },
       });
     } catch (err) {
-      return { error: `Cancelled, but refund failed — do it from the Razorpay dashboard. (${String(err)})` };
+      return { error: `Cancelled, but refund failed - do it from the Razorpay dashboard. (${String(err)})` };
     }
   }
 
@@ -589,7 +589,7 @@ export async function orderCancel(orderNumber: string): Promise<Result> {
     template: "order-cancelled",
     html: renderEmail(
       "Your order was cancelled",
-      `<p>Order <b>${order.orderNumber}</b> (${formatINR(order.total)}) has been cancelled.${wasCaptured ? " Your payment is being refunded and should reach your account in 5–7 working days." : ""}</p>`,
+      `<p>Order <b>${order.orderNumber}</b> (${formatINR(order.total)}) has been cancelled.${wasCaptured ? " Your payment is being refunded and should reach your account in 5-7 working days." : ""}</p>`,
     ),
   });
   return { ok: true };

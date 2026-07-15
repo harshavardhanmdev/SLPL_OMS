@@ -21,7 +21,7 @@ export default function CartPage() {
         </div>
         <h1 className="font-heading text-2xl font-bold">Your cart is empty</h1>
         <p className="text-muted-foreground">
-          Browse the catalog and add books — they will wait for you here.
+          Browse the catalog and add books - they will wait for you here.
         </p>
         <Button size="lg" asChild>
           <Link href="/categories">Start shopping</Link>

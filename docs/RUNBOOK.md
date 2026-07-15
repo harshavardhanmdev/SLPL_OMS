@@ -1,4 +1,4 @@
-# Runbook — operations & troubleshooting
+# Runbook - operations & troubleshooting
 
 All commands run on the server (`ssh slplserver@100.109.145.97`), from
 `~/oms/deploy` unless said otherwise.
@@ -40,8 +40,8 @@ docker run --rm --network deploy_default -v oms-backups:/b postgres:16-alpine \
 
 | Symptom | Likely cause → fix |
 |---|---|
-| Customer paid, order still "Awaiting payment" | Webhook missed. The worker reconciles within 10 min — check `oms-worker` logs. Manual: admin → order → *Mark paid (manual)* only after seeing the payment in the Razorpay dashboard. |
-| Emails not arriving | Real SMTP not configured (check Mailpit viewer :8026) or Brevo creds wrong — `docker compose logs oms-web \| grep email`. Failures are also listed in DB table `EmailLog`. |
+| Customer paid, order still "Awaiting payment" | Webhook missed. The worker reconciles within 10 min - check `oms-worker` logs. Manual: admin → order → *Mark paid (manual)* only after seeing the payment in the Razorpay dashboard. |
+| Emails not arriving | Real SMTP not configured (check Mailpit viewer :8026) or Brevo creds wrong - `docker compose logs oms-web \| grep email`. Failures are also listed in DB table `EmailLog`. |
 | "Ship via Shiprocket" errors | Wallet empty, pickup address name ≠ `SHIPROCKET_PICKUP_LOCATION`, or API-user creds wrong. The error text says which. Fall back to manual *Ship order* meanwhile. |
 | Store slow / down | `docker ps` → is `oms-web` restarting? `docker compose logs oms-web`. Disk full? `df -h`. DB up? `/api/health`. |
 | Stock looks wrong | Failed/expired orders restock automatically within 10 min (worker). Check the order's timeline for EXPIRED/FAILED events. |
@@ -64,7 +64,7 @@ docker run --rm node:22-alpine node -e "console.log(require('bcryptjs').hashSync
 docker compose --env-file .env up -d oms-web
 ```
 `SESSION_SECRET` rotation: same procedure (`openssl rand -hex 32`); all
-customers get logged out (carts survive — they're in the DB/localStorage).
+customers get logged out (carts survive - they're in the DB/localStorage).
 
 ## 7. Dev leftovers on the server
 

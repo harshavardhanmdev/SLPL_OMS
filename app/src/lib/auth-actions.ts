@@ -39,7 +39,7 @@ export async function signupAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   if (!rateLimit(await ipKey("signup"), 10, 60 * 60 * 1000)) {
-    return { error: "Too many attempts — please try again later." };
+    return { error: "Too many attempts - please try again later." };
   }
   const parsed = signupSchema.safeParse({
     name: formData.get("name"),
@@ -54,7 +54,7 @@ export async function signupAction(
 
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
-    return { error: "An account with this email already exists — try logging in." };
+    return { error: "An account with this email already exists - try logging in." };
   }
 
   const user = await db.user.create({
@@ -74,7 +74,7 @@ export async function loginAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   if (!rateLimit(await ipKey("login"), 20, 15 * 60 * 1000)) {
-    return { error: "Too many attempts — please try again in 15 minutes." };
+    return { error: "Too many attempts - please try again in 15 minutes." };
   }
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),

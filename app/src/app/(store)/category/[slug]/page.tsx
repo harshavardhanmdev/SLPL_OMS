@@ -31,7 +31,7 @@ export default async function CategoryPage({ params }: Props) {
 
       {category.products.length === 0 ? (
         <p className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
-          Titles for this category are on their way — check back soon.
+          Titles for this category are on their way - check back soon.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

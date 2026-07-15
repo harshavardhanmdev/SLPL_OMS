@@ -123,7 +123,7 @@ export function CouponEditor({ coupon }: { coupon?: CouponRow }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>{v.type === "PERCENT" ? "Percent (1–90)" : "Amount off (₹)"}</Label>
+            <Label>{v.type === "PERCENT" ? "Percent (1-90)" : "Amount off (₹)"}</Label>
             <Input type="number" min={1} value={v.value} onChange={(e) => setV({ ...v, value: Number(e.target.value) })} />
           </div>
           <div className="space-y-1.5">

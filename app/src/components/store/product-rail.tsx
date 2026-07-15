@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 /**
  * Horizontally scrollable rail (touch-swipe on mobile, arrow buttons on
- * desktop) — used for the home "New Releases" strip.
+ * desktop) - used for the home "New Releases" strip.
  */
 export function ProductRail({ children }: { children: React.ReactNode }) {
   const ref = React.useRef<HTMLDivElement>(null);

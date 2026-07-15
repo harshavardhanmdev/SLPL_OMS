@@ -109,7 +109,7 @@ export function SaleEditor({ sale, categories }: { sale?: SaleRow; categories: C
             <Input
               value={v.bannerText}
               onChange={(e) => setV({ ...v, bannerText: e.target.value })}
-              placeholder="🪔 Diwali Sale — 15% off all textbooks till Nov 2!"
+              placeholder="🪔 Diwali Sale - 15% off all textbooks till Nov 2!"
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -126,7 +126,7 @@ export function SaleEditor({ sale, categories }: { sale?: SaleRow; categories: C
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>{v.discountType === "PERCENT" ? "Percent (1–90)" : "₹ off"}</Label>
+              <Label>{v.discountType === "PERCENT" ? "Percent (1-90)" : "₹ off"}</Label>
               <Input type="number" min={1} value={v.value} onChange={(e) => setV({ ...v, value: Number(e.target.value) })} />
             </div>
             <div className="space-y-1.5">

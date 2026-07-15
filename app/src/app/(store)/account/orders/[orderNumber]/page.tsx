@@ -31,8 +31,8 @@ type Props = {
 const statusMeta: Record<string, { label: string; tone: "ok" | "warn" | "bad" | "info" }> = {
   AWAITING_PAYMENT: { label: "Awaiting payment", tone: "warn" },
   COD_PENDING_OTP: { label: "Awaiting COD confirmation", tone: "warn" },
-  PAID: { label: "Paid — being packed", tone: "ok" },
-  CONFIRMED: { label: "Confirmed (COD) — being packed", tone: "ok" },
+  PAID: { label: "Paid - being packed", tone: "ok" },
+  CONFIRMED: { label: "Confirmed (COD) - being packed", tone: "ok" },
   PAYMENT_FAILED: { label: "Payment failed", tone: "bad" },
   EXPIRED: { label: "Expired (unpaid)", tone: "bad" },
   PROCESSING: { label: "Packing", tone: "info" },
@@ -125,7 +125,7 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
             <p className="font-medium">Waiting for your payment to confirm.</p>
             <p className="mt-0.5 text-muted-foreground">
               If you completed the payment, this page will update automatically within a few
-              minutes — interrupted payments are auto-confirmed or auto-refunded, never lost.
+              minutes - interrupted payments are auto-confirmed or auto-refunded, never lost.
             </p>
           </div>
         </div>
@@ -136,7 +136,7 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
           <div>
             <p className="font-medium">This order was not completed.</p>
             <p className="mt-0.5 text-muted-foreground">
-              Any deducted amount is auto-refunded by the bank within 5–7 working days. Add the
+              Any deducted amount is auto-refunded by the bank within 5-7 working days. Add the
               items to your cart again to reorder.
             </p>
           </div>
@@ -236,7 +236,7 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Tracking details will appear here once your order ships — we will also email
+                  Tracking details will appear here once your order ships - we will also email
                   you the tracking link.
                 </p>
               )}
@@ -252,7 +252,7 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
                   <span className="mt-1.5 size-2 shrink-0 rounded-full bg-saffron" />
                   <span>
                     <span className="font-medium">{statusMeta[ev.status]?.label ?? ev.status}</span>
-                    {ev.note && <span className="text-muted-foreground"> — {ev.note}</span>}
+                    {ev.note && <span className="text-muted-foreground"> - {ev.note}</span>}
                     <span className="block text-xs text-muted-foreground">
                       {ev.createdAt.toLocaleString("en-IN", {
                         day: "numeric",
@@ -279,7 +279,7 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
               {addr.line2 ? `, ${addr.line2}` : ""}
               {addr.landmark ? `, near ${addr.landmark}` : ""}
               <br />
-              {addr.city}, {addr.state} — {addr.pincode}
+              {addr.city}, {addr.state} - {addr.pincode}
               <br />
               {addr.phone}
             </p>

@@ -1,4 +1,4 @@
-# Kubernetes (k3s) manifests — for the Dell R640
+# Kubernetes (k3s) manifests - for the Dell R640
 
 These mirror the Docker Compose stack 1:1. Use them **after** the R640 arrives
 (see `docs/MIGRATION_R640.md`). On the current laptop, stay on Compose.
@@ -26,6 +26,6 @@ docker build -t oms-worker:latest --target builder ../app
 Notes
 - `postgres.yaml` uses a `local-path` PVC (k3s default StorageClass).
 - Uploads use a PVC mounted at `/app/uploads` on the web pod.
-- Scale the web Deployment (`replicas: 2+`) freely — the app is stateless;
+- Scale the web Deployment (`replicas: 2+`) freely - the app is stateless;
   note the in-memory rate limiter becomes per-pod (fine behind Cloudflare).
 - The worker must stay at `replicas: 1` (cron jobs must not double-fire).

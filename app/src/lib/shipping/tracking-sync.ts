@@ -67,7 +67,7 @@ export async function syncShipmentTracking(): Promise<void> {
           data: {
             orderId: shipment.orderId,
             status: "RTO",
-            note: "Shipment returning to origin — check the Shiprocket panel",
+            note: "Shipment returning to origin - check the Shiprocket panel",
           },
         });
       }

@@ -21,7 +21,7 @@ export function PdfPreview({ url, title }: { url: string; title: string }) {
       </DialogTrigger>
       <DialogContent className="flex h-[85vh] flex-col sm:max-w-4xl">
         <DialogHeader className="flex-row items-center justify-between gap-4 space-y-0 pr-8">
-          <DialogTitle className="line-clamp-1">{title} — sample pages</DialogTitle>
+          <DialogTitle className="line-clamp-1">{title} - sample pages</DialogTitle>
           <Button variant="outline" size="sm" asChild>
             <a href={url} download className="gap-1.5">
               <Download className="size-4" /> Download

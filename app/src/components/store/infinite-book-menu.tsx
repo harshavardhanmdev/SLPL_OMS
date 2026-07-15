@@ -35,12 +35,16 @@ void main() {
     vec3 centerPos = (uWorldMatrix * aInstanceMatrix * vec4(0., 0., 0., 1.)).xyz;
     float radius = length(centerPos.xyz);
 
-    if (gl_VertexID > 0) {
-        // Slight motion stretch only (a tenth of the original effect)
-        vec3 rotationAxis = uRotationAxisVelocity.xyz;
+    // Slight motion stretch. Guard by distance, not gl_VertexID: any vertex
+    // sitting exactly at the tile center makes normalize(0) = NaN and blows a
+    // hexagonal hole in the tile.
+    vec3 rel = worldPosition.xyz - centerPos;
+    float relLen = length(rel);
+    vec3 axisCross = cross(centerPos, uRotationAxisVelocity.xyz);
+    if (relLen > 1e-5 && length(axisCross) > 1e-5) {
         float rotationVelocity = min(.015, uRotationAxisVelocity.w * 1.5);
-        vec3 stretchDir = normalize(cross(centerPos, rotationAxis));
-        vec3 relativeVertexPos = normalize(worldPosition.xyz - centerPos);
+        vec3 stretchDir = normalize(axisCross);
+        vec3 relativeVertexPos = rel / relLen;
         float strength = dot(stretchDir, relativeVertexPos);
         float invAbsStrength = min(0., abs(strength) - 1.);
         strength = rotationVelocity * sign(strength) * abs(invAbsStrength * invAbsStrength * invAbsStrength + 1.);
@@ -90,6 +94,9 @@ void main() {
 
     // Premultiplied alpha out (the canvas is premultiplied)
     float a = color.a * vAlpha * mask;
+    // Never write depth for the masked-out rounded corners: tiles overlap on
+    // the sphere and an invisible corner would occlude the tile behind it
+    if (a < 0.01) discard;
     outColor = vec4(color.rgb * a, a);
 }`;
 
@@ -123,7 +130,7 @@ function bookPlaneGeometry(cols = 6, rows = 8): Buffers {
   return { vertices: new Float32Array(verts), uvs: new Float32Array(uvs), indices: new Uint16Array(idx) };
 }
 
-function icosahedronVertices(radius: number, divisions = 2): vec3[] {
+function icosahedronVertices(radius: number, divisions = 1): vec3[] {
   const t = Math.sqrt(5) * 0.5 + 0.5;
   const base: [number, number, number][] = [
     [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
@@ -396,10 +403,15 @@ class BookMenuScene {
     const gl = this.gl;
     const itemCount = Math.max(1, this.items.length);
     this.atlasSize = Math.ceil(Math.sqrt(itemCount));
-    const cell = 512;
+    const cell = 384;
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = this.atlasSize * cell;
     const ctx = canvas.getContext("2d")!;
+
+    // Local covers go through the Next image optimizer: a few original PNGs
+    // are multi-MB and made the sphere take seconds to appear.
+    const thumb = (src: string) =>
+      src.startsWith("/") ? `/_next/image?url=${encodeURIComponent(src)}&w=384&q=75` : src;
 
     Promise.all(
       this.items.map(
@@ -409,7 +421,7 @@ class BookMenuScene {
             img.crossOrigin = "anonymous";
             img.onload = () => resolve(img);
             img.onerror = () => resolve(null);
-            img.src = item.image;
+            img.src = thumb(item.image);
           }),
       ),
     ).then((images) => {
@@ -428,6 +440,10 @@ class BookMenuScene {
         const sy = (img.height - sh) / 2;
         ctx.drawImage(img, sx, sy, sw, sh, dx, y, dw, cell);
       });
+      if (window.location.search.includes("debugatlas")) {
+        canvas.style.cssText = "position:fixed;inset:0;z-index:9999;width:600px;height:600px;background:#fff";
+        document.body.appendChild(canvas);
+      }
       gl.bindTexture(gl.TEXTURE_2D, this.tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
       gl.generateMipmap(gl.TEXTURE_2D);
@@ -473,7 +489,9 @@ class BookMenuScene {
 
   private animate() {
     const gl = this.gl;
-    const scale = 0.17;
+    // 0.4 reproduces the original component's tile-to-sphere proportion
+    // (disc diameter 0.5 on an effective radius-1.5 sphere)
+    const scale = 0.45;
     const SCALE_INTENSITY = 0.6;
     let frontZ = -Infinity;
     let frontIdx = 0;
@@ -507,7 +525,8 @@ class BookMenuScene {
     gl.useProgram(this.program);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    gl.disable(gl.CULL_FACE);
+    // Cull the sphere's inside faces (the mirrored ghost tiles)
+    gl.enable(gl.CULL_FACE);
     // Depth test keeps back-hemisphere tiles behind the front ones (they all
     // project near the center, so draw order alone is not enough)
     gl.enable(gl.DEPTH_TEST);

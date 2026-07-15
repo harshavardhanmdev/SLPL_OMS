@@ -9,6 +9,9 @@ RUN npm ci
 
 FROM deps AS builder
 COPY . .
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time
+ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
+ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 RUN npx prisma generate && npm run build
 
 FROM node:22-alpine AS runner

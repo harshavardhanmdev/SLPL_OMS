@@ -45,6 +45,8 @@ services:
     build:
       context: ../app
       target: runner
+      args:
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
     container_name: oms-web
     restart: always
     ports:

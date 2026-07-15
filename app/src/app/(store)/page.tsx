@@ -29,11 +29,13 @@ export default async function HomePage() {
   const { newReleases, categories, bundleProducts, services, sale } = await getHomeData();
   // Every visible product with a cover feeds the dome, so books added in the
   // admin panel show up here automatically.
+  // 16 covers fill the 42-tile sphere with repetition and keep the texture
+  // atlas download small (a large pool made first paint take ~5s)
   const domeProducts = await db.product.findMany({
     where: { isVisible: true, coverImage: { not: null } },
     select: { slug: true, title: true, coverImage: true },
-    orderBy: { updatedAt: "desc" },
-    take: 48,
+    orderBy: [{ isNewRelease: "desc" }, { updatedAt: "desc" }],
+    take: 16,
   });
   const menuItems = domeProducts.map((p) => ({
     image: p.coverImage!,
@@ -103,13 +105,13 @@ export default async function HomePage() {
             {menuItems.length > 0 && <InfiniteBookMenu items={menuItems} />}
           </div>
 
-          {/* Mobile: two clickable covers per row. */}
-          <div className="grid grid-cols-2 gap-3 lg:hidden">
-            {menuItems.slice(0, 6).map((item) => (
+          {/* Mobile: swipeable rail, two covers per view. */}
+          <div className="no-scrollbar -mx-2 flex snap-x snap-mandatory gap-3 overflow-x-auto px-2 pb-1 lg:hidden">
+            {menuItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="group overflow-hidden rounded-xl border bg-card shadow-sm transition-transform active:scale-[0.98]"
+                className="group w-[calc(50%-0.375rem)] shrink-0 snap-start overflow-hidden rounded-xl border bg-card shadow-sm transition-transform active:scale-[0.98]"
               >
                 <span className="relative block aspect-[3/4]">
                   <Image

@@ -10,6 +10,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "── Syncing code to $SERVER:$REMOTE_DIR (tar over ssh - server has no rsync)"
 ssh "$SERVER" "mkdir -p $REMOTE_DIR"
+# Remove source dirs first: tar extraction never deletes files that were
+# removed locally, and stale files break the build.
+ssh "$SERVER" "rm -rf $REMOTE_DIR/app/src $REMOTE_DIR/app/public $REMOTE_DIR/app/prisma $REMOTE_DIR/app/scripts $REMOTE_DIR/docs"
 tar -C "$ROOT" -czf - \
   --exclude='app/node_modules' --exclude='app/.next' --exclude='.git' \
   --exclude='app/.env' --exclude='app/uploads' \

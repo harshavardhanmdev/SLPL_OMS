@@ -6,7 +6,9 @@ import {
   ArrowRight,
   BadgePercent,
   BookOpen,
+  FlaskConical,
   GraduationCap,
+  Landmark,
   Layers,
   Radio,
   ShieldCheck,
@@ -18,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProductCard } from "@/components/store/product-card";
 import { ProductRail } from "@/components/store/product-rail";
-import DomeGallery from "@/components/store/dome-gallery";
+import InfiniteBookMenu from "@/components/store/infinite-book-menu";
 import { db } from "@/lib/db";
 import { getHomeData } from "@/lib/catalog";
 import { site } from "@/lib/site";
@@ -33,9 +35,9 @@ export default async function HomePage() {
     orderBy: { updatedAt: "desc" },
     take: 48,
   });
-  const domeImages = domeProducts.map((p) => ({
-    src: p.coverImage!,
-    alt: p.title,
+  const menuItems = domeProducts.map((p) => ({
+    image: p.coverImage!,
+    title: p.title,
     href: `/product/${p.slug}`,
   }));
 
@@ -49,24 +51,21 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* Hero. The panel is the solid --dome-overlay color so the dome's
-          radial fade blends into it seamlessly. */}
+      {/* Hero: products front and center, copy kept subtle. */}
       <section className="relative mt-4 overflow-hidden rounded-3xl bg-[color:var(--dome-overlay)] ring-1 ring-border">
-        <div className="relative grid items-center gap-6 p-8 sm:p-12 lg:grid-cols-[1fr_1.15fr] lg:py-8 lg:pl-16 lg:pr-4">
-          <div className="space-y-6">
+        <div className="relative grid items-center gap-8 p-6 sm:p-10 lg:grid-cols-[0.8fr_1.2fr] lg:py-6 lg:pl-14 lg:pr-4">
+          <div className="space-y-5">
             <span className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-4 py-1.5 text-xs font-medium backdrop-blur">
               <Sparkles className="size-3.5 text-saffron-deep" />
-              {site.company} · Research | Innovation | Impact
+              {site.company}
             </span>
-            <h1 className="text-balance font-heading text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-              Many publish books.
-              <br />
-              <span className="text-saffron-deep">We build futures.</span>
-            </h1>
-            <p className="max-w-lg text-pretty text-muted-foreground sm:text-lg">
-              Skill-based textbooks from Pre-Primary to Grade 12, novels and
-              class bundles - crafted by educators, delivered to your door
-              anywhere in India.
+            <p className="font-heading text-lg font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Nursery to Civils, <span className="text-saffron-deep">one store.</span>
+            </p>
+            <p className="max-w-md text-pretty text-sm text-muted-foreground sm:text-base">
+              Research-oriented textbooks for every grade, complete class
+              bundles, novels and a UPSC Civils foundation, delivered anywhere
+              in India.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button size="lg" className="gap-2" asChild>
@@ -80,9 +79,15 @@ export default async function HomePage() {
                 </Link>
               </Button>
             </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <GraduationCap className="size-4 text-saffron-deep" /> Nursery → Grade 12
+              </span>
+              <span className="flex items-center gap-1.5">
+                <FlaskConical className="size-4 text-saffron-deep" /> Research-first material
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Landmark className="size-4 text-saffron-deep" /> UPSC Civils
               </span>
               <span className="flex items-center gap-1.5">
                 <Truck className="size-4 text-saffron-deep" /> Pan-India delivery
@@ -93,10 +98,31 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Rotating product dome. Hover to pause, drag to spin, click a
-              cover to open the book. */}
-          <div className="relative hidden h-[560px] w-full lg:block xl:h-[620px]">
-            {domeImages.length > 0 && <DomeGallery images={domeImages} fit={0.8} minRadius={580} />}
+          {/* Desktop: draggable book sphere; snaps to a book, tap opens it. */}
+          <div className="relative hidden h-[540px] w-full lg:block xl:h-[600px]">
+            {menuItems.length > 0 && <InfiniteBookMenu items={menuItems} />}
+          </div>
+
+          {/* Mobile: two clickable covers per row. */}
+          <div className="grid grid-cols-2 gap-3 lg:hidden">
+            {menuItems.slice(0, 6).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group overflow-hidden rounded-xl border bg-card shadow-sm transition-transform active:scale-[0.98]"
+              >
+                <span className="relative block aspect-[3/4]">
+                  <Image
+                    src={item.image}
+                    alt={item.title}
+                    fill
+                    sizes="45vw"
+                    className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  />
+                </span>
+                <span className="line-clamp-1 block px-2.5 py-2 text-xs font-medium">{item.title}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

@@ -25,6 +25,8 @@ const linesSchema = z
 // ── Addresses ────────────────────────────────────────────────────────────────
 
 const addressSchema = z.object({
+  id: z.string().optional(), // present = update existing
+  name: z.string().trim().max(40).optional().or(z.literal("")),
   label: z.enum(["HOME", "OFFICE", "OTHER"]),
   fullName: z.string().trim().min(2).max(80),
   phone: z.string().trim().regex(/^[6-9][0-9]{9}$/, "Enter a valid 10-digit mobile number"),
@@ -47,20 +49,39 @@ export async function saveAddress(input: AddressInput): Promise<{ id?: string; e
   const parsed = addressSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
+  const { id, ...fields } = parsed.data;
   const data = {
-    ...parsed.data,
-    line2: parsed.data.line2 || null,
-    landmark: parsed.data.landmark || null,
-    lat: parsed.data.lat ?? null,
-    lng: parsed.data.lng ?? null,
-    userId: session.uid,
-    isDefault: parsed.data.isDefault ?? false,
+    ...fields,
+    name: fields.name || null,
+    line2: fields.line2 || null,
+    landmark: fields.landmark || null,
+    lat: fields.lat ?? null,
+    lng: fields.lng ?? null,
+    isDefault: fields.isDefault ?? false,
   };
   if (data.isDefault) {
     await db.address.updateMany({ where: { userId: session.uid }, data: { isDefault: false } });
   }
-  const row = await db.address.create({ data });
+  if (id) {
+    const owned = await db.address.findFirst({ where: { id, userId: session.uid } });
+    if (!owned) return { error: "Address not found." };
+    const row = await db.address.update({ where: { id }, data });
+    return { id: row.id };
+  }
+  const row = await db.address.create({ data: { ...data, userId: session.uid } });
   return { id: row.id };
+}
+
+export async function setDefaultAddress(id: string): Promise<{ ok: boolean }> {
+  const session = await getSession();
+  if (!session) return { ok: false };
+  const owned = await db.address.findFirst({ where: { id, userId: session.uid } });
+  if (!owned) return { ok: false };
+  await db.$transaction([
+    db.address.updateMany({ where: { userId: session.uid }, data: { isDefault: false } }),
+    db.address.update({ where: { id }, data: { isDefault: true } }),
+  ]);
+  return { ok: true };
 }
 
 export async function deleteAddress(id: string): Promise<void> {
@@ -185,7 +206,7 @@ export async function placeOrder(input: {
   if (quote.contactRequired) {
     return {
       error:
-        "Orders of this size are handled personally - please contact us on +91 79891 91962 (call/WhatsApp) for institutional pricing and secure delivery.",
+        "Orders of this size are handled personally - please contact us on +91 90303 90077 (call/WhatsApp) for institutional pricing and secure delivery.",
     };
   }
   if (input.method === "COD" && !quote.codAllowed) {

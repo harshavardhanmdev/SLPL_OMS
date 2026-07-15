@@ -91,6 +91,7 @@ export async function loginAction(
     return { error: "Incorrect email or password." };
   }
 
+  await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession({ uid: user.id, name: user.name, email: user.email });
   redirect(safeNext(formData.get("next"), "/account"));
 }

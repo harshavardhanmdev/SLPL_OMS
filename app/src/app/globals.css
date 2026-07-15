@@ -145,9 +145,8 @@
   }
 }
 
-/* ── Product dome gallery (home hero) ──────────────────────────────────────
-   Adapted from React Bits DomeGallery. The overlay color must match the
-   backdrop the dome sits on so the radial fade is seamless. */
+/* ── Hero surface + infinite book menu ─────────────────────────────────────
+   --dome-overlay is the solid hero panel color (kept name for compatibility). */
 :root {
   --dome-overlay: #eef2fa; /* = secondary */
 }
@@ -155,108 +154,83 @@
   --dome-overlay: #121a30; /* = card */
 }
 
-.sphere-root {
+.book-menu-root {
   position: relative;
   width: 100%;
   height: 100%;
-  --radius: 520px;
-  --circ: calc(var(--radius) * 3.14);
-  --rot-y: calc((360deg / var(--segments-x)) / 2);
-  --rot-x: calc((360deg / var(--segments-y)) / 2);
-  --item-width: calc(var(--circ) / var(--segments-x));
-  --item-height: calc(var(--circ) / var(--segments-y));
 }
-.sphere,
-.sphere-item,
-.sphere-item__image {
-  transform-style: preserve-3d;
-}
-.sphere-main {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  touch-action: pan-y;
-  user-select: none;
-  -webkit-user-select: none;
-  background: transparent;
-}
-.stage {
+.book-menu-canvas {
   width: 100%;
   height: 100%;
-  display: grid;
-  place-items: center;
-  perspective: calc(var(--radius) * 2);
-  perspective-origin: 50% 50%;
-  contain: layout paint size;
+  display: block;
+  cursor: grab;
+  outline: none;
+  touch-action: none;
 }
-.sphere {
-  transform: translateZ(calc(var(--radius) * -1));
-  will-change: transform;
+.book-menu-canvas:active {
+  cursor: grabbing;
 }
-.sphere-overlay {
+.book-menu-caption {
   position: absolute;
-  inset: 0;
-  margin: auto;
-  z-index: 3;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
   pointer-events: none;
-  background-image: radial-gradient(rgb(235 235 235 / 0) 60%, var(--dome-overlay) 98%);
+  opacity: 1;
+  transition: opacity 0.4s ease, transform 0.4s ease;
 }
-.sphere-item {
-  width: calc(var(--item-width) * var(--item-size-x));
-  height: calc(var(--item-height) * var(--item-size-y));
-  position: absolute;
-  top: -999px;
-  bottom: -999px;
-  left: -999px;
-  right: -999px;
-  margin: auto;
-  transform-origin: 50% 50%;
-  backface-visibility: hidden;
-  transform: rotateY(calc(var(--rot-y) * (var(--offset-x) + ((var(--item-size-x) - 1) / 2))))
-    rotateX(calc(var(--rot-x) * (var(--offset-y) - ((var(--item-size-y) - 1) / 2)))) translateZ(var(--radius));
+.book-menu-caption.is-moving {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+  transition: opacity 0.12s ease;
 }
-.sphere-item__image {
-  position: absolute;
-  inset: 6px;
-  border-radius: 14px;
-  overflow: hidden;
-  backface-visibility: hidden;
+.book-menu-title {
+  max-width: 340px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.25;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--dome-overlay) 80%, transparent);
+  border-radius: 10px;
+  padding: 4px 12px;
+  backdrop-filter: blur(4px);
+}
+.book-menu-view {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--saffron);
+  color: var(--navy);
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 999px;
+  padding: 8px 18px;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 200ms ease;
-  transform: translateZ(0);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.15);
+  transition: transform 0.15s ease, background 0.15s ease;
 }
-.sphere-item__image:hover {
-  transform: translateZ(0) scale(1.06);
+.book-menu-view:hover {
+  transform: translateY(-1px);
+  background: var(--saffron-deep);
 }
-.sphere-item__image:focus-visible {
-  outline: 2px solid var(--saffron);
-  outline-offset: 2px;
-}
-.sphere-item__image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-  backface-visibility: hidden;
-}
-.sphere-edge-fade {
+.book-menu-hint {
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 90px;
-  z-index: 5;
+  top: 10px;
+  right: 14px;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
   pointer-events: none;
-  background: linear-gradient(to bottom, transparent, var(--dome-overlay));
+  transition: opacity 0.3s ease;
 }
-.sphere-edge-fade--top {
-  top: 0;
-  transform: rotate(180deg);
-}
-.sphere-edge-fade--bottom {
-  bottom: 0;
+.book-menu-hint.is-moving {
+  opacity: 0;
 }
 
 @layer utilities {

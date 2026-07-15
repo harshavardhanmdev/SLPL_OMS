@@ -1,11 +1,13 @@
 import "server-only";
 
 import { renderEmail, sendEmail } from "@/lib/email";
+import { getPrefs, notifyUser } from "@/lib/notify";
 
 type OrderLite = {
   orderNumber: string;
   customerName: string;
   customerEmail: string;
+  userId: string;
 };
 
 type ShipmentLite = {
@@ -16,6 +18,13 @@ type ShipmentLite = {
 };
 
 export async function emailShipped(order: OrderLite, shipment: ShipmentLite): Promise<void> {
+  await notifyUser(
+    order.userId,
+    "Your order is on its way",
+    `Order ${order.orderNumber} shipped via ${shipment.courierName ?? "courier"}${shipment.awb ? `, AWB ${shipment.awb}` : ""}.`,
+    `/account/orders/${order.orderNumber}`,
+  );
+  if (!(await getPrefs(order.userId)).orderEmails) return;
   const trackBlock = shipment.trackingUrl
     ? `<p style="margin:16px 0;text-align:center"><a href="${shipment.trackingUrl}" style="display:inline-block;background:#1e2a5a;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 24px;font-weight:bold">Track your package</a></p>`
     : "";
@@ -36,6 +45,13 @@ export async function emailShipped(order: OrderLite, shipment: ShipmentLite): Pr
 }
 
 export async function emailOutForDelivery(order: OrderLite, shipment: ShipmentLite): Promise<void> {
+  await notifyUser(
+    order.userId,
+    "Out for delivery today",
+    `Order ${order.orderNumber} is out for delivery. Keep your phone reachable.`,
+    `/account/orders/${order.orderNumber}`,
+  );
+  if (!(await getPrefs(order.userId)).orderEmails) return;
   await sendEmail({
     to: order.customerEmail,
     subject: `Out for delivery - order ${order.orderNumber} 🚚`,
@@ -50,6 +66,13 @@ export async function emailOutForDelivery(order: OrderLite, shipment: ShipmentLi
 }
 
 export async function emailDelivered(order: OrderLite): Promise<void> {
+  await notifyUser(
+    order.userId,
+    "Delivered. Happy learning!",
+    `Order ${order.orderNumber} was delivered.`,
+    `/account/orders/${order.orderNumber}`,
+  );
+  if (!(await getPrefs(order.userId)).orderEmails) return;
   await sendEmail({
     to: order.customerEmail,
     subject: `Delivered - order ${order.orderNumber} ✅`,
@@ -57,7 +80,7 @@ export async function emailDelivered(order: OrderLite): Promise<void> {
     html: renderEmail(
       "Your order has been delivered",
       `<p style="margin:0 0 10px">Hi ${order.customerName}, order <b>${order.orderNumber}</b> was delivered. Happy learning!</p>
-       <p style="margin:10px 0 0;font-size:13px;color:#5a6478">Received a damaged copy? Reply to this email or call +91 79891 91962 within 48 hours and we will replace it.</p>`,
+       <p style="margin:10px 0 0;font-size:13px;color:#5a6478">Received a damaged copy? Reply to this email or call +91 90303 90077 within 48 hours and we will replace it.</p>`,
     ),
   });
 }

@@ -10,14 +10,14 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      // Razorpay checkout script + Next inline runtime
-      "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com",
-      "style-src 'self' 'unsafe-inline'",
-      // OSM map tiles, uploaded covers, data/blob previews
-      "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org",
-      "font-src 'self' data:",
+      // Razorpay checkout + Google Maps scripts + Next inline runtime
+      "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://maps.googleapis.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // OSM/Google map tiles, uploaded covers, Google avatars, data/blob previews
+      "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.googleapis.com https://*.gstatic.com https://*.googleusercontent.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
       // APIs the browser calls directly
-      "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://api.postalpincode.in https://nominatim.openstreetmap.org",
+      "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://api.postalpincode.in https://nominatim.openstreetmap.org https://maps.googleapis.com",
       // Razorpay renders its modal in an iframe
       "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
       "object-src 'none'",

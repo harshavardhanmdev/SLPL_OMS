@@ -33,7 +33,7 @@ export function renderEmail(title: string, bodyHtml: string): string {
         ${bodyHtml}
       </td></tr>
       <tr><td style="padding:16px 24px;border-top:1px solid #e3e8f2;font-size:12px;color:#5a6478">
-        Saaradaa Learknowations Pvt Ltd · Nagole, Hyderabad · +91 79891 91962<br>
+        Saaradaa Learknowations Pvt Ltd · Nagole, Hyderabad · +91 90303 90077<br>
         This is an automated message from the SLPL Store.
       </td></tr>
     </table>

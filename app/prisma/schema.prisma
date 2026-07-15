@@ -13,18 +13,35 @@ datasource db {
 // ─── Customers ────────────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  phone         String?
-  passwordHash  String
-  emailVerified DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String
+  phone             String?
+  passwordHash      String
+  emailVerified     DateTime?
+  image             String?
+  lastLoginAt       DateTime?
+  notificationPrefs Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  addresses Address[]
-  orders    Order[]
-  cart      Cart?
+  addresses     Address[]
+  orders        Order[]
+  cart          Cart?
+  notifications Notification[]
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }
 
 enum AddressLabel {
@@ -38,6 +55,7 @@ model Address {
   userId    String
   user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   label     AddressLabel @default(HOME)
+  name      String? // custom nickname, e.g. "Granny's house"
   fullName  String
   phone     String
   line1     String

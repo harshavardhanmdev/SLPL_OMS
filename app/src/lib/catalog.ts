@@ -96,19 +96,4 @@ export async function getProductBySlug(slug: string) {
   });
 }
 
-export async function searchProducts(q: string) {
-  if (!q.trim()) return [];
-  return db.product.findMany({
-    where: {
-      isVisible: true,
-      OR: [
-        { title: { contains: q, mode: "insensitive" } },
-        { series: { contains: q, mode: "insensitive" } },
-        { gradeLabel: { contains: q, mode: "insensitive" } },
-        { description: { contains: q, mode: "insensitive" } },
-      ],
-    },
-    select: productCardSelect,
-    take: 40,
-  });
-}
+// Search moved to src/lib/search.ts (synonyms + relevance scoring)

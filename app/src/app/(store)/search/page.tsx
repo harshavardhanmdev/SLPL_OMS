@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { SearchX } from "lucide-react";
 
 import { ProductCard } from "@/components/store/product-card";
-import { getActiveSale, searchProducts } from "@/lib/catalog";
+import { SearchBar } from "@/components/layout/search-bar";
+import { getActiveSale } from "@/lib/catalog";
+import { searchProducts } from "@/lib/search";
 
 export const metadata: Metadata = { title: "Search" };
 
@@ -14,16 +16,7 @@ export default async function SearchPage({ searchParams }: Props) {
 
   return (
     <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6">
-      <form action="/search" className="mb-6 max-w-xl" role="search">
-        <input
-          type="search"
-          name="q"
-          defaultValue={q}
-          placeholder="Search by title, series or grade…"
-          autoFocus
-          className="h-12 w-full rounded-full border border-input bg-muted/60 px-5 text-base outline-none transition-colors focus:border-ring focus:bg-background"
-        />
-      </form>
+      <SearchBar defaultValue={q} variant="page" className="mb-6 max-w-xl" />
 
       {q.trim() === "" ? (
         <p className="text-muted-foreground">Type to search across all SLPL titles.</p>

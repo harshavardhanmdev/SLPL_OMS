@@ -11,6 +11,7 @@ import {
   Settings,
   Store,
   Ticket,
+  UsersRound,
 } from "lucide-react";
 
 import { isAdmin } from "@/lib/admin-auth";
@@ -21,6 +22,7 @@ const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: Package },
   { href: "/admin/products", label: "Products", icon: Boxes },
+  { href: "/admin/users", label: "Customers", icon: UsersRound },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/sales", label: "Festival sales", icon: BadgePercent },
   { href: "/admin/services", label: "Services", icon: Radio },

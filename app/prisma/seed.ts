@@ -216,7 +216,41 @@ async function main() {
     isNewRelease: true,
   };
 
-  const allBooks = [...babySteps, ...littleLeaps, ...skillBuilders, novel, poems];
+  // ── Little Leaps per-subject books (real covers from assets/cover_pages) ─
+  const subjectBlurb: Record<string, string> = {
+    English: "reading, phonics, grammar-in-use and confident speaking",
+    Telugu: "varnamala, padalu, reading fluency and handwriting practice",
+    Hindi: "varnmala, matras, vocabulary and simple sentence practice",
+    Math: "numbers, operations, shapes and everyday problem solving",
+    Computer: "computer basics, digital habits and hands-on activities",
+    GK: "the world around us, current awareness and thinking questions",
+    Social: "family, neighbourhood, our country and community life",
+  };
+  const subjectCovers: [number, string][] = [
+    [1, "Computer"], [1, "English"], [1, "GK"], [1, "Hindi"], [1, "Social"], [1, "Telugu"],
+    [2, "Math"],
+    [3, "Computer"], [3, "GK"], [3, "Hindi"],
+    [4, "Computer"], [4, "GK"], [4, "Telugu"],
+  ];
+  const subjectBooks: ProductSeed[] = subjectCovers.map(([grade, subject]) => ({
+    slug: `little-leaps-grade${grade}-${subject.toLowerCase()}`,
+    title: `Little Leaps ${subject === "GK" ? "General Knowledge" : subject}, Grade ${grade}`,
+    categoryId: primary.id,
+    series: "Little Leaps",
+    gradeLabel: `Grade ${grade}`,
+    description:
+      `The Little Leaps ${subject === "GK" ? "General Knowledge" : subject} book for Grade ${grade}, covering ${subjectBlurb[subject]}. ` +
+      `Research-oriented design: every chapter opens with a real-life hook and closes with skill checks students can self-correct. ` +
+      `Full-colour pages with QR-linked lessons on the SLPL LMS. ` +
+      `Part of the complete Little Leaps set for Grade ${grade}.`,
+    mrp: 29900, // dummy values, owner edits in admin
+    price: 24900,
+    weightGrams: 350,
+    coverImage: `/seed/covers/subjects/grade${grade}_${subject.toLowerCase()}.png`,
+    isNewRelease: true,
+  }));
+
+  const allBooks = [...babySteps, ...littleLeaps, ...subjectBooks, ...skillBuilders, novel, poems];
   const created: Record<string, { id: string; price: number }> = {};
   for (const p of allBooks) {
     const row = await upsertProduct(p);
@@ -316,7 +350,7 @@ async function main() {
     shipping_flat_fee: 6000, // ₹60 fallback when courier API is unavailable
     origin_pincode: "500068", // Nagole, Hyderabad - confirm in admin settings
     store_notice: "",
-    contact_phone: "+91 79891 91962",
+    contact_phone: "+91 90303 90077",
     contact_email: "saradapublications18@gmail.com",
   };
   for (const [key, value] of Object.entries(settings)) {

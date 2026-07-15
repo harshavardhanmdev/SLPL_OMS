@@ -6,6 +6,7 @@ import { getActiveSale, getSetting } from "@/lib/catalog";
 import { effectivePrice } from "@/lib/pricing";
 import { estimateDelivery } from "@/lib/shipping/estimate";
 import { renderEmail, sendEmail, notifyOwner } from "@/lib/email";
+import { notifyUser } from "@/lib/notify";
 import { formatINR } from "@/lib/money";
 import {
   fetchPaymentsForOrder,
@@ -348,6 +349,12 @@ export async function markOrderPaid(
   ]);
 
   await db.cart.deleteMany({ where: { userId: order.userId } });
+  await notifyUser(
+    order.userId,
+    "Order confirmed",
+    `Payment received for order ${order.orderNumber}. We are packing your books.`,
+    `/account/orders/${order.orderNumber}`,
+  );
 
   await sendEmail({
     to: order.customerEmail,
@@ -383,6 +390,12 @@ export async function confirmCodOrder(orderId: string): Promise<void> {
       : []),
   ]);
   await db.cart.deleteMany({ where: { userId: order.userId } });
+  await notifyUser(
+    order.userId,
+    "COD order confirmed",
+    `Order ${order.orderNumber} is confirmed. Keep the amount ready at delivery.`,
+    `/account/orders/${order.orderNumber}`,
+  );
 
   await sendEmail({
     to: order.customerEmail,

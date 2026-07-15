@@ -17,7 +17,7 @@ export default async function LoginPage({ searchParams }: Props) {
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="mb-1 font-heading text-3xl font-bold">Welcome back</h1>
       <p className="mb-8 text-muted-foreground">Log in to track orders and check out faster.</p>
-      <AuthForm mode="login" action={loginAction} next={next} />
+      <AuthForm mode="login" action={loginAction} next={next} googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID)} />
     </div>
   );
 }

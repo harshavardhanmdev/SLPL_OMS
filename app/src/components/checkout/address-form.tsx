@@ -11,14 +11,21 @@ import { Label } from "@/components/ui/label";
 import { saveAddress, type AddressInput } from "@/lib/checkout-actions";
 import { cn } from "@/lib/utils";
 
-const AddressMap = dynamic(() => import("./address-map"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-56 items-center justify-center rounded-xl border bg-muted text-sm text-muted-foreground">
-      Loading map…
-    </div>
-  ),
-});
+// Google Maps when the owner has configured a key, OpenStreetMap otherwise
+const AddressMap = dynamic(
+  () =>
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+      ? import("./address-map-google")
+      : import("./address-map"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-56 items-center justify-center rounded-xl border bg-muted text-sm text-muted-foreground">
+        Loading map…
+      </div>
+    ),
+  },
+);
 
 const labels = [
   { value: "HOME", label: "Home", icon: Home },
@@ -26,19 +33,45 @@ const labels = [
   { value: "OTHER", label: "Other", icon: MapPin },
 ] as const;
 
-export function AddressForm({ onSaved }: { onSaved: (id: string) => void }) {
+export type AddressFormInitial = Partial<{
+  id: string;
+  name: string;
+  label: AddressInput["label"];
+  fullName: string;
+  phone: string;
+  line1: string;
+  line2: string;
+  landmark: string;
+  city: string;
+  state: string;
+  pincode: string;
+  lat: number | null;
+  lng: number | null;
+  isDefault: boolean;
+}>;
+
+export function AddressForm({
+  onSaved,
+  initial,
+}: {
+  onSaved: (id: string) => void;
+  initial?: AddressFormInitial;
+}) {
   const [saving, setSaving] = React.useState(false);
-  const [label, setLabel] = React.useState<AddressInput["label"]>("HOME");
-  const [pin, setPin] = React.useState<{ lat: number; lng: number } | null>(null);
+  const [label, setLabel] = React.useState<AddressInput["label"]>(initial?.label ?? "HOME");
+  const [pin, setPin] = React.useState<{ lat: number; lng: number } | null>(
+    initial?.lat != null && initial?.lng != null ? { lat: initial.lat, lng: initial.lng } : null,
+  );
   const [form, setForm] = React.useState({
-    fullName: "",
-    phone: "",
-    line1: "",
-    line2: "",
-    landmark: "",
-    city: "",
-    state: "",
-    pincode: "",
+    name: initial?.name ?? "",
+    fullName: initial?.fullName ?? "",
+    phone: initial?.phone ?? "",
+    line1: initial?.line1 ?? "",
+    line2: initial?.line2 ?? "",
+    landmark: initial?.landmark ?? "",
+    city: initial?.city ?? "",
+    state: initial?.state ?? "",
+    pincode: initial?.pincode ?? "",
   });
 
   function set<K extends keyof typeof form>(key: K, value: string) {
@@ -71,11 +104,12 @@ export function AddressForm({ onSaved }: { onSaved: (id: string) => void }) {
     setSaving(true);
     try {
       const res = await saveAddress({
+        id: initial?.id,
         label,
         ...form,
         lat: pin?.lat ?? null,
         lng: pin?.lng ?? null,
-        isDefault: true,
+        isDefault: initial?.id ? (initial.isDefault ?? false) : true,
       });
       if (res.error) {
         toast.error(res.error);
@@ -90,6 +124,12 @@ export function AddressForm({ onSaved }: { onSaved: (id: string) => void }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="addrname">
+          Address nickname <span className="text-muted-foreground">(optional, e.g. "Granny's house")</span>
+        </Label>
+        <Input id="addrname" value={form.name} onChange={(e) => set("name", e.target.value)} maxLength={40} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="fullName">Full name</Label>

@@ -121,3 +121,46 @@ Razorpay/Shiprocket profiles.
   need formal invoice PDFs; the data model already stores everything needed.
 - **Google login**, **direct BlueDart contract** (once volumes justify a
   rate negotiation - the adapter seam is `src/lib/shipping/estimate-source.ts`).
+
+---
+
+## 6. Google Maps for the checkout map (optional)
+
+The address pin works out of the box with OpenStreetMap. To switch to Google
+Maps (better satellite/roads in India):
+
+1. https://console.cloud.google.com → create project `slpl-store`.
+2. APIs & Services → Library → enable **Maps JavaScript API** (the map) and
+   **Geocoding API** (turns the pin into city/state/pincode).
+3. APIs & Services → Credentials → *Create credentials* → **API key**.
+4. Restrict the key: Application restrictions → Websites →
+   `https://store.theslpl.in/*`; API restrictions → the two APIs above.
+5. Billing must be enabled (card required). Google gives a recurring
+   **$200/month free credit**; a store this size stays comfortably inside it.
+
+```ini
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIza...
+```
+
+Note: this is a build-time variable, so after adding it run a full rebuild:
+`docker compose --env-file .env up -d --build oms-web`.
+
+## 7. Login with Google (optional)
+
+1. Same Google Cloud project → APIs & Services → **OAuth consent screen**:
+   External, app name `SLPL Store`, your support email, add domain
+   `theslpl.in`, publish the app.
+2. Credentials → *Create credentials* → **OAuth client ID** → Web application:
+   - Authorized JavaScript origins: `https://store.theslpl.in`
+   - Authorized redirect URIs: `https://store.theslpl.in/api/auth/google/callback`
+3. Copy the client ID + secret into `.env`:
+
+```ini
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-...
+APP_URL=https://store.theslpl.in
+```
+
+4. Rebuild (`docker compose --env-file .env up -d --build oms-web`). The
+   "Continue with Google" button appears on the login and signup pages
+   automatically. Google accounts are matched to existing customers by email.

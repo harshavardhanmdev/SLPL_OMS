@@ -19,7 +19,7 @@ export default async function SignupPage({ searchParams }: Props) {
       <p className="mb-8 text-muted-foreground">
         One account for orders, tracking and faster checkout.
       </p>
-      <AuthForm mode="signup" action={signupAction} next={next} />
+      <AuthForm mode="signup" action={signupAction} next={next} googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID)} />
     </div>
   );
 }

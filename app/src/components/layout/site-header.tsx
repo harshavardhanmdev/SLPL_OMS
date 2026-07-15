@@ -1,30 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronDown, Package, Search, ShoppingCart } from "lucide-react";
+import { ChevronDown, Package, ShoppingCart } from "lucide-react";
 
 import { getSession } from "@/lib/auth";
 import { mainNav, site } from "@/lib/site";
 import { CartBadge } from "@/components/store/cart-badge";
 import { DeliverTo } from "@/components/layout/deliver-to";
+import { SearchBar } from "@/components/layout/search-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
-
-function SearchBar({ className }: { className?: string }) {
-  return (
-    <form action="/search" role="search" className={className}>
-      <div className="flex h-10 overflow-hidden rounded-md bg-white ring-saffron focus-within:ring-2">
-        <input
-          type="search"
-          name="q"
-          placeholder="Search books, series, grades…"
-          className="w-full bg-transparent px-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-500"
-        />
-        <button type="submit" aria-label="Search" className="grid w-11 shrink-0 place-items-center bg-saffron transition-colors hover:bg-saffron-deep">
-          <Search className="size-5 text-navy" />
-        </button>
-      </div>
-    </form>
-  );
-}
 
 /** Amazon-pattern header: brand top-left, search center, account/orders/cart top-right. */
 export async function SiteHeader() {
@@ -77,7 +60,7 @@ export async function SiteHeader() {
           </Link>
 
           <Link
-            href="/account"
+            href="/account/orders"
             className="hidden flex-col rounded-md px-2 py-1 leading-tight ring-white/60 transition hover:ring-1 lg:flex"
           >
             <span className="text-[11px] text-white/70">Returns</span>

@@ -3,13 +3,13 @@ export const site = {
   company: "Saaradaa Learknowations Pvt Ltd",
   tagline: "Many publish books. We build futures.",
   description:
-    "Official store of Saaradaa Learknowations - school textbooks from Pre-Primary to Grade 12, novels, poem books and class bundles, delivered across India.",
+    "Official store of Saaradaa Learknowations - research-oriented school textbooks from Pre-Primary to Grade 12, UPSC Civils foundation material, novels, poem books and class bundles, delivered across India.",
   contact: {
     person: "Mohammad Ismail",
-    phone: "+91 79891 91962",
+    phone: "+91 90303 90077",
     email: "saradapublications18@gmail.com",
-    address: "Nagole, Hyderabad, Telangana",
-    whatsapp: "https://wa.me/917989191962",
+    address: "2-3-472, Road No. 3D, Sai Nagar Colony, Nagole, Hyderabad - 500068",
+    whatsapp: "https://wa.me/919030390077",
   },
   links: {
     main: "https://theslpl.in",

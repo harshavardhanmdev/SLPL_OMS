@@ -6,6 +6,7 @@ import { BookOpen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { VisibilityToggle } from "@/components/admin/visibility-toggle";
+import { ProductRowActions } from "@/components/admin/product-row-actions";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 
@@ -39,6 +40,7 @@ export default async function AdminProductsPage() {
               <th className="p-3">Stock</th>
               <th className="p-3">Flags</th>
               <th className="p-3">Visible</th>
+              <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -81,6 +83,9 @@ export default async function AdminProductsPage() {
                 </td>
                 <td className="p-3">
                   <VisibilityToggle id={p.id} visible={p.isVisible} />
+                </td>
+                <td className="p-3">
+                  <ProductRowActions id={p.id} title={p.title} />
                 </td>
               </tr>
             ))}

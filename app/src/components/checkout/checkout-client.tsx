@@ -407,12 +407,12 @@ export function CheckoutClient({ initialAddresses }: { initialAddresses: Address
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
                 <Button asChild className="gap-2">
-                  <a href="tel:+917989191962">
-                    <Phone className="size-4" /> Call +91 79891 91962
+                  <a href="tel:+919030390077">
+                    <Phone className="size-4" /> Call +91 90303 90077
                   </a>
                 </Button>
                 <Button variant="outline" asChild className="gap-2">
-                  <a href="https://wa.me/917989191962" target="_blank" rel="noreferrer">
+                  <a href="https://wa.me/919030390077" target="_blank" rel="noreferrer">
                     <MessageCircle className="size-4" /> WhatsApp
                   </a>
                 </Button>

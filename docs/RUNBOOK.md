@@ -56,6 +56,17 @@ docker run --rm --network deploy_default -v oms-backups:/b postgres:16-alpine \
 
 ## 6. Rotating secrets
 
+**bcrypt + Compose gotcha:** Docker Compose expands `$` inside `.env` values,
+and bcrypt hashes contain several. Always double them (`$` becomes `$$`) when
+pasting `ADMIN_PASSWORD_HASH`, or the stored hash is silently corrupted and
+every login fails. The one-liner in `.env.example` outputs the escaped form.
+Quick sanity check after changing it:
+
+```bash
+docker exec oms-web sh -c 'printenv ADMIN_PASSWORD_HASH | wc -c'   # must print 61
+```
+
+
 ```bash
 # new admin password hash:
 docker run --rm node:22-alpine node -e "console.log(require('bcryptjs').hashSync(process.argv[1],11))" 'NewPassword' \

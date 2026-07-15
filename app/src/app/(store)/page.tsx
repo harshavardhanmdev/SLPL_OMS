@@ -40,7 +40,7 @@ export default async function HomePage() {
   }));
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <div className="mx-auto max-w-[1500px] px-4 sm:px-6">
       {/* Festival sale banner (admin-scheduled) */}
       {sale && (
         <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-saffron/20 via-saffron/10 to-saffron/20 px-4 py-2.5 text-center text-sm font-medium ring-1 ring-saffron/40">
@@ -52,7 +52,7 @@ export default async function HomePage() {
       {/* Hero. The panel is the solid --dome-overlay color so the dome's
           radial fade blends into it seamlessly. */}
       <section className="relative mt-4 overflow-hidden rounded-3xl bg-[color:var(--dome-overlay)] ring-1 ring-border">
-        <div className="relative grid items-center gap-6 p-8 sm:p-12 lg:grid-cols-[1fr_1fr] lg:py-10 lg:pl-16 lg:pr-6">
+        <div className="relative grid items-center gap-6 p-8 sm:p-12 lg:grid-cols-[1fr_1.15fr] lg:py-8 lg:pl-16 lg:pr-4">
           <div className="space-y-6">
             <span className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-4 py-1.5 text-xs font-medium backdrop-blur">
               <Sparkles className="size-3.5 text-saffron-deep" />
@@ -95,8 +95,8 @@ export default async function HomePage() {
 
           {/* Rotating product dome. Hover to pause, drag to spin, click a
               cover to open the book. */}
-          <div className="relative hidden h-[480px] w-full lg:block">
-            {domeImages.length > 0 && <DomeGallery images={domeImages} />}
+          <div className="relative hidden h-[560px] w-full lg:block xl:h-[620px]">
+            {domeImages.length > 0 && <DomeGallery images={domeImages} fit={0.8} minRadius={580} />}
           </div>
         </div>
       </section>

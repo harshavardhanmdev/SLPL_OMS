@@ -16,7 +16,7 @@ export default async function BundlesPage() {
   const products = category?.products ?? [];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6">
       <header className="mb-8 max-w-2xl">
         <div className="mb-3 inline-flex rounded-xl bg-accent p-3 text-saffron-deep">
           <Layers className="size-7" />

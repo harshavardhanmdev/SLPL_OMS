@@ -7,7 +7,7 @@ import { mainNav, site } from "@/lib/site";
 export function SiteFooter() {
   return (
     <footer className="mt-16 border-t bg-secondary/50 dark:bg-card">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4">
+      <div className="mx-auto grid max-w-[1500px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-4">
         <div className="space-y-3 md:col-span-2 md:max-w-sm">
           <div className="flex items-center gap-2.5">
             <Image
@@ -69,7 +69,7 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:px-6">
+        <div className="mx-auto flex max-w-[1500px] flex-col items-center justify-between gap-3 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:px-6">
           <p>
             © {new Date().getFullYear()} {site.company}. All rights reserved.
           </p>

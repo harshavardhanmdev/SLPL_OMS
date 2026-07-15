@@ -21,7 +21,7 @@ export default async function CategoryPage({ params }: Props) {
   if (!category) notFound();
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6">
       <header className="mb-6 max-w-2xl">
         <h1 className="font-heading text-3xl font-bold">{category.name}</h1>
         {category.description && (

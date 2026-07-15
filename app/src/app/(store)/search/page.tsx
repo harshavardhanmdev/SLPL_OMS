@@ -13,7 +13,7 @@ export default async function SearchPage({ searchParams }: Props) {
   const [results, sale] = await Promise.all([searchProducts(q), getActiveSale()]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6">
       <form action="/search" className="mb-6 max-w-xl" role="search">
         <input
           type="search"

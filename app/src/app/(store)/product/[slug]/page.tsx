@@ -39,7 +39,7 @@ export default async function ProductPage({ params }: Props) {
   const bundleSavings = product.kind === "BUNDLE" && memberTotal > price ? memberTotal - price : 0;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6">
       <nav className="mb-5 text-sm text-muted-foreground" aria-label="Breadcrumb">
         <Link href="/" className="hover:text-foreground">Home</Link>
         <span className="mx-2">/</span>

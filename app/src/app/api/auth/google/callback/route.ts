@@ -10,8 +10,11 @@ export const dynamic = "force-dynamic";
 /** Step 2 of Login with Google: verify state, exchange code, sign the user in. */
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  // Behind the tunnel the request URL shows the container host (0.0.0.0:3000),
+  // so all redirects must be built on the public APP_URL.
+  const base = process.env.APP_URL || url.origin;
   const fail = (reason: string) =>
-    NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(reason)}`, url.origin));
+    NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(reason)}`, base));
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -63,13 +66,14 @@ export async function GET(request: Request) {
 
   const email = info.email.toLowerCase();
   const existing = await db.user.findUnique({ where: { email } });
+  // Avatars are initial-letter or locally uploaded; Google's picture URL is
+  // not stored (remote images are blocked by the image pipeline anyway).
   const user = existing
     ? await db.user.update({
         where: { id: existing.id },
         data: {
           lastLoginAt: new Date(),
           emailVerified: existing.emailVerified ?? new Date(),
-          image: existing.image ?? info.picture ?? null,
         },
       })
     : await db.user.create({
@@ -79,11 +83,10 @@ export async function GET(request: Request) {
           // Google users get an unguessable local password they never use
           passwordHash: await hashPassword(randomBytes(24).toString("hex")),
           emailVerified: new Date(),
-          image: info.picture ?? null,
           lastLoginAt: new Date(),
         },
       });
 
   await createSession({ uid: user.id, name: user.name, email: user.email });
-  return NextResponse.redirect(new URL(next, url.origin));
+  return NextResponse.redirect(new URL(next, base));
 }

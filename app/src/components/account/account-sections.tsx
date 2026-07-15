@@ -16,7 +16,6 @@ import {
   Save,
   Star,
   Trash2,
-  UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -63,12 +62,12 @@ export function AvatarUploader({ image, name }: { image: string | null; name: st
         hidden
         onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])}
       />
-      <div className="relative size-20 overflow-hidden rounded-full bg-accent ring-2 ring-border">
-        {image ? (
+      <div className="relative size-20 overflow-hidden rounded-full bg-primary ring-2 ring-border">
+        {image?.startsWith("/") ? (
           <Image src={image} alt={name} fill sizes="80px" className="object-cover" />
         ) : (
-          <span className="flex h-full items-center justify-center text-saffron-deep">
-            <UserRound className="size-9" />
+          <span className="flex h-full items-center justify-center font-heading text-4xl font-bold text-primary-foreground">
+            {(name.trim()[0] ?? "?").toUpperCase()}
           </span>
         )}
       </div>

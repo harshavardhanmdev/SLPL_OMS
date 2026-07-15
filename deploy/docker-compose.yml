@@ -54,6 +54,7 @@ services:
     env_file: .env
     environment:
       UPLOADS_DIR: /app/uploads
+      TZ: Asia/Kolkata # dates render in IST
     volumes:
       - oms-uploads:/app/uploads
     depends_on:
@@ -78,6 +79,8 @@ services:
     restart: always
     command: sh -c "NODE_OPTIONS=--conditions=react-server npx tsx scripts/worker.ts"
     env_file: .env
+    environment:
+      TZ: Asia/Kolkata
     depends_on:
       oms-db:
         condition: service_healthy

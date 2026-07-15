@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProductCard } from "@/components/store/product-card";
 import { ProductRail } from "@/components/store/product-rail";
-import InfiniteBookMenu from "@/components/store/infinite-book-menu";
+import { HeroCarousel } from "@/components/store/hero-carousel";
 import { db } from "@/lib/db";
 import { getHomeData } from "@/lib/catalog";
 import { site } from "@/lib/site";
@@ -100,31 +100,9 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Desktop: draggable book sphere; snaps to a book, tap opens it. */}
-          <div className="relative hidden h-[540px] w-full lg:block xl:h-[600px]">
-            {menuItems.length > 0 && <InfiniteBookMenu items={menuItems} />}
-          </div>
-
-          {/* Mobile: swipeable rail, two covers per view. */}
-          <div className="no-scrollbar -mx-2 flex snap-x snap-mandatory gap-3 overflow-x-auto px-2 pb-1 lg:hidden">
-            {menuItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="group w-[calc(50%-0.375rem)] shrink-0 snap-start overflow-hidden rounded-xl border bg-card shadow-sm transition-transform active:scale-[0.98]"
-              >
-                <span className="relative block aspect-[3/4]">
-                  <Image
-                    src={item.image}
-                    alt={item.title}
-                    fill
-                    sizes="45vw"
-                    className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                  />
-                </span>
-                <span className="line-clamp-1 block px-2.5 py-2 text-xs font-medium">{item.title}</span>
-              </Link>
-            ))}
+          {/* Product carousel: swipe or arrows, auto-advances, tap to open. */}
+          <div className="min-w-0">
+            <HeroCarousel items={menuItems} />
           </div>
         </div>
       </section>

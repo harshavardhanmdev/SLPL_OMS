@@ -1,26 +1,25 @@
 #!/usr/bin/env bash
-# make3d.sh <dieline.jpeg> <out.png>
-# Crops front+spine from the SLPL kit dieline and renders a 3D box mockup.
+# make3d-kit.sh <front.png> <spine.png> <out.png>
+# Renders the SLPL kit box mockup (front + left spine, shadow, 800x1067).
+# Panels stay near native resolution to avoid upscale blur; text is never
+# regenerated, only perspective-warped.
 set -euo pipefail
-SRC="$1"; OUT="$2"; T=$(mktemp -d)
-# Panels (all three dielines share the same 1600x900 layout)
-convert "$SRC" -crop 408x551+832+187 +repage "$T/front.png"
-convert "$SRC" -crop 50x551+766+187 +repage "$T/spine.png"
-# Spine face: recedes left, far edge foreshortened, darkened for depth
-convert "$T/spine.png" -modulate 78,92 -alpha set -virtual-pixel transparent \
-  -define distort:viewport=1200x1600+0+0 \
-  +distort Perspective "0,0 168,318 50,0 262,262 50,551 262,1288 0,551 168,1222" \
+FRONT="$1"; SPINE="$2"; OUT="$3"; T=$(mktemp -d)
+FW=$(identify -format %w "$FRONT"); FH=$(identify -format %h "$FRONT")
+SW=$(identify -format %w "$SPINE"); SH=$(identify -format %h "$SPINE")
+convert "$SPINE" -modulate 78,92 -alpha set -virtual-pixel transparent \
+  -define distort:viewport=800x1067+0+0 \
+  +distort Perspective "0,0 112,212 $SW,0 175,175 $SW,$SH 175,859 0,$SH 112,815" \
   "$T/spine3d.png"
-# Front face: near edge shared with spine, far edge slightly foreshortened
-convert "$T/front.png" -alpha set -virtual-pixel transparent \
-  -define distort:viewport=1200x1600+0+0 \
-  +distort Perspective "0,0 262,262 408,0 1010,300 408,551 1010,1250 0,551 262,1288" \
+convert "$FRONT" -alpha set -virtual-pixel transparent \
+  -define distort:viewport=800x1067+0+0 \
+  +distort Perspective "0,0 175,175 $FW,0 673,200 $FW,$FH 673,833 0,$FH 175,859" \
   "$T/front3d.png"
-# Soft ground shadow + composite on white
-convert -size 1200x1600 xc:white \
-  \( -size 900x140 xc:none -fill "rgba(20,25,45,0.28)" -draw "ellipse 450,70 430,55 0,360" -blur 0x22 \) -geometry +155+1240 -composite \
+convert -size 800x1067 xc:white \
+  \( -size 600x94 xc:none -fill "rgba(20,25,45,0.28)" -draw "ellipse 300,47 287,37 0,360" -blur 0x15 \) -geometry +103+827 -composite \
   "$T/spine3d.png" -composite \
   "$T/front3d.png" -composite \
-  \( -size 1200x1600 gradient:"rgba(255,255,255,0.16)-rgba(0,0,0,0.05)" \) -compose softlight -composite \
+  \( -size 800x1067 gradient:"rgba(255,255,255,0.16)-rgba(0,0,0,0.05)" \) -compose softlight -composite \
+  -unsharp 0x1+0.7+0.02 \
   "$OUT"
 rm -rf "$T"

@@ -8,3 +8,4 @@ dist/
 
 # generated prisma client
 app/src/generated/
+assets/cover_pdfs/

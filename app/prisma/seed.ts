@@ -7,24 +7,14 @@
  * in paise (₹349 = 34900).
  */
 import "dotenv/config";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
 });
-
-const covers = [
-  "/seed/covers/img3.jpeg",
-  "/seed/covers/img11.jpg",
-  "/seed/covers/img12.jpg",
-  "/seed/covers/img13.jpg",
-  "/seed/covers/img14.jpg",
-  "/seed/covers/img17.jpeg",
-  "/seed/covers/img18.jpeg",
-  "/seed/covers/img4.png",
-];
-const cover = (i: number) => covers[i % covers.length];
 
 async function upsertCategory(slug: string, name: string, description: string, sortOrder: number) {
   return db.category.upsert({
@@ -50,6 +40,7 @@ type ProductSeed = {
   samplePdf?: string;
   isNewRelease?: boolean;
   isFeatured?: boolean;
+  isVisible?: boolean;
 };
 
 async function upsertProduct(p: ProductSeed) {
@@ -68,9 +59,8 @@ async function upsertProduct(p: ProductSeed) {
     samplePdf: p.samplePdf,
     isNewRelease: p.isNewRelease ?? false,
     isFeatured: p.isFeatured ?? false,
-    // Visible with placeholder prices so the store demos end-to-end.
-    // OWNER_GUIDE: set real prices in /admin before pointing the public domain.
-    isVisible: true,
+    // Placeholder prices; owner sets real ones in /admin.
+    isVisible: p.isVisible ?? true,
   };
   return db.product.upsert({
     where: { slug: p.slug },
@@ -118,69 +108,6 @@ async function main() {
     6,
   );
 
-  // ── Baby Steps (Pre-Primary ×3) ─────────────────────────────────────────
-  const babySteps: ProductSeed[] = (
-    [
-      ["nursery", "Nursery", "first lines and strokes, colours, shapes, rhymes and number play"],
-      ["lkg", "LKG", "letter formation, phonic sounds, numbers to 50, patterns and picture talk"],
-      ["ukg", "UKG", "reading simple words, writing practice, numbers to 100 and early addition"],
-    ] as const
-  ).map(([slug, grade, focus], i) => ({
-    slug: `baby-steps-${slug}`,
-    title: `Baby Steps - ${grade}`,
-    categoryId: prePrimary.id,
-    series: "Baby Steps",
-    gradeLabel: grade,
-    description:
-      `A joyful, activity-first workbook for ${grade} covering ${focus}. ` +
-      `Large friendly type, colour illustrations on every page, and tear-free thick paper made for small hands. ` +
-      `Each unit ends with a fun "show what you know" activity parents can do with the child. ` +
-      `Developed by the SLPL curriculum team and refined through classroom use in partner schools.`,
-    mrp: 34900,
-    price: 29900,
-    weightGrams: 300,
-    coverImage: cover(i),
-  }));
-
-  // ── Little Leaps (Grades 1-5 ×5) ────────────────────────────────────────
-  const littleLeaps: ProductSeed[] = [1, 2, 3, 4, 5].map((g, i) => ({
-    slug: `little-leaps-grade-${g}`,
-    title: `Little Leaps - Grade ${g}`,
-    categoryId: primary.id,
-    series: "Little Leaps",
-    gradeLabel: `Grade ${g}`,
-    description:
-      `The complete Little Leaps companion for Grade ${g} - concepts explained the way children actually think. ` +
-      `Every chapter moves from a real-life hook to guided examples to independent practice, with skill-check boxes throughout. ` +
-      `Includes term-wise revision maps and QR-linked concept videos on the SLPL LMS. ` +
-      `Progressively revised to suit heterogeneous learners at state and national levels.`,
-    mrp: 39900,
-    price: 34900,
-    weightGrams: 400,
-    coverImage: cover(i + 3),
-    isNewRelease: g === 5,
-  }));
-
-  // ── Skill Builders (Grades 6-10 ×5) ─────────────────────────────────────
-  const skillBuilders: ProductSeed[] = [6, 7, 8, 9, 10].map((g, i) => ({
-    slug: `skill-builders-grade-${g}`,
-    title: `Skill Builders - Grade ${g}`,
-    categoryId: highSchool.id,
-    series: "Skill Builders",
-    gradeLabel: `Grade ${g}`,
-    description:
-      `Skill Builders for Grade ${g} turns the syllabus into mastery - module-wise practice that fills the gap between textbook and exam hall. ` +
-      `Graded exercise sets (basic → standard → challenge), previous-year style questions and UPSC-pattern concept probes. ` +
-      `Answer keys with worked solutions help students self-correct, not just check. ` +
-      `Trusted by partner schools across Telangana and Andhra Pradesh.`,
-    mrp: 44900,
-    price: 39900,
-    weightGrams: 450,
-    coverImage: cover(i + 1),
-    samplePdf: `/seed/samples/skill-builders-${g}.pdf`,
-    isNewRelease: g === 10,
-  }));
-
   // ── Novels & Poems ──────────────────────────────────────────────────────
   const novel: ProductSeed = {
     slug: "life-of-student",
@@ -198,22 +125,6 @@ async function main() {
     coverImage: "/seed/covers/life-of-student.jpg",
     isNewRelease: true,
     isFeatured: true,
-  };
-
-  const poems: ProductSeed = {
-    slug: "poems-collection-vol-1",
-    title: "SLPL Poems Collection - Volume 1",
-    kind: "POEMS",
-    categoryId: novelsPoems.id,
-    description:
-      `A curated collection of poems for young readers - rhythm, wonder and values in verses short enough to memorise and deep enough to discuss. ` +
-      `Ideal for recitation practice, morning assemblies and quiet reading alike. ` +
-      `Includes a reading guide for teachers and parents.`,
-    mrp: 19900,
-    price: 17900,
-    weightGrams: 200,
-    coverImage: cover(5),
-    isNewRelease: true,
   };
 
   // ── Little Leaps per-subject books (real covers from assets/cover_pages) ─
@@ -250,44 +161,135 @@ async function main() {
     isNewRelease: true,
   }));
 
-  const allBooks = [...babySteps, ...littleLeaps, ...subjectBooks, ...skillBuilders, novel, poems];
+  const allBooks = [...subjectBooks, novel];
   const created: Record<string, { id: string; price: number }> = {};
   for (const p of allBooks) {
     const row = await upsertProduct(p);
     created[p.slug] = { id: row.id, price: row.price };
   }
 
-  // ── Bundles (placeholder members - owner attaches the real set in admin) ─
-  const bundleDefs = [
-    { slug: "nursery-kit", grade: "Nursery", member: "baby-steps-nursery" },
-    { slug: "lkg-kit", grade: "LKG", member: "baby-steps-lkg" },
-    { slug: "ukg-kit", grade: "UKG", member: "baby-steps-ukg" },
-  ] as const;
-
-  for (const [i, b] of bundleDefs.entries()) {
-    const member = created[b.member];
-    const bundle = await upsertProduct({
-      slug: b.slug,
-      title: `${b.grade} Complete Kit`,
+  // ── Bundles ─────────────────────────────────────────────────────────────
+  // Pre-primary kits stay hidden until the owner uploads their images.
+  for (const grade of ["Nursery", "LKG", "UKG"] as const) {
+    await upsertProduct({
+      slug: `${grade.toLowerCase()}-kit`,
+      title: `${grade} Complete Kit`,
       kind: "BUNDLE",
       categoryId: bundles.id,
       series: "Baby Steps",
-      gradeLabel: b.grade,
+      gradeLabel: grade,
       description:
-        `Every SLPL book your child needs for ${b.grade}, packed as one kit at a bundled price. ` +
+        `Every SLPL book your child needs for ${grade}, packed as one kit at a bundled price. ` +
         `Covers language, numbers and activity work for the full academic year. ` +
-        `One order, one delivery, school-ready. ` +
-        `(Kit contents are being finalised - the list below will grow.)`,
-      mrp: 34900,
-      price: Math.round((member.price * 0.9) / 100) * 100, // 10% under member total, rounded to a rupee
+        `One order, one delivery, school-ready.`,
+      mrp: 99900,
+      price: 89900,
       weightGrams: 900,
-      coverImage: cover(i + 6),
+      isVisible: false,
     });
-    await db.bundleItem.upsert({
-      where: { bundleId_productId: { bundleId: bundle.id, productId: member.id } },
-      update: { quantity: 1 },
-      create: { bundleId: bundle.id, productId: member.id, quantity: 1 },
+  }
+
+  // Grade kits hold every subject book of that grade. Books added later in
+  // the admin panel attach to their grade kit automatically.
+  for (const grade of [1, 2, 3, 4, 5]) {
+    const label = `Grade ${grade}`;
+    const members = Object.entries(created).filter(([slug]) =>
+      slug.startsWith(`little-leaps-grade${grade}-`),
+    );
+    const memberTotal = members.reduce((sum, [, m]) => sum + m.price, 0);
+    const kit = await upsertProduct({
+      slug: `grade-${grade}-kit`,
+      title: `${label} Complete Kit`,
+      kind: "BUNDLE",
+      categoryId: bundles.id,
+      series: "Little Leaps",
+      gradeLabel: label,
+      description:
+        `The full Little Leaps set for ${label} in one box: every subject, one bundled price. ` +
+        `Cheaper than buying the books one by one, and everything arrives together, school-ready. ` +
+        `More titles join this kit as they are released.`,
+      mrp: memberTotal > 0 ? memberTotal : 99900,
+      price: memberTotal > 0 ? Math.round((memberTotal * 0.9) / 100) * 100 : 89900,
+      weightGrams: Math.max(400, members.length * 350),
+      isVisible: members.length > 0,
     });
+    for (const [, m] of members) {
+      await db.bundleItem.upsert({
+        where: { bundleId_productId: { bundleId: kit.id, productId: m.id } },
+        update: { quantity: 1 },
+        create: { bundleId: kit.id, productId: m.id, quantity: 1 },
+      });
+    }
+  }
+
+  // ── Books imported from cover PDFs (written by scripts/import-covers-batch.ts) ─
+  const importedPath = path.resolve(__dirname, "imported-books.json");
+  if (existsSync(importedPath)) {
+    type Imported = {
+      slug: string;
+      title: string;
+      categorySlug: string;
+      series: string;
+      gradeLabel: string;
+      description: string;
+      coverImage: string;
+      weightGrams: number;
+    };
+    const imported = JSON.parse(readFileSync(importedPath, "utf8")) as Imported[];
+    const catBySlug: Record<string, string> = {
+      "pre-primary": prePrimary.id,
+      primary: primary.id,
+      "high-school": highSchool.id,
+    };
+    for (const b of imported) {
+      const product = await db.product.upsert({
+        where: { slug: b.slug },
+        update: { coverImage: b.coverImage, title: b.title },
+        create: {
+          slug: b.slug,
+          title: b.title,
+          kind: "BOOK",
+          categoryId: catBySlug[b.categorySlug] ?? primary.id,
+          series: b.series,
+          gradeLabel: b.gradeLabel,
+          description: b.description,
+          mrp: 29900,
+          price: 24900,
+          stock: 100,
+          weightGrams: b.weightGrams,
+          coverImage: b.coverImage,
+          isNewRelease: true,
+          isVisible: true,
+        },
+      });
+      const kitSlug = `${b.gradeLabel.toLowerCase().replace(/\s/g, "-")}-kit`;
+      const kit = await db.product.upsert({
+        where: { slug: kitSlug },
+        update: {},
+        create: {
+          slug: kitSlug,
+          title: `${b.gradeLabel} Complete Kit`,
+          kind: "BUNDLE",
+          categoryId: bundles.id,
+          series: b.series.startsWith("Baby Steps") ? "Baby Steps" : b.series,
+          gradeLabel: b.gradeLabel,
+          description:
+            `The full ${b.series} set for ${b.gradeLabel} in one box: every subject, one bundled price. ` +
+            `Cheaper than buying the books one by one, and everything arrives together, school-ready.`,
+          mrp: 99900,
+          price: 89900,
+          weightGrams: 1200,
+          isVisible: false,
+        },
+      });
+      await db.bundleItem.upsert({
+        where: { bundleId_productId: { bundleId: kit.id, productId: product.id } },
+        update: {},
+        create: { bundleId: kit.id, productId: product.id, quantity: 1 },
+      });
+      await db.product.update({ where: { id: kit.id }, data: { isVisible: true } });
+    }
+    console.log(`imported-books.json: ${imported.length} books ensured`);
   }
 
   // ── Services showcase ───────────────────────────────────────────────────

@@ -130,6 +130,22 @@ export async function saveProduct(input: ProductInput): Promise<Result> {
   const row = d.id
     ? await db.product.update({ where: { id: d.id }, data })
     : await db.product.create({ data });
+
+  // Books join their grade's kit automatically ("Grade 3" book → "Grade 3
+  // Complete Kit"), so newly uploaded titles appear in the bundle without
+  // extra steps. Removing it from the kit stays a manual bundle edit.
+  if (data.kind !== "BUNDLE" && data.gradeLabel) {
+    const kit = await db.product.findFirst({
+      where: { kind: "BUNDLE", gradeLabel: data.gradeLabel, NOT: { id: row.id } },
+    });
+    if (kit) {
+      await db.bundleItem.upsert({
+        where: { bundleId_productId: { bundleId: kit.id, productId: row.id } },
+        update: {},
+        create: { bundleId: kit.id, productId: row.id, quantity: 1 },
+      });
+    }
+  }
   return { ok: true, id: row.id };
 }
 

@@ -18,6 +18,9 @@ const slugs = [
   ...[1, 2, 3, 4, 5].map((g) => `little-leaps-grade-${g}`), // old combined per-grade books
   ...[6, 7, 8, 9, 10].map((g) => `skill-builders-grade-${g}`),
   "poems-collection-vol-1",
+  // Grade kits removed 16 Jul 2026 (owner keeps only pre-primary kits)
+  ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((g) => `grade-${g}-kit`),
+  "skill-builders-grade9-geography", // merged into skill-builders-grade9-social
 ];
 
 async function main() {

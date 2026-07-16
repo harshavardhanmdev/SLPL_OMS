@@ -161,7 +161,44 @@ async function main() {
     isNewRelease: true,
   }));
 
-  const allBooks = [...subjectBooks, novel];
+  // ── Poem books ──────────────────────────────────────────────────────────
+  const poems: ProductSeed[] = [
+    {
+      slug: "seasons-of-my-soul",
+      title: "Seasons of My Soul",
+      kind: "POEMS",
+      categoryId: novelsPoems.id,
+      description:
+        `An anthology of nature poetry by Ramesh Mamidala, a progressive writer whose verses personify ` +
+        `nature in her originality. In this collection, AGNI speaks volumes about his deeper understanding of ` +
+        `nature and his close, emotional attachment to her: inspiration drawn from the outdoors with the touch ` +
+        `of Miltonic power. Through his poetry, Ramesh invites readers to evoke love for nature and preserve ` +
+        `her properly for our next generations.`,
+      mrp: 34900,
+      price: 29900, // dummy, owner edits in admin
+      weightGrams: 250,
+      coverImage: "/seed/covers/seasons-of-my-soul.webp",
+      isNewRelease: true,
+    },
+    {
+      slug: "pusthakavilapam",
+      title: "Pusthakavilapam (Telugu)",
+      kind: "POEMS",
+      categoryId: novelsPoems.id,
+      description:
+        `Pusthakavilapam, the lament of books, by Ramesh Mamidala. This is not just a story: it is a mirror ` +
+        `held up to our society and a quiet anguish over the reading habits we are losing. A Telugu work that ` +
+        `asks what happens to us when books fall silent, and gently calls readers back to them. ` +
+        `From the SLPL publishing house.`,
+      mrp: 24900,
+      price: 19900, // dummy, owner edits in admin
+      weightGrams: 200,
+      coverImage: "/seed/covers/pusthakavilapam.webp",
+      isNewRelease: true,
+    },
+  ];
+
+  const allBooks = [...subjectBooks, novel, ...poems];
   const created: Record<string, { id: string; price: number }> = {};
   for (const p of allBooks) {
     const row = await upsertProduct(p);
@@ -181,7 +218,9 @@ async function main() {
   });
 
   // ── Bundles ─────────────────────────────────────────────────────────────
-  // Pre-primary kits stay hidden until the owner uploads their images.
+  // Only the pre-primary kits exist for now (owner decision, 16 Jul 2026).
+  // Grade kits were removed; the admin auto-attach still works if the owner
+  // ever creates a bundle with a matching grade label.
   for (const grade of ["Nursery", "LKG", "UKG"] as const) {
     await upsertProduct({
       slug: `${grade.toLowerCase()}-kit`,
@@ -197,41 +236,9 @@ async function main() {
       mrp: 99900,
       price: 89900,
       weightGrams: 900,
-      isVisible: false,
+      coverImage: `/seed/covers/${grade.toLowerCase()}-kit.webp`,
+      isVisible: true,
     });
-  }
-
-  // Grade kits hold every subject book of that grade. Books added later in
-  // the admin panel attach to their grade kit automatically.
-  for (const grade of [1, 2, 3, 4, 5]) {
-    const label = `Grade ${grade}`;
-    const members = Object.entries(created).filter(([slug]) =>
-      slug.startsWith(`little-leaps-grade${grade}-`),
-    );
-    const memberTotal = members.reduce((sum, [, m]) => sum + m.price, 0);
-    const kit = await upsertProduct({
-      slug: `grade-${grade}-kit`,
-      title: `${label} Complete Kit`,
-      kind: "BUNDLE",
-      categoryId: bundles.id,
-      series: "Little Leaps",
-      gradeLabel: label,
-      description:
-        `The full Little Leaps set for ${label} in one box: every subject, one bundled price. ` +
-        `Cheaper than buying the books one by one, and everything arrives together, school-ready. ` +
-        `More titles join this kit as they are released.`,
-      mrp: memberTotal > 0 ? memberTotal : 99900,
-      price: memberTotal > 0 ? Math.round((memberTotal * 0.9) / 100) * 100 : 89900,
-      weightGrams: Math.max(400, members.length * 350),
-      isVisible: members.length > 0,
-    });
-    for (const [, m] of members) {
-      await db.bundleItem.upsert({
-        where: { bundleId_productId: { bundleId: kit.id, productId: m.id } },
-        update: { quantity: 1 },
-        create: { bundleId: kit.id, productId: m.id, quantity: 1 },
-      });
-    }
   }
 
   // ── Books imported from cover PDFs (written by scripts/import-covers-batch.ts) ─
@@ -274,32 +281,17 @@ async function main() {
           isVisible: true,
         },
       });
-      const kitSlug = `${b.gradeLabel.toLowerCase().replace(/\s/g, "-")}-kit`;
-      const kit = await db.product.upsert({
-        where: { slug: kitSlug },
-        update: {},
-        create: {
-          slug: kitSlug,
-          title: `${b.gradeLabel} Complete Kit`,
-          kind: "BUNDLE",
-          categoryId: bundles.id,
-          series: b.series.startsWith("Baby Steps") ? "Baby Steps" : b.series,
-          gradeLabel: b.gradeLabel,
-          description:
-            `The full ${b.series} set for ${b.gradeLabel} in one box: every subject, one bundled price. ` +
-            `Cheaper than buying the books one by one, and everything arrives together, school-ready.`,
-          mrp: 99900,
-          price: 89900,
-          weightGrams: 1200,
-          isVisible: false,
-        },
+      // Attach to a kit only when one exists for that grade (pre-primary today)
+      const kit = await db.product.findFirst({
+        where: { kind: "BUNDLE", gradeLabel: b.gradeLabel },
       });
-      await db.bundleItem.upsert({
-        where: { bundleId_productId: { bundleId: kit.id, productId: product.id } },
-        update: {},
-        create: { bundleId: kit.id, productId: product.id, quantity: 1 },
-      });
-      await db.product.update({ where: { id: kit.id }, data: { isVisible: true } });
+      if (kit) {
+        await db.bundleItem.upsert({
+          where: { bundleId_productId: { bundleId: kit.id, productId: product.id } },
+          update: {},
+          create: { bundleId: kit.id, productId: product.id, quantity: 1 },
+        });
+      }
     }
     console.log(`imported-books.json: ${imported.length} books ensured`);
   }

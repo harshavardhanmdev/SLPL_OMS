@@ -5,7 +5,7 @@ export const site = {
   description:
     "Official store of Saaradaa Learknowations - research-oriented school textbooks from Pre-Primary to Grade 12, UPSC Civils foundation material, novels, poem books and class bundles, delivered across India.",
   contact: {
-    person: "Mohammad Ismail",
+    person: "Ramesh Mamidala",
     phone: "+91 90303 90077",
     email: "saradapublications18@gmail.com",
     address: "2-3-472, Road No. 3D, Sai Nagar Colony, Nagole, Hyderabad - 500068",

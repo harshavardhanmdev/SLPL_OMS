@@ -23,10 +23,12 @@ import { ProductRail } from "@/components/store/product-rail";
 import { HeroCarousel } from "@/components/store/hero-carousel";
 import { db } from "@/lib/db";
 import { getHomeData } from "@/lib/catalog";
+import { formatINR } from "@/lib/money";
+import { effectivePrice } from "@/lib/pricing";
 import { site } from "@/lib/site";
 
 export default async function HomePage() {
-  const { newReleases, categories, bundleProducts, services, sale } = await getHomeData();
+  const { newReleases, featured, categories, bundleProducts, services, sale } = await getHomeData();
   // Every visible product with a cover feeds the dome, so books added in the
   // admin panel show up here automatically.
   // 16 covers fill the 42-tile sphere with repetition and keep the texture
@@ -106,6 +108,66 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Featured spotlight (owner-picked, currently Life of Student) */}
+      {featured.length > 0 && (
+        <section className="mt-10">
+          {featured.slice(0, 1).map((p) => {
+            const price = effectivePrice(p, sale);
+            return (
+              <div
+                key={p.id}
+                className="relative overflow-hidden rounded-3xl bg-navy text-white ring-1 ring-border"
+              >
+                <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-saffron/20 blur-3xl" />
+                <div className="relative grid items-center gap-8 p-8 sm:p-10 lg:grid-cols-[220px_1fr_auto] lg:p-12">
+                  <Link
+                    href={`/product/${p.slug}`}
+                    className="mx-auto block w-44 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/20 transition-transform hover:scale-[1.03] lg:w-52"
+                  >
+                    {p.coverImage && (
+                      <Image
+                        src={p.coverImage}
+                        alt={p.title}
+                        width={208}
+                        height={295}
+                        className="aspect-[3/4] w-full object-cover"
+                      />
+                    )}
+                  </Link>
+                  <div className="space-y-3 text-center lg:text-left">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-saffron">
+                      From the SLPL publishing house
+                    </p>
+                    <h2 className="text-balance font-heading text-3xl font-bold sm:text-4xl">{p.title}</h2>
+                    <p className="mx-auto max-w-2xl text-pretty text-sm text-white/80 lg:mx-0">
+                      A mirror, a movement and a manifesto for every learner: the acclaimed novel by
+                      educator Ramesh Mamidala, born from two decades inside real classrooms.
+                    </p>
+                    <p className="font-heading text-2xl font-bold text-saffron">
+                      {formatINR(price)}
+                      {p.mrp > price && (
+                        <span className="ml-2 text-base font-normal text-white/60 line-through">{formatINR(p.mrp)}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex justify-center lg:block">
+                    <Button
+                      size="lg"
+                      className="gap-2 bg-saffron text-navy hover:bg-saffron-deep"
+                      asChild
+                    >
+                      <Link href={`/product/${p.slug}`}>
+                        Read about it <ArrowRight className="size-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       {/* New releases - horizontally scrollable */}
       {newReleases.length > 0 && (

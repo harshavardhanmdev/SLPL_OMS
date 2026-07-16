@@ -111,18 +111,18 @@ async function main() {
   // ── Novels & Poems ──────────────────────────────────────────────────────
   const novel: ProductSeed = {
     slug: "life-of-student",
-    title: "Life of Student",
+    title: "Life of Student: A Tale of Four Students",
     kind: "NOVEL",
     categoryId: novelsPoems.id,
     description:
-      `A heartfelt novel that walks through the everyday battles of a student - friendships, failures, marks, dreams and the quiet courage it takes to keep going. ` +
-      `Written in simple, honest prose that young readers see themselves in. ` +
-      `A book meant to be passed from one school bag to another. ` +
-      `From the SLPL publishing house.`,
-    mrp: 29900,
-    price: 24900,
-    weightGrams: 250,
-    coverImage: "/seed/covers/life-of-student.jpg",
+      `Life of Student is written by Ramesh Mamidala, a compassionate educator and evocative writer whose work gives ` +
+      `voice to the silent and untold dreams of Indian students. Drawn from two decades of teaching and mentoring, from ` +
+      `counseling rooms echoing with unspoken fears to classrooms that thirst for creativity, this is more than fiction: ` +
+      `a mirror, a movement and a manifesto for every learner burdened by a system that demands scores but silences questions.`,
+    mrp: 44900,
+    price: 39900, // real price set by owner: ₹399
+    weightGrams: 300,
+    coverImage: "/seed/covers/life-of-student.webp",
     isNewRelease: true,
     isFeatured: true,
   };
@@ -167,6 +167,18 @@ async function main() {
     const row = await upsertProduct(p);
     created[p.slug] = { id: row.id, price: row.price };
   }
+  // The novel's price and cover are owner-final: force them on re-seed
+  await db.product.update({
+    where: { slug: "life-of-student" },
+    data: {
+      title: novel.title,
+      description: novel.description,
+      mrp: novel.mrp,
+      price: novel.price,
+      coverImage: novel.coverImage,
+      isFeatured: true,
+    },
+  });
 
   // ── Bundles ─────────────────────────────────────────────────────────────
   // Pre-primary kits stay hidden until the owner uploads their images.

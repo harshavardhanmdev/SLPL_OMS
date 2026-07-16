@@ -68,6 +68,11 @@ export function SiteFooter() {
                 Contact Us
               </Link>
             </li>
+            <li>
+              <Link href="/about" className="transition-colors hover:text-foreground">
+                About Us
+              </Link>
+            </li>
           </ul>
         </div>
 

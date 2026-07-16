@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { OrderLive } from "@/components/checkout/order-live";
+import { RetryPayment } from "@/components/checkout/retry-payment";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
@@ -119,14 +120,18 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
       </div>
 
       {order.status === "AWAITING_PAYMENT" && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-saffron/50 bg-accent/60 p-4 text-sm">
+        <div className="mb-6 flex flex-wrap items-start gap-3 rounded-xl border border-saffron/50 bg-accent/60 p-4 text-sm">
           <Clock className="mt-0.5 size-5 shrink-0 text-saffron-deep" />
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="font-medium">Waiting for your payment to confirm.</p>
             <p className="mt-0.5 text-muted-foreground">
               If you completed the payment, this page will update automatically within a few
               minutes - interrupted payments are auto-confirmed or auto-refunded, never lost.
+              If you closed the payment window, you can finish paying now.
             </p>
+            <div className="mt-3">
+              <RetryPayment orderNumber={order.orderNumber} />
+            </div>
           </div>
         </div>
       )}

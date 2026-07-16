@@ -41,6 +41,34 @@ export function SiteFooter() {
               </Link>
             </li>
           </ul>
+          <h3 className="mb-3 mt-6 text-sm font-semibold">Policies</h3>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li>
+              <Link href="/policies/shipping" className="transition-colors hover:text-foreground">
+                Shipping Policy
+              </Link>
+            </li>
+            <li>
+              <Link href="/policies/refund" className="transition-colors hover:text-foreground">
+                Cancellation &amp; Refunds
+              </Link>
+            </li>
+            <li>
+              <Link href="/policies/terms" className="transition-colors hover:text-foreground">
+                Terms &amp; Conditions
+              </Link>
+            </li>
+            <li>
+              <Link href="/policies/privacy" className="transition-colors hover:text-foreground">
+                Privacy Policy
+              </Link>
+            </li>
+            <li>
+              <Link href="/contact" className="transition-colors hover:text-foreground">
+                Contact Us
+              </Link>
+            </li>
+          </ul>
         </div>
 
         <div>

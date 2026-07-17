@@ -57,3 +57,71 @@ export async function markNotificationsRead(): Promise<{ ok: boolean }> {
   });
   return { ok: true };
 }
+
+export async function cancelMyOrder(orderNumber: string): Promise<{ ok?: boolean; error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Please log in again." };
+
+  const { restockOrder } = await import("@/lib/orders");
+  const { isRazorpayConfigured, refundPayment } = await import("@/lib/razorpay");
+  const { renderEmail, sendEmail } = await import("@/lib/email");
+  const { formatINR } = await import("@/lib/money");
+  const { notifyUser } = await import("@/lib/notify");
+
+  const order = await db.order.findFirst({
+    where: { orderNumber, userId: session.uid },
+    include: { payment: true, shipment: true },
+  });
+  if (!order) return { error: "Order not found." };
+  if (order.shipment?.awb || ["SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"].includes(order.status)) {
+    return { error: "This order has already shipped. Please use the return process after delivery, or contact us." };
+  }
+  if (!["AWAITING_PAYMENT", "COD_PENDING_OTP", "PAID", "CONFIRMED", "PROCESSING"].includes(order.status)) {
+    return { error: "This order can no longer be cancelled." };
+  }
+
+  const wasCaptured = order.payment?.status === "CAPTURED";
+  await db.$transaction([
+    db.order.update({ where: { id: order.id }, data: { status: "CANCELLED" } }),
+    db.orderEvent.create({ data: { orderId: order.id, status: "CANCELLED", note: "Cancelled by customer" } }),
+  ]);
+  await restockOrder(order.id);
+
+  let refundNote = "";
+  if (wasCaptured && order.payment?.razorpayPaymentId && isRazorpayConfigured()) {
+    try {
+      await refundPayment(order.payment.razorpayPaymentId);
+      await db.payment.update({
+        where: { orderId: order.id },
+        data: { status: "REFUNDED", refundedAmount: order.total },
+      });
+      await db.orderEvent.create({
+        data: { orderId: order.id, status: "REFUNDED", note: "Auto-refund issued on cancellation" },
+      });
+      refundNote = " Your payment is being refunded and should reach your account in 5-7 working days.";
+    } catch (err) {
+      console.error("[cancelMyOrder] refund failed", orderNumber, err);
+      refundNote = " Your refund is being processed and will reach your account in 5-7 working days.";
+      await db.orderEvent.create({
+        data: { orderId: order.id, status: "CANCELLED", note: "Refund pending - issue manually from Razorpay dashboard" },
+      });
+    }
+  }
+
+  await sendEmail({
+    to: order.customerEmail,
+    subject: `Order ${order.orderNumber} cancelled`,
+    template: "order-cancelled",
+    html: renderEmail(
+      "Your order is cancelled",
+      `<p>Order <b>${order.orderNumber}</b> (${formatINR(order.total)}) has been cancelled as you requested.${refundNote}</p>`,
+    ),
+  });
+  await notifyUser(
+    session.uid,
+    "Order cancelled",
+    `Order ${order.orderNumber} was cancelled.${refundNote}`,
+    `/account/orders/${order.orderNumber}`,
+  );
+  return { ok: true };
+}

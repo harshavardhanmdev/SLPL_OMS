@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { CancelOrder } from "@/components/checkout/cancel-order";
 import { OrderLive } from "@/components/checkout/order-live";
 import { RetryPayment } from "@/components/checkout/retry-payment";
 import { getSession } from "@/lib/auth";
@@ -297,6 +298,13 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
             </p>
             <p className="mt-1 font-medium">{formatINR(order.total)}</p>
           </div>
+          {["AWAITING_PAYMENT", "COD_PENDING_OTP", "PAID", "CONFIRMED", "PROCESSING"].includes(order.status) &&
+            !order.shipment?.awb && (
+              <CancelOrder
+                orderNumber={order.orderNumber}
+                paid={order.payment?.status === "CAPTURED"}
+              />
+            )}
           <Button variant="outline" className="w-full" asChild>
             <Link href="/account">Back to my orders</Link>
           </Button>

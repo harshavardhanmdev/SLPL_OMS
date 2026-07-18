@@ -286,6 +286,13 @@ export function SettingsPanel({ prefs }: { prefs: NotificationPrefs }) {
           </span>
           <Switch checked={v.promoEmails} onCheckedChange={(c) => void toggle("promoEmails", c)} />
         </label>
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>
+            <span className="block font-medium">SMS updates</span>
+            <span className="text-muted-foreground">Order confirmation and delivery texts</span>
+          </span>
+          <Switch checked={v.orderSms} onCheckedChange={(c) => void toggle("orderSms", c)} />
+        </label>
         <p className="text-xs text-muted-foreground">
           Payment receipts and order confirmations are always sent.
         </p>

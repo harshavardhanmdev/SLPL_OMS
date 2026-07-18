@@ -4,6 +4,8 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 
+import { isAdmin } from "@/lib/admin-auth";
+
 export const runtime = "nodejs";
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR ?? path.join(process.cwd(), "uploads");
@@ -31,6 +33,11 @@ export async function GET(
   const type = TYPES[ext];
   if (!type) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Courier receipt photos carry customer addresses - admin eyes only
+  if (name.startsWith("receipt-") && !(await isAdmin())) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const filePath = path.join(UPLOADS_DIR, name);
   try {
     const info = await stat(filePath);
@@ -39,7 +46,9 @@ export async function GET(
       headers: {
         "Content-Type": type,
         "Content-Length": String(info.size),
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": name.startsWith("receipt-")
+          ? "private, no-store"
+          : "public, max-age=31536000, immutable",
       },
     });
   } catch {

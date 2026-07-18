@@ -40,6 +40,7 @@ export async function savePrefs(prefs: NotificationPrefs): Promise<{ ok: boolean
   const clean: NotificationPrefs = {
     orderEmails: Boolean(prefs.orderEmails),
     promoEmails: Boolean(prefs.promoEmails),
+    orderSms: Boolean(prefs.orderSms),
   };
   await db.user.update({
     where: { id: session.uid },

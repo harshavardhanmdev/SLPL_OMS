@@ -11,6 +11,7 @@ import {
   Settings,
   Store,
   Ticket,
+  Truck,
   UsersRound,
 } from "lucide-react";
 
@@ -21,6 +22,7 @@ import { Button } from "@/components/ui/button";
 const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: Package },
+  { href: "/admin/shipments", label: "Shipments", icon: Truck },
   { href: "/admin/products", label: "Products", icon: Boxes },
   { href: "/admin/users", label: "Customers", icon: UsersRound },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },

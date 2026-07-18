@@ -5,9 +5,10 @@ import { db } from "@/lib/db";
 export type NotificationPrefs = {
   orderEmails: boolean; // shipped / out-for-delivery / delivered emails
   promoEmails: boolean;
+  orderSms: boolean; // order confirmation + delivery status texts
 };
 
-export const DEFAULT_PREFS: NotificationPrefs = { orderEmails: true, promoEmails: true };
+export const DEFAULT_PREFS: NotificationPrefs = { orderEmails: true, promoEmails: true, orderSms: true };
 
 export async function getPrefs(userId: string): Promise<NotificationPrefs> {
   const user = await db.user.findUnique({ where: { id: userId }, select: { notificationPrefs: true } });

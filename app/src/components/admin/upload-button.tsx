@@ -11,7 +11,7 @@ export function UploadButton({
   label,
   onUploaded,
 }: {
-  kind: "image" | "pdf";
+  kind: "image" | "pdf" | "receipt";
   label: string;
   onUploaded: (url: string) => void;
 }) {
@@ -44,7 +44,7 @@ export function UploadButton({
         ref={inputRef}
         type="file"
         hidden
-        accept={kind === "image" ? "image/*" : "application/pdf"}
+        accept={kind === "pdf" ? "application/pdf" : "image/*"}
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) void handleFile(f);

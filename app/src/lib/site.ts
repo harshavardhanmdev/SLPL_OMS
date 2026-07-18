@@ -18,6 +18,10 @@ export const site = {
   },
 } as const;
 
+// DTDC has no per-consignment URL; customers paste the AWB on this page.
+// Admin-overridable via the tracking_url_template setting.
+export const DEFAULT_TRACKING_URL = "https://www.dtdc.com/track-your-shipment";
+
 export const bookCategories = [
   { slug: "pre-primary", name: "Pre-Primary", series: "Baby Steps", grades: "Nursery · LKG · UKG" },
   { slug: "primary", name: "Primary", series: "Little Leaps", grades: "Grade 1 - 5" },

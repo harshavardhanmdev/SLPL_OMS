@@ -20,6 +20,7 @@ export type SettingsValues = {
   store_notice: string;
   contact_phone: string;
   contact_email: string;
+  tracking_url_template: string;
 };
 
 export function SettingsForm({ initial }: { initial: SettingsValues }) {
@@ -35,6 +36,7 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
     store_notice: initial.store_notice,
     contact_phone: initial.contact_phone,
     contact_email: initial.contact_email,
+    tracking_url_template: initial.tracking_url_template,
   });
 
   function set(key: keyof typeof v, value: string) {
@@ -55,6 +57,7 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
         store_notice: v.store_notice,
         contact_phone: v.contact_phone,
         contact_email: v.contact_email,
+        tracking_url_template: v.tracking_url_template,
       });
       if (res.error) toast.error(res.error);
       else {
@@ -99,6 +102,17 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
               onChange={(e) => set("origin_pincode", e.target.value.replace(/\D/g, ""))}
             />
             <p className="text-xs text-muted-foreground">Where parcels ship from (used for delivery estimates).</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Courier tracking page</Label>
+            <Input
+              value={v.tracking_url_template}
+              onChange={(e) => set("tracking_url_template", e.target.value)}
+              placeholder="https://www.dtdc.com/track-your-shipment"
+            />
+            <p className="text-xs text-muted-foreground">
+              Prefills the tracking link when you ship an order (DTDC page by default).
+            </p>
           </div>
         </div>
       </div>

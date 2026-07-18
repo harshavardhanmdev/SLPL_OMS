@@ -39,6 +39,56 @@ RAZORPAY_WEBHOOK_SECRET=the-secret-you-typed-in-step-6
 
 ---
 
+## 2a. Self-shipment with DTDC (current mode)
+
+The store is set up for self-shipment: you pack, a DTDC agent picks up, and
+you enter the consignment number in **Admin → Shipments**. Nothing to sign up
+for - this works today. Two optional add-ons make it richer:
+
+### SMS updates (Brevo transactional SMS)
+
+Customers already get emails and in-app notifications at every stage. To also
+send SMS (order confirmed, shipped with tracking number, out for delivery,
+delivered):
+
+1. In your Brevo account (same one as email, section 3): **SMS** →
+   activate transactional SMS. SMS credits are prepaid (about 20-25 paise per
+   SMS in India).
+2. **India DLT requirement:** to send SMS in India you must register the
+   company and a sender ID (e.g. `SLPLST`) on a DLT portal (Jio/Airtel/Vodafone
+   TrustBox etc.) and get the message templates approved. Brevo's help pages
+   walk through it. Until that is done, keep SMS off.
+3. Get an API key: **SMTP & API** → API Keys → generate.
+
+```ini
+BREVO_API_KEY=xkeysib-...
+SMS_SENDER=SLPLST
+```
+
+Add to `deploy/.env` on the server and restart. No key = no SMS, everything
+else works.
+
+### Automatic DTDC tracking (trackcourier.io)
+
+DTDC has no free public API, so by default you advance orders yourself in
+Admin → Shipments (Out for delivery / Mark delivered). To have the worker do
+it automatically every 3 hours:
+
+1. https://api.trackcourier.io → sign up (free tier: 100 lookups/month,
+   plenty at current volume).
+2. Copy the API key from the dashboard.
+
+```ini
+TRACKCOURIER_API_KEY=...
+```
+
+With the key set, the worker polls DTDC via trackcourier.io for every
+in-transit consignment, appends checkpoints to the customer's timeline, and
+flips orders to Out for delivery / Delivered (with the usual emails and SMS)
+without you touching anything.
+
+---
+
 ## 2. Shiprocket (courier)
 
 **What it gives you:** one account → BlueDart, Delhivery, DTDC, Xpressbees,

@@ -2,11 +2,13 @@ import "server-only";
 
 import { renderEmail, sendEmail } from "@/lib/email";
 import { getPrefs, notifyUser } from "@/lib/notify";
+import { sendSms } from "@/lib/sms";
 
 type OrderLite = {
   orderNumber: string;
   customerName: string;
   customerEmail: string;
+  customerPhone?: string | null;
   userId: string;
 };
 
@@ -24,7 +26,14 @@ export async function emailShipped(order: OrderLite, shipment: ShipmentLite): Pr
     `Order ${order.orderNumber} shipped via ${shipment.courierName ?? "courier"}${shipment.awb ? `, AWB ${shipment.awb}` : ""}.`,
     `/account/orders/${order.orderNumber}`,
   );
-  if (!(await getPrefs(order.userId)).orderEmails) return;
+  const prefs = await getPrefs(order.userId);
+  if (prefs.orderSms) {
+    await sendSms(
+      order.customerPhone,
+      `SLPL Store: order ${order.orderNumber} shipped via ${shipment.courierName ?? "courier"}${shipment.awb ? `, consignment ${shipment.awb}` : ""}.${shipment.trackingUrl ? ` Track: ${shipment.trackingUrl}` : ""}`,
+    );
+  }
+  if (!prefs.orderEmails) return;
   const trackBlock = shipment.trackingUrl
     ? `<p style="margin:16px 0;text-align:center"><a href="${shipment.trackingUrl}" style="display:inline-block;background:#1e2a5a;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 24px;font-weight:bold">Track your package</a></p>`
     : "";
@@ -51,7 +60,14 @@ export async function emailOutForDelivery(order: OrderLite, shipment: ShipmentLi
     `Order ${order.orderNumber} is out for delivery. Keep your phone reachable.`,
     `/account/orders/${order.orderNumber}`,
   );
-  if (!(await getPrefs(order.userId)).orderEmails) return;
+  const prefs = await getPrefs(order.userId);
+  if (prefs.orderSms) {
+    await sendSms(
+      order.customerPhone,
+      `SLPL Store: order ${order.orderNumber} is out for delivery today. Please keep your phone reachable.`,
+    );
+  }
+  if (!prefs.orderEmails) return;
   await sendEmail({
     to: order.customerEmail,
     subject: `Out for delivery - order ${order.orderNumber} 🚚`,
@@ -72,7 +88,14 @@ export async function emailDelivered(order: OrderLite): Promise<void> {
     `Order ${order.orderNumber} was delivered.`,
     `/account/orders/${order.orderNumber}`,
   );
-  if (!(await getPrefs(order.userId)).orderEmails) return;
+  const prefs = await getPrefs(order.userId);
+  if (prefs.orderSms) {
+    await sendSms(
+      order.customerPhone,
+      `SLPL Store: order ${order.orderNumber} was delivered. Happy learning! Damaged copy? Call +91 90303 90077 within 48 hours.`,
+    );
+  }
+  if (!prefs.orderEmails) return;
   await sendEmail({
     to: order.customerEmail,
     subject: `Delivered - order ${order.orderNumber} ✅`,

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 
@@ -7,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { OrderActions } from "@/components/admin/order-actions";
+import { getSetting } from "@/lib/catalog";
+import { DEFAULT_TRACKING_URL } from "@/lib/site";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { isShiprocketConfigured } from "@/lib/shipping/shiprocket";
@@ -66,6 +69,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         orderNumber={order.orderNumber}
         status={order.status}
         shiprocketEnabled={isShiprocketConfigured()}
+        trackingUrlDefault={await getSetting("tracking_url_template", DEFAULT_TRACKING_URL)}
       />
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -167,6 +171,19 @@ export default async function AdminOrderDetailPage({ params }: Props) {
               </>
             )}
           </p>
+          {order.shipment.trackingPhotoUrl && (
+            <a href={order.shipment.trackingPhotoUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block">
+              <Image
+                src={order.shipment.trackingPhotoUrl}
+                alt="Courier receipt"
+                width={120}
+                height={120}
+                unoptimized
+                className="rounded-lg border object-cover"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">Courier receipt (admin only)</span>
+            </a>
+          )}
         </div>
       )}
 

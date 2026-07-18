@@ -303,7 +303,13 @@ const NUMERIC_SETTINGS = new Set([
   "free_shipping_threshold",
   "shipping_flat_fee",
 ]);
-const TEXT_SETTINGS = new Set(["origin_pincode", "store_notice", "contact_phone", "contact_email"]);
+const TEXT_SETTINGS = new Set([
+  "origin_pincode",
+  "store_notice",
+  "contact_phone",
+  "contact_email",
+  "tracking_url_template",
+]);
 
 export async function saveSettings(values: Record<string, string>): Promise<Result> {
   const denied = await ensureAdmin();
@@ -378,6 +384,11 @@ export async function orderMarkProcessing(orderNumber: string): Promise<Result> 
   await db.$transaction([
     db.order.update({ where: { id: order.id }, data: { status: "PROCESSING" } }),
     db.orderEvent.create({ data: { orderId: order.id, status: "PROCESSING", note: "Packing started" } }),
+    db.shipment.upsert({
+      where: { orderId: order.id },
+      update: { packedAt: new Date() },
+      create: { orderId: order.id, provider: "manual", status: "PENDING", packedAt: new Date() },
+    }),
   ]);
   return { ok: true };
 }
@@ -387,6 +398,12 @@ const shipSchema = z.object({
   awb: z.string().trim().min(4).max(40),
   trackingUrl: z.string().url().max(300).optional().or(z.literal("")),
   etaDays: z.number().int().min(1).max(30).nullable().optional(),
+  trackingPhotoUrl: z
+    .string()
+    .regex(/^\/media\/receipt-[a-z0-9.-]+$/)
+    .max(120)
+    .optional()
+    .or(z.literal("")),
 });
 
 export async function orderShip(
@@ -414,6 +431,7 @@ export async function orderShip(
       awb: d.awb,
       trackingUrl,
       etaDays: d.etaDays ?? null,
+      ...(d.trackingPhotoUrl ? { trackingPhotoUrl: d.trackingPhotoUrl } : {}),
     },
     create: {
       orderId: order.id,
@@ -423,6 +441,7 @@ export async function orderShip(
       awb: d.awb,
       trackingUrl,
       etaDays: d.etaDays ?? null,
+      trackingPhotoUrl: d.trackingPhotoUrl || null,
     },
   });
   await db.$transaction([

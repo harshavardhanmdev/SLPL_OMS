@@ -24,15 +24,16 @@ export async function POST(request: Request) {
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
   const kind = form?.get("kind");
-  if (!(file instanceof File) || (kind !== "image" && kind !== "pdf")) {
+  if (!(file instanceof File) || (kind !== "image" && kind !== "pdf" && kind !== "receipt")) {
     return NextResponse.json({ error: "Send multipart form-data with file + kind" }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
   await mkdir(UPLOADS_DIR, { recursive: true });
-  const stamp = `${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
+  // "receipt-" prefixed files are served only to admins (courier slips carry addresses)
+  const stamp = `${kind === "receipt" ? "receipt-" : ""}${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
 
-  if (kind === "image") {
+  if (kind === "image" || kind === "receipt") {
     if (buffer.byteLength > MAX_IMAGE_BYTES) {
       return NextResponse.json({ error: "Image too large (max 10 MB)" }, { status: 413 });
     }

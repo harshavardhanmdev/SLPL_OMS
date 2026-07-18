@@ -300,6 +300,8 @@ model Shipment {
   shiprocketOrderId    String?
   shiprocketShipmentId String?
   etaDays              Int?
+  trackingPhotoUrl     String? // courier receipt photo, served admin-only
+  packedAt             DateTime?
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
 

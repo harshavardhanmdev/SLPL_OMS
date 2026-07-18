@@ -16,10 +16,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { AwbCopy } from "@/components/checkout/awb-copy";
 import { CancelOrder } from "@/components/checkout/cancel-order";
 import { OrderLive } from "@/components/checkout/order-live";
 import { RetryPayment } from "@/components/checkout/retry-payment";
 import { getSession } from "@/lib/auth";
+import { getSetting } from "@/lib/catalog";
+import { DEFAULT_TRACKING_URL } from "@/lib/site";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 
@@ -208,19 +211,27 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
             <div className="p-4">
               {order.shipment?.awb ? (
                 <div className="space-y-3">
-                  <p className="text-sm">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-muted-foreground">Courier:</span>{" "}
                     <b>{order.shipment.courierName ?? "Assigned"}</b>
-                    {" · "}
-                    <span className="text-muted-foreground">AWB:</span> <b>{order.shipment.awb}</b>
+                    <span className="text-muted-foreground">· Tracking number:</span>
+                    <AwbCopy awb={order.shipment.awb} />
+                  </div>
+                  <Button size="sm" className="gap-2" asChild>
+                    <a
+                      href={
+                        order.shipment.trackingUrl ??
+                        (await getSetting("tracking_url_template", DEFAULT_TRACKING_URL))
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Track on courier page <ExternalLink className="size-3.5" />
+                    </a>
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Tap the number to copy it, then paste it on the courier&apos;s tracking page.
                   </p>
-                  {order.shipment.trackingUrl && (
-                    <Button size="sm" className="gap-2" asChild>
-                      <a href={order.shipment.trackingUrl} target="_blank" rel="noreferrer">
-                        Track on courier page <ExternalLink className="size-3.5" />
-                      </a>
-                    </Button>
-                  )}
                   {order.shipment.events.length > 0 && (
                     <ul className="space-y-2 border-l-2 border-border pl-4 text-sm">
                       {order.shipment.events.map((ev) => (

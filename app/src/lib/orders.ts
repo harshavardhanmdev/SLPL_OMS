@@ -6,7 +6,8 @@ import { getActiveSale, getSetting } from "@/lib/catalog";
 import { effectivePrice } from "@/lib/pricing";
 import { estimateDelivery } from "@/lib/shipping/estimate";
 import { renderEmail, sendEmail, notifyOwner } from "@/lib/email";
-import { notifyUser } from "@/lib/notify";
+import { getPrefs, notifyUser } from "@/lib/notify";
+import { sendSms } from "@/lib/sms";
 import { formatINR } from "@/lib/money";
 import {
   fetchPaymentsForOrder,
@@ -355,6 +356,13 @@ export async function markOrderPaid(
     `Payment received for order ${order.orderNumber}. We are packing your books.`,
     `/account/orders/${order.orderNumber}`,
   );
+  if ((await getPrefs(order.userId)).orderSms) {
+    await sendSms(
+      order.customerPhone,
+      // "Rs." keeps the SMS in plain GSM text; the rupee sign would force short UCS-2 segments
+      `SLPL Store: payment received for order ${order.orderNumber} (Rs. ${Math.round(order.total / 100)}). We are packing your books.`,
+    );
+  }
 
   await sendEmail({
     to: order.customerEmail,
@@ -396,6 +404,12 @@ export async function confirmCodOrder(orderId: string): Promise<void> {
     `Order ${order.orderNumber} is confirmed. Keep the amount ready at delivery.`,
     `/account/orders/${order.orderNumber}`,
   );
+  if ((await getPrefs(order.userId)).orderSms) {
+    await sendSms(
+      order.customerPhone,
+      `SLPL Store: COD order ${order.orderNumber} confirmed. Please keep Rs. ${Math.round(order.total / 100)} ready at delivery.`,
+    );
+  }
 
   await sendEmail({
     to: order.customerEmail,

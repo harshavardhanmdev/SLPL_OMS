@@ -38,7 +38,7 @@ export default async function AdminDashboard() {
   const stats = [
     { label: "Orders today", value: String(todayOrders), icon: Package },
     { label: "Revenue today", value: formatINR(todayRevenue._sum.total ?? 0), icon: IndianRupee },
-    { label: "Waiting to ship", value: String(pendingShip), icon: Truck },
+    { label: "Waiting to ship", value: String(pendingShip), icon: Truck, href: "/admin/shipments" },
   ];
 
   return (
@@ -46,13 +46,25 @@ export default async function AdminDashboard() {
       <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        {stats.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="rounded-2xl border bg-card p-5">
-            <Icon className="mb-2 size-5 text-saffron-deep" />
-            <p className="font-heading text-2xl font-bold">{value}</p>
-            <p className="text-sm text-muted-foreground">{label}</p>
-          </div>
-        ))}
+        {stats.map(({ label, value, icon: Icon, href }) =>
+          href ? (
+            <Link
+              key={label}
+              href={href}
+              className="rounded-2xl border bg-card p-5 transition-colors hover:border-saffron/60"
+            >
+              <Icon className="mb-2 size-5 text-saffron-deep" />
+              <p className="font-heading text-2xl font-bold">{value}</p>
+              <p className="text-sm text-muted-foreground">{label}</p>
+            </Link>
+          ) : (
+            <div key={label} className="rounded-2xl border bg-card p-5">
+              <Icon className="mb-2 size-5 text-saffron-deep" />
+              <p className="font-heading text-2xl font-bold">{value}</p>
+              <p className="text-sm text-muted-foreground">{label}</p>
+            </div>
+          ),
+        )}
       </div>
 
       {lowStock.length > 0 && (

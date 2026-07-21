@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProductCard } from "@/components/store/product-card";
 import { ProductRail } from "@/components/store/product-rail";
-import { HeroCarousel } from "@/components/store/hero-carousel";
+import { HeroConveyor, type ConveyorCover } from "@/components/store/hero-conveyor";
 import { db } from "@/lib/db";
 import { getHomeData } from "@/lib/catalog";
 import { formatINR } from "@/lib/money";
@@ -29,21 +29,18 @@ import { site } from "@/lib/site";
 
 export default async function HomePage() {
   const { newReleases, featured, categories, bundleProducts, services, sale } = await getHomeData();
-  // Every visible product with a cover feeds the dome, so books added in the
-  // admin panel show up here automatically.
-  // 16 covers fill the 42-tile sphere with repetition and keep the texture
-  // atlas download small (a large pool made first paint take ~5s)
-  const domeProducts = await db.product.findMany({
+  // Hero frame: a mixed stream of real covers circles the hero border, so
+  // books added in the admin panel show up automatically.
+  const heroPool = await db.product.findMany({
     where: { isVisible: true, coverImage: { not: null } },
     select: { slug: true, title: true, coverImage: true },
-    orderBy: [{ isNewRelease: "desc" }, { updatedAt: "desc" }],
-    take: 16,
+    take: 60,
   });
-  const menuItems = domeProducts.map((p) => ({
-    image: p.coverImage!,
-    title: p.title,
-    href: `/product/${p.slug}`,
-  }));
+  const heroCovers: ConveyorCover[] = [...heroPool]
+    .sort(() => 0.5 - Math.random())
+    .filter((p, i, arr) => i === 0 || p.coverImage !== arr[i - 1].coverImage)
+    .slice(0, 28)
+    .map((p) => ({ src: p.coverImage!, title: p.title, href: `/product/${p.slug}` }));
 
   return (
     <div className="mx-auto max-w-[1500px] px-4 sm:px-6">
@@ -55,58 +52,56 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* Hero: products front and center, copy kept subtle. */}
+      {/* Hero: a clockwise conveyor of covers frames the copy. */}
       <section className="relative mt-4 overflow-hidden rounded-3xl bg-[color:var(--dome-overlay)] ring-1 ring-border">
-        <div className="relative grid items-center gap-8 p-6 sm:p-10 lg:grid-cols-[0.8fr_1.2fr] lg:py-6 lg:pl-14 lg:pr-4">
-          <div className="space-y-5">
-            <span className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-4 py-1.5 text-xs font-medium backdrop-blur">
-              <Sparkles className="size-3.5 text-saffron-deep" />
-              {site.company}
-            </span>
-            <p className="font-heading text-lg font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Nursery to Civils, <span className="text-saffron-deep">one store.</span>
-            </p>
-            <p className="max-w-md text-pretty text-sm text-muted-foreground sm:text-base">
-              Research-oriented textbooks for every grade, complete class
-              bundles, novels and a UPSC Civils foundation, delivered anywhere
-              in India.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Button size="lg" className="gap-2" asChild>
-                <Link href="/categories">
-                  Shop books <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" className="gap-2 border-saffron/60" asChild>
-                <Link href="/bundles">
-                  <Layers className="size-4 text-saffron-deep" /> Class bundles
-                </Link>
-              </Button>
+        <HeroConveyor covers={heroCovers}>
+          <div className="grid items-center gap-8 lg:grid-cols-[1.2fr_1fr]">
+            <div className="space-y-5 text-center lg:text-left">
+              <span className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-4 py-1.5 text-sm font-medium backdrop-blur">
+                <Sparkles className="size-4 text-saffron-deep" />
+                {site.company}
+              </span>
+              <h1 className="font-heading text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
+                Nursery to Civils,{" "}
+                <span className="text-saffron-deep">one store.</span>
+              </h1>
+              <p className="mx-auto max-w-xl text-pretty text-base text-muted-foreground sm:text-lg lg:mx-0">
+                Research-oriented textbooks for every grade, complete class
+                bundles, novels and a UPSC Civils foundation, delivered
+                anywhere in India.
+              </p>
+              <div className="flex flex-wrap justify-center gap-3 lg:justify-start">
+                <Button size="lg" className="gap-2" asChild>
+                  <Link href="/categories">
+                    Shop books <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" className="gap-2 border-saffron/60" asChild>
+                  <Link href="/bundles">
+                    <Layers className="size-4 text-saffron-deep" /> Class bundles
+                  </Link>
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <GraduationCap className="size-4 text-saffron-deep" /> Nursery → Grade 12
-              </span>
-              <span className="flex items-center gap-1.5">
-                <FlaskConical className="size-4 text-saffron-deep" /> Research-first material
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Landmark className="size-4 text-saffron-deep" /> UPSC Civils
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Truck className="size-4 text-saffron-deep" /> Pan-India delivery
-              </span>
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck className="size-4 text-saffron-deep" /> Secure payments
-              </span>
-            </div>
+            <ul className="grid grid-cols-2 gap-2 text-xs font-medium sm:gap-3 sm:text-sm lg:grid-cols-1 lg:text-base">
+              <li className="col-span-2 flex items-center gap-2 rounded-xl border bg-background/70 px-3 py-2 backdrop-blur sm:gap-2.5 sm:px-4 sm:py-2.5 lg:col-span-1">
+                <GraduationCap className="size-4 shrink-0 text-saffron-deep sm:size-5" /> Nursery → Grade 12, every subject
+              </li>
+              <li className="flex items-center gap-2 rounded-xl border bg-background/70 px-3 py-2 backdrop-blur sm:gap-2.5 sm:px-4 sm:py-2.5">
+                <FlaskConical className="size-4 shrink-0 text-saffron-deep sm:size-5" /> Research-first material
+              </li>
+              <li className="flex items-center gap-2 rounded-xl border bg-background/70 px-3 py-2 backdrop-blur sm:gap-2.5 sm:px-4 sm:py-2.5">
+                <Landmark className="size-4 shrink-0 text-saffron-deep sm:size-5" /> UPSC Civils foundation
+              </li>
+              <li className="flex items-center gap-2 rounded-xl border bg-background/70 px-3 py-2 backdrop-blur sm:gap-2.5 sm:px-4 sm:py-2.5">
+                <Truck className="size-4 shrink-0 text-saffron-deep sm:size-5" /> Pan-India delivery
+              </li>
+              <li className="flex items-center gap-2 rounded-xl border bg-background/70 px-3 py-2 backdrop-blur sm:gap-2.5 sm:px-4 sm:py-2.5">
+                <ShieldCheck className="size-4 shrink-0 text-saffron-deep sm:size-5" /> Secure payments
+              </li>
+            </ul>
           </div>
-
-          {/* Product carousel: swipe or arrows, auto-advances, tap to open. */}
-          <div className="min-w-0">
-            <HeroCarousel items={menuItems} />
-          </div>
-        </div>
+        </HeroConveyor>
       </section>
 
       {/* Featured spotlight (owner-picked, currently Life of Student) */}

@@ -10,8 +10,9 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      // Razorpay checkout + Google Maps scripts + Next inline runtime
-      "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://maps.googleapis.com",
+      // Razorpay checkout + Google Maps scripts + Next inline runtime.
+      // Dev only: React's debugging tooling needs eval; production never does.
+      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} https://checkout.razorpay.com https://maps.googleapis.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // OSM/Google map tiles, uploaded covers, Google avatars, data/blob previews
       "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.googleapis.com https://*.gstatic.com https://*.googleusercontent.com",

@@ -71,17 +71,52 @@ export async function getHomeData() {
   return { newReleases, featured, categories, bundleProducts, services, sale, notice };
 }
 
+// Alphabetical gradeLabel sorting puts Grade 10 before Grade 2 and LKG before
+// Nursery, so rank grades and subjects explicitly and sort in JS.
+const GRADE_ORDER = ["Nursery", "LKG", "UKG"];
+const SUBJECT_ORDER = [
+  "english", "telugu", "hindi", "math", "evs", "science", "social", "geography",
+  "history", "general knowledge", "computer", "rhymes", "cursive", "handwriting",
+  "writing", "drawing", "coloring",
+];
+
+export function gradeRank(gradeLabel: string | null): number {
+  if (!gradeLabel) return 999;
+  const named = GRADE_ORDER.indexOf(gradeLabel);
+  if (named !== -1) return named;
+  const num = gradeLabel.match(/(\d+)/);
+  return num ? GRADE_ORDER.length + Number(num[1]) : 998;
+}
+
+function subjectRank(title: string): number {
+  const t = title.toLowerCase();
+  const i = SUBJECT_ORDER.findIndex((s) => t.includes(s));
+  return i === -1 ? 999 : i;
+}
+
+export function sortByGradeThenSubject<T extends { title: string; gradeLabel: string | null }>(
+  products: T[],
+): T[] {
+  return [...products].sort(
+    (a, b) =>
+      gradeRank(a.gradeLabel) - gradeRank(b.gradeLabel) ||
+      subjectRank(a.title) - subjectRank(b.title) ||
+      a.title.localeCompare(b.title),
+  );
+}
+
 export async function getCategoryWithProducts(slug: string) {
-  return db.category.findUnique({
+  const category = await db.category.findUnique({
     where: { slug },
     include: {
       products: {
         where: { isVisible: true },
         select: productCardSelect,
-        orderBy: [{ gradeLabel: "asc" }, { title: "asc" }],
       },
     },
   });
+  if (!category) return null;
+  return { ...category, products: sortByGradeThenSubject(category.products) };
 }
 
 export async function getProductBySlug(slug: string) {

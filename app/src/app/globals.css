@@ -167,3 +167,31 @@
     padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
   }
 }
+/* Hero conveyor marquees - four directions so the box ring reads clockwise.
+   Track holds two copies of its covers; -50% loops seamlessly. */
+@keyframes conveyor-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes conveyor-y {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+.conveyor-x {
+  animation: conveyor-x 40s linear infinite;
+}
+.conveyor-x-reverse {
+  animation: conveyor-x 40s linear infinite reverse;
+}
+.conveyor-y {
+  animation: conveyor-y 40s linear infinite;
+}
+.conveyor-y-reverse {
+  animation: conveyor-y 40s linear infinite reverse;
+}
+.group:hover .conveyor-x,
+.group:hover .conveyor-x-reverse,
+.group:hover .conveyor-y,
+.group:hover .conveyor-y-reverse {
+  animation-play-state: paused;
+}

@@ -36,5 +36,6 @@ export const mainNav = [
   { href: "/category/high-school", label: "High School" },
   { href: "/category/novels-poems", label: "Novels & Poems" },
   { href: "/bundles", label: "Bundles" },
+  { href: "/competitive-exams", label: "Competitive Exams" },
   { href: "/services", label: "Services" },
 ] as const;

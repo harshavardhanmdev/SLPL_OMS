@@ -171,6 +171,35 @@ export default async function AdminOrderDetailPage({ params }: Props) {
               </>
             )}
           </p>
+          {order.shipment.events.length > 0 && (
+            <ul className="mt-3 space-y-2 border-l-2 border-border pl-4 text-sm">
+              {order.shipment.events.map((ev) => (
+                <li key={ev.id}>
+                  <p className="font-medium">{ev.description ?? ev.status}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {ev.location ? `${ev.location} · ` : ""}
+                    {ev.occurredAt.toLocaleString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {order.shipment.lastTrackedAt && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Courier last checked{" "}
+              {order.shipment.lastTrackedAt.toLocaleString("en-IN", {
+                day: "numeric",
+                month: "short",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </p>
+          )}
           {order.shipment.trackingPhotoUrl && (
             <a href={order.shipment.trackingPhotoUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block">
               <Image

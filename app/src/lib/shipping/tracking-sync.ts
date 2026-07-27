@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { getSetting } from "@/lib/catalog";
 import { emailDelivered, emailOutForDelivery } from "@/lib/shipment-notify";
 import { isShiprocketConfigured, mapTrackingStatus, trackByAwb } from "@/lib/shipping/shiprocket";
 
@@ -99,7 +100,32 @@ async function syncShiprocketShipments(): Promise<void> {
 }
 
 // ── Manual (self-shipped DTDC) tracking via trackcourier.io ──────────────────
-// Free tier: 100 requests/month. Dormant until TRACKCOURIER_API_KEY is set.
+// The free tier allows only ~100 lookups a month, so polling every shipment on
+// every 3-hourly tick would exhaust it in days. Instead we keep a monthly
+// counter and spread the remaining budget across the shipments still moving:
+// each one is checked at most every `minInterval`, recomputed each run from
+// how much quota is left and how many days remain in the month.
+
+const USAGE_KEY = "trackcourier_usage";
+const CAP_KEY = "trackcourier_monthly_cap";
+
+type Usage = { month: string; count: number };
+
+const currentMonth = () => new Date().toISOString().slice(0, 7);
+
+async function readUsage(): Promise<Usage> {
+  const stored = await getSetting<Usage>(USAGE_KEY, { month: currentMonth(), count: 0 });
+  // A new month resets the allowance
+  return stored.month === currentMonth() ? stored : { month: currentMonth(), count: 0 };
+}
+
+async function writeUsage(usage: Usage): Promise<void> {
+  await db.setting.upsert({
+    where: { key: USAGE_KEY },
+    update: { value: usage },
+    create: { key: USAGE_KEY, value: usage },
+  });
+}
 
 type TrackCourierCheckpoint = {
   status?: string;
@@ -121,13 +147,41 @@ async function syncManualShipments(): Promise<void> {
   if (!apiKey) return;
   const courier = process.env.TRACKCOURIER_COURIER ?? "dtdc";
 
-  const active = await findActiveShipments("manual");
+  const cap = await getSetting<number>(CAP_KEY, 95); // headroom under the free 100
+  const usage = await readUsage();
+  let budget = cap - usage.count;
+  if (budget <= 0) {
+    console.warn(`[tracking-sync] monthly lookup cap (${cap}) reached, pausing until next month`);
+    return;
+  }
+
+  const all = await findActiveShipments("manual");
+  if (all.length === 0) return;
+
+  // Spread what's left of the month's budget over the shipments still moving.
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeft = Math.max(1, daysInMonth - now.getDate() + 1);
+  const pollsPerDay = Math.min(4, Math.max(0.5, budget / (all.length * daysLeft)));
+  const minIntervalMs = (24 / pollsPerDay) * 3600_000;
+
+  const active = all
+    .filter((s) => !s.lastTrackedAt || now.getTime() - s.lastTrackedAt.getTime() >= minIntervalMs)
+    .sort((a, b) => (a.lastTrackedAt?.getTime() ?? 0) - (b.lastTrackedAt?.getTime() ?? 0))
+    .slice(0, budget);
+
   for (const shipment of active) {
+    if (budget <= 0) break;
     try {
       const res = await fetch(
         `https://api.trackcourier.io/v1/track?courier=${encodeURIComponent(courier)}&tracking_number=${encodeURIComponent(shipment.awb!)}`,
         { headers: { "X-API-Key": apiKey }, signal: AbortSignal.timeout(20000) },
       );
+      // Count the call whatever it returned - the provider bills the attempt
+      budget -= 1;
+      usage.count += 1;
+      await db.shipment.update({ where: { id: shipment.id }, data: { lastTrackedAt: new Date() } });
+
       if (!res.ok) {
         console.error("[tracking-sync] trackcourier", shipment.awb, res.status);
         continue;
@@ -162,4 +216,9 @@ async function syncManualShipments(): Promise<void> {
       console.error("[tracking-sync] manual AWB", shipment.awb, err);
     }
   }
+
+  await writeUsage(usage);
+  console.log(
+    `[tracking-sync] courier lookups used ${usage.count}/${cap} this month (${active.length} checked, every ~${(24 / pollsPerDay).toFixed(1)}h per shipment)`,
+  );
 }

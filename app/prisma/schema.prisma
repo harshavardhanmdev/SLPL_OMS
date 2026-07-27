@@ -302,6 +302,7 @@ model Shipment {
   etaDays              Int?
   trackingPhotoUrl     String? // courier receipt photo, served admin-only
   packedAt             DateTime?
+  lastTrackedAt        DateTime? // last courier API poll, used to ration lookups
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
 

@@ -36,6 +36,9 @@ export const metadata: Metadata = {
     "rhymes book for nursery", "general knowledge book for kids", "class book bundles",
     "school book kits", "Baby Steps books", "Little Leaps books", "Skill Builders books",
     "SLPL Store", "Saaradaa Learknowations", "school books Hyderabad",
+    "The GenZ Times", "GenZ Times magazine", "education magazine India",
+    "youth magazine for students", "student magazine subscription",
+    "advertise in education magazine", "school magazine advertising India",
   ],
   openGraph: {
     siteName: site.name,

@@ -36,6 +36,33 @@ export default async function HomePage() {
     select: { slug: true, title: true, coverImage: true },
     take: 60,
   });
+  // Spotlight copy is per title; anything else the owner features falls back
+  // to its own description.
+  const spotlightCopy: Record<
+    string,
+    { kicker: string; blurb: string; cta: string; extra?: { label: string; href: string } }
+  > = {
+    "life-of-student": {
+      kicker: "From the SLPL publishing house",
+      blurb:
+        "A mirror, a movement and a manifesto for every learner: the acclaimed novel by educator Ramesh Mamidala, born from two decades inside real classrooms.",
+      cta: "Read about it",
+    },
+    "genz-times-issue-01": {
+      kicker: "New monthly magazine",
+      blurb:
+        "Where generations connect. Sixty-four pages on AI in the classroom, the careers taking shape around this generation, and the young change makers already at work.",
+      cta: "Read Issue 01",
+      extra: { label: "Advertise with us", href: "/advertise" },
+    },
+  };
+  const spotlightOrder = ["life-of-student", "genz-times-issue-01"];
+  const spotlights = featured
+    .filter((p) => spotlightCopy[p.slug])
+    .sort((a, b) => spotlightOrder.indexOf(a.slug) - spotlightOrder.indexOf(b.slug))
+    .slice(0, 2)
+    .map((product) => ({ product, ...spotlightCopy[product.slug] }));
+
   const heroCovers: ConveyorCover[] = [...heroPool]
     .sort(() => 0.5 - Math.random())
     .filter((p, i, arr) => i === 0 || p.coverImage !== arr[i - 1].coverImage)
@@ -104,10 +131,10 @@ export default async function HomePage() {
         </HeroConveyor>
       </section>
 
-      {/* Featured spotlight (owner-picked, currently Life of Student) */}
-      {featured.length > 0 && (
-        <section className="mt-10">
-          {featured.slice(0, 1).map((p) => {
+      {/* Featured spotlights (owner-picked: the novel and the magazine) */}
+      {spotlights.length > 0 && (
+        <section className="mt-10 grid gap-5 lg:grid-cols-2">
+          {spotlights.map(({ product: p, kicker, blurb, cta, extra }) => {
             const price = effectivePrice(p, sale);
             return (
               <div
@@ -115,47 +142,51 @@ export default async function HomePage() {
                 className="relative overflow-hidden rounded-3xl bg-navy text-white ring-1 ring-border"
               >
                 <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-saffron/20 blur-3xl" />
-                <div className="relative grid items-center gap-8 p-8 sm:p-10 lg:grid-cols-[220px_1fr_auto] lg:p-12">
+                <div className="relative flex h-full flex-col gap-6 p-6 sm:flex-row sm:items-center sm:p-8">
                   <Link
                     href={`/product/${p.slug}`}
-                    className="mx-auto block w-44 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/20 transition-transform hover:scale-[1.03] lg:w-52"
+                    className="mx-auto block w-36 shrink-0 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/20 transition-transform hover:scale-[1.03] sm:mx-0 sm:w-40"
                   >
                     {p.coverImage && (
                       <Image
                         src={p.coverImage}
                         alt={p.title}
-                        width={208}
-                        height={295}
+                        width={160}
+                        height={227}
                         className="aspect-[3/4] w-full object-cover"
                       />
                     )}
                   </Link>
-                  <div className="space-y-3 text-center lg:text-left">
+                  <div className="flex min-w-0 flex-1 flex-col gap-3 text-center sm:text-left">
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-saffron">
-                      From the SLPL publishing house
+                      {kicker}
                     </p>
-                    <h2 className="text-balance font-heading text-3xl font-bold sm:text-4xl">{p.title}</h2>
-                    <p className="mx-auto max-w-2xl text-pretty text-sm text-white/80 lg:mx-0">
-                      A mirror, a movement and a manifesto for every learner: the acclaimed novel by
-                      educator Ramesh Mamidala, born from two decades inside real classrooms.
-                    </p>
+                    <h2 className="text-balance font-heading text-2xl font-bold">{p.title}</h2>
+                    <p className="text-pretty text-sm text-white/80">{blurb}</p>
                     <p className="font-heading text-2xl font-bold text-saffron">
                       {formatINR(price)}
                       {p.mrp > price && (
-                        <span className="ml-2 text-base font-normal text-white/60 line-through">{formatINR(p.mrp)}</span>
+                        <span className="ml-2 text-base font-normal text-white/60 line-through">
+                          {formatINR(p.mrp)}
+                        </span>
                       )}
                     </p>
-                  </div>
-                  <div className="flex justify-center lg:block">
-                    <Button
-                      size="lg"
-                      className="gap-2 bg-saffron text-navy hover:bg-saffron-deep"
-                      asChild
-                    >
-                      <Link href={`/product/${p.slug}`}>
-                        Read about it <ArrowRight className="size-4" />
-                      </Link>
-                    </Button>
+                    <div className="mt-auto flex flex-wrap justify-center gap-2 pt-1 sm:justify-start">
+                      <Button className="gap-2 bg-saffron text-navy hover:bg-saffron-deep" asChild>
+                        <Link href={`/product/${p.slug}`}>
+                          {cta} <ArrowRight className="size-4" />
+                        </Link>
+                      </Button>
+                      {extra && (
+                        <Button
+                          variant="outline"
+                          className="gap-2 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                          asChild
+                        >
+                          <Link href={extra.href}>{extra.label}</Link>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

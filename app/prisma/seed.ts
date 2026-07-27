@@ -101,11 +101,17 @@ async function main() {
     "Stories and verse from SLPL - reading that builds language and character.",
     5,
   );
+  const magazine = await upsertCategory(
+    "magazine",
+    "The GenZ Times",
+    "Our monthly education and youth magazine - careers, technology, leadership and ideas for the next generation.",
+    6,
+  );
   const bundles = await upsertCategory(
     "bundles",
     "Class Bundles",
     "Everything a class needs in one box - complete book sets at a bundled price.",
-    6,
+    7,
   );
 
   // ── Novels & Poems ──────────────────────────────────────────────────────
@@ -198,7 +204,32 @@ async function main() {
     },
   ];
 
-  const allBooks = [...subjectBooks, novel, ...poems];
+  // ── The GenZ Times (monthly magazine) ───────────────────────────────────
+  const genzTimes: ProductSeed = {
+    slug: "genz-times-issue-01",
+    title: "The GenZ Times, Issue 01 (August 2026)",
+    kind: "BOOK",
+    categoryId: magazine.id,
+    series: "The GenZ Times",
+    description:
+      `The inaugural issue of The GenZ Times, a premium monthly education and youth magazine from Saaradaa ` +
+      `Learknowations. Sixty-four pages on artificial intelligence in the classroom, the careers taking shape ` +
+      `around this generation, the skills worth learning now and the young change makers already at work.\n\n` +
+      `Inside Issue 01: Are We Turning Around? (AI has entered the classroom, are we steering it), The Gen Z Pulse, ` +
+      `Career and Beyond (a centre-spread map of ten worlds a student can build a life in), How Close Are We to Chitti, ` +
+      `SchoolCast on SL Radio, Developing Reading Habits by Ramesh Mamidala, The Scholarship Search and Brain Boosters.\n\n` +
+      `Written for students of Grade 6 and above, college students, parents, teachers and school leaders. ` +
+      `Preview the opening pages below before you order.`,
+    mrp: 23400,
+    price: 23400, // cover price ₹234
+    weightGrams: 250,
+    coverImage: "/seed/covers/genz-times-issue-01.webp",
+    samplePdf: "/seed/genz-times-issue-01-preview.pdf",
+    isNewRelease: true,
+    isFeatured: true,
+  };
+
+  const allBooks = [...subjectBooks, novel, genzTimes, ...poems];
   const created: Record<string, { id: string; price: number }> = {};
   for (const p of allBooks) {
     const row = await upsertProduct(p);
@@ -213,6 +244,19 @@ async function main() {
       mrp: novel.mrp,
       price: novel.price,
       coverImage: novel.coverImage,
+      isFeatured: true,
+    },
+  });
+  // Same for the magazine: cover price and artwork are owner-final
+  await db.product.update({
+    where: { slug: "genz-times-issue-01" },
+    data: {
+      title: genzTimes.title,
+      description: genzTimes.description,
+      mrp: genzTimes.mrp,
+      price: genzTimes.price,
+      coverImage: genzTimes.coverImage,
+      samplePdf: genzTimes.samplePdf,
       isFeatured: true,
     },
   });

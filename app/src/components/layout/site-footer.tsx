@@ -40,6 +40,11 @@ export function SiteFooter() {
                 Track your order
               </Link>
             </li>
+            <li>
+              <Link href="/advertise" className="transition-colors hover:text-foreground">
+                Advertise with us
+              </Link>
+            </li>
           </ul>
           <h3 className="mb-3 mt-6 text-sm font-semibold">Policies</h3>
           <ul className="space-y-2 text-sm text-muted-foreground">

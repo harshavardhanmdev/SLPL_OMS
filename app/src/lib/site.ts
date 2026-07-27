@@ -15,6 +15,9 @@ export const site = {
     main: "https://theslpl.in",
     lms: "https://study.theslpl.in",
     journal: "https://journal.e2eindia.org",
+    // Zoho form that collects advertiser enquiries for The GenZ Times
+    advertiseForm:
+      "https://forms.zohopublic.in/saaradaalearknowations1/form/AdvertiseWithUs/formperma/_ImSF-xLHQB4-KfRdUie_ECjOh72vzovcEubqhl5I8I",
   },
 } as const;
 
@@ -37,5 +40,6 @@ export const mainNav = [
   { href: "/category/novels-poems", label: "Novels & Poems" },
   { href: "/bundles", label: "Bundles" },
   { href: "/competitive-exams", label: "Competitive Exams" },
+  { href: "/category/magazine", label: "The GenZ Times" },
   { href: "/services", label: "Services" },
 ] as const;

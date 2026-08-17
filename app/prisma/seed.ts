@@ -411,6 +411,23 @@ async function main() {
     });
   }
 
+  // ── Official price catalog (SLPL Price Catalog 2026) ────────────────────
+  // Applied last so it always wins over the placeholder prices above; MRP is
+  // the published rate and we sell at it, so mrp and price are the same.
+  const priceCatalogPath = path.resolve(__dirname, "price-catalog-2026.json");
+  if (existsSync(priceCatalogPath)) {
+    const catalog = JSON.parse(readFileSync(priceCatalogPath, "utf8")) as Record<string, number>;
+    let priced = 0;
+    for (const [slug, paise] of Object.entries(catalog)) {
+      const res = await db.product.updateMany({
+        where: { slug },
+        data: { mrp: paise, price: paise, salePrice: null },
+      });
+      priced += res.count;
+    }
+    console.log(`price catalog: ${priced} products priced from ${Object.keys(catalog).length} entries`);
+  }
+
   const counts = {
     categories: await db.category.count(),
     products: await db.product.count(),

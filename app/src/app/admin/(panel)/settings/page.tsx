@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { SettingsForm, type SettingsValues } from "@/components/admin/settings-form";
 import { getSetting } from "@/lib/catalog";
-import { DEFAULT_TRACKING_URL } from "@/lib/site";
+import { DEFAULT_TRACKING_URL, site } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Admin · Settings", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -19,6 +19,9 @@ export default async function AdminSettingsPage() {
     contact_phone: await getSetting("contact_phone", "+91 90303 90077"),
     contact_email: await getSetting("contact_email", "saradapublications18@gmail.com"),
     tracking_url_template: await getSetting("tracking_url_template", DEFAULT_TRACKING_URL),
+    grievance_officer_name: await getSetting("grievance_officer_name", site.contact.person),
+    grievance_officer_email: await getSetting("grievance_officer_email", site.contact.email),
+    grievance_officer_phone: await getSetting("grievance_officer_phone", site.contact.phone),
   };
 
   return (

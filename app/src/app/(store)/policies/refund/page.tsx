@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { site } from "@/lib/site";
 
@@ -32,6 +33,15 @@ export default function RefundPolicyPage() {
 
       <h2>What is not returnable</h2>
       <p>Books that have been used, written in, or damaged after delivery are not eligible for return. Since our products are printed books, we do not accept change-of-mind returns once a parcel has been opened, except for the defect cases above.</p>
+
+      <h2>If a refund does not arrive</h2>
+      <p>
+        If a refund has not reached you within the timelines above, or an amount was debited without
+        an order, raise it on our <Link href="/grievance">complaint form</Link>. You will get a
+        ticket number, an acknowledgement within 48 hours and a named officer accountable for the
+        outcome. See our <Link href="/policies/grievance">Grievance Redressal Policy</Link> for the
+        full escalation route.
+      </p>
 
       <h2>Contact</h2>
       <p>{site.company}, {site.contact.address}. Phone: {site.contact.phone}. Email: {site.contact.email}.</p>

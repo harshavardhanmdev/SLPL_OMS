@@ -72,6 +72,16 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
+              <Link href="/policies/grievance" className="transition-colors hover:text-foreground">
+                Grievance Redressal
+              </Link>
+            </li>
+            <li>
+              <Link href="/grievance" className="transition-colors hover:text-foreground">
+                Raise a complaint
+              </Link>
+            </li>
+            <li>
               <Link href="/contact" className="transition-colors hover:text-foreground">
                 Contact Us
               </Link>

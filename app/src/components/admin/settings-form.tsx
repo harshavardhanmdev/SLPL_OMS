@@ -21,6 +21,9 @@ export type SettingsValues = {
   contact_phone: string;
   contact_email: string;
   tracking_url_template: string;
+  grievance_officer_name: string;
+  grievance_officer_email: string;
+  grievance_officer_phone: string;
 };
 
 export function SettingsForm({ initial }: { initial: SettingsValues }) {
@@ -37,6 +40,9 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
     contact_phone: initial.contact_phone,
     contact_email: initial.contact_email,
     tracking_url_template: initial.tracking_url_template,
+    grievance_officer_name: initial.grievance_officer_name,
+    grievance_officer_email: initial.grievance_officer_email,
+    grievance_officer_phone: initial.grievance_officer_phone,
   });
 
   function set(key: keyof typeof v, value: string) {
@@ -58,6 +64,9 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
         contact_phone: v.contact_phone,
         contact_email: v.contact_email,
         tracking_url_template: v.tracking_url_template,
+        grievance_officer_name: v.grievance_officer_name,
+        grievance_officer_email: v.grievance_officer_email,
+        grievance_officer_phone: v.grievance_officer_phone,
       });
       if (res.error) toast.error(res.error);
       else {
@@ -135,6 +144,40 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
           <div className="space-y-1.5">
             <Label>Contact email</Label>
             <Input type="email" value={v.contact_email} onChange={(e) => set("contact_email", e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-2xl border bg-card p-5">
+        <div>
+          <h2 className="font-heading font-semibold">Grievance Officer</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Published on the grievance policy page and in every complaint email, as required by the
+            Consumer Protection (E-Commerce) Rules.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Officer name</Label>
+            <Input
+              value={v.grievance_officer_name}
+              onChange={(e) => set("grievance_officer_name", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Officer email</Label>
+            <Input
+              type="email"
+              value={v.grievance_officer_email}
+              onChange={(e) => set("grievance_officer_email", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Officer phone</Label>
+            <Input
+              value={v.grievance_officer_phone}
+              onChange={(e) => set("grievance_officer_phone", e.target.value)}
+            />
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { AlertTriangle, IndianRupee, Package, Truck } from "lucide-react";
+import { AlertTriangle, IndianRupee, MessageSquareWarning, Package, Truck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/db";
@@ -15,13 +15,16 @@ export default async function AdminDashboard() {
   const midnight = new Date();
   midnight.setHours(0, 0, 0, 0);
 
-  const [todayOrders, todayRevenue, pendingShip, lowStock, recent] = await Promise.all([
+  const [todayOrders, todayRevenue, pendingShip, openGrievances, lowStock, recent] = await Promise.all([
     db.order.count({ where: { createdAt: { gte: midnight }, status: { in: [...PAID_STATUSES] } } }),
     db.order.aggregate({
       where: { createdAt: { gte: midnight }, status: { in: [...PAID_STATUSES] } },
       _sum: { total: true },
     }),
     db.order.count({ where: { status: { in: ["PAID", "CONFIRMED", "PROCESSING"] } } }),
+    db.grievance.count({
+      where: { status: { in: ["OPEN", "ACKNOWLEDGED", "IN_PROGRESS", "AWAITING_CUSTOMER", "ESCALATED"] } },
+    }),
     db.product.findMany({
       where: { isVisible: true, stock: { lte: 5 } },
       orderBy: { stock: "asc" },
@@ -39,13 +42,19 @@ export default async function AdminDashboard() {
     { label: "Orders today", value: String(todayOrders), icon: Package },
     { label: "Revenue today", value: formatINR(todayRevenue._sum.total ?? 0), icon: IndianRupee },
     { label: "Waiting to ship", value: String(pendingShip), icon: Truck, href: "/admin/shipments" },
+    {
+      label: "Open grievances",
+      value: String(openGrievances),
+      icon: MessageSquareWarning,
+      href: "/admin/grievances",
+    },
   ];
 
   return (
     <div className="space-y-8">
       <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, href }) =>
           href ? (
             <Link

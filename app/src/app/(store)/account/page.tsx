@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Bell, LogOut, MapPin, Package, Settings2, UserRound } from "lucide-react";
+import { Bell, LifeBuoy, LogOut, MapPin, Package, Settings2, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -74,10 +74,15 @@ export default async function AccountPage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="gap-2" asChild>
             <Link href="/account/orders">
               <Package className="size-4" /> Returns & Orders
+            </Link>
+          </Button>
+          <Button variant="outline" className="gap-2" asChild>
+            <Link href="/account/grievances">
+              <LifeBuoy className="size-4" /> My complaints
             </Link>
           </Button>
           <form action={logoutAction}>

@@ -309,6 +309,9 @@ const TEXT_SETTINGS = new Set([
   "contact_phone",
   "contact_email",
   "tracking_url_template",
+  "grievance_officer_name",
+  "grievance_officer_email",
+  "grievance_officer_phone",
 ]);
 
 export async function saveSettings(values: Record<string, string>): Promise<Result> {

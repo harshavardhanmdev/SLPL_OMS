@@ -29,6 +29,7 @@ model User {
   orders        Order[]
   cart          Cart?
   notifications Notification[]
+  grievances    Grievance[]
 }
 
 model Notification {
@@ -202,10 +203,11 @@ model Order {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  items    OrderItem[]
-  payment  Payment?
-  shipment Shipment?
-  events   OrderEvent[]
+  items      OrderItem[]
+  payment    Payment?
+  shipment   Shipment?
+  events     OrderEvent[]
+  grievances Grievance[]
 
   @@index([userId])
   @@index([status])
@@ -408,4 +410,92 @@ model EmailLog {
   status    String // SENT | FAILED
   error     String?
   createdAt DateTime @default(now())
+}
+
+// ─── Grievance redressal ──────────────────────────────────────────────────────
+// Statutory complaint channel: the Consumer Protection (E-Commerce) Rules
+// require a named officer, a 48 h acknowledgement and a 30 day resolution, so
+// both clocks are stamped on the row at creation and reported on in admin.
+
+enum GrievanceStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  AWAITING_CUSTOMER
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+enum GrievanceCategory {
+  PAYMENT_DEBITED_NO_ORDER
+  REFUND_NOT_RECEIVED
+  DOUBLE_CHARGED
+  ORDER_NOT_DELIVERED
+  DAMAGED_OR_WRONG_ITEM
+  CANCELLATION_ISSUE
+  DATA_PRIVACY
+  OTHER
+}
+
+enum GrievancePriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Grievance {
+  id           String  @id @default(cuid())
+  ticketNumber String  @unique // SLPL-G-YYMM-XXXXX
+  accessToken  String  @unique // unguessable, powers the emailed tracking link
+  userId       String? // null when filed by a guest
+  user         User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orderId      String?
+  order        Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  // What the customer typed as their order number, kept even when unmatched
+  orderRef     String?
+
+  category    GrievanceCategory
+  subject     String
+  description String
+
+  // Contact snapshot: guests have no account row to fall back on
+  contactName  String
+  contactEmail String
+  contactPhone String?
+
+  // Payment complaints: customer-supplied reference and the amount in dispute
+  paymentRef    String?
+  amountClaimed Int? // paise
+
+  status   GrievanceStatus   @default(OPEN)
+  priority GrievancePriority @default(NORMAL)
+
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  resolution     String?
+  ackDueAt       DateTime // createdAt + 48 h
+  dueAt          DateTime // createdAt + 30 days
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events GrievanceEvent[]
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@index([contactEmail])
+}
+
+model GrievanceEvent {
+  id                String    @id @default(cuid())
+  grievanceId       String
+  grievance         Grievance @relation(fields: [grievanceId], references: [id], onDelete: Cascade)
+  status            String
+  note              String?
+  byAdmin           Boolean   @default(false)
+  visibleToCustomer Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+
+  @@index([grievanceId])
 }

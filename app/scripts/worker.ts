@@ -5,6 +5,7 @@
  *  - every 10 min: release expired stock reservations + reconcile pending
  *    Razorpay payments (heals interrupted payments / missed webhooks)
  *  - every 3 h:    sync Shiprocket tracking → order statuses + emails
+ *  - daily 9 am:   email the owner any grievance past its statutory deadline
  *
  * Start: npx tsx scripts/worker.ts   (NODE_OPTIONS=--conditions=react-server)
  */
@@ -13,6 +14,7 @@ import cron from "node-cron";
 
 import { releaseExpiredOrders, reconcilePendingPayments } from "../src/lib/orders";
 import { syncShipmentTracking } from "../src/lib/shipping/tracking-sync";
+import { reportOverdueGrievances } from "../src/lib/grievance-sla";
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), "[worker]", ...args);
 
@@ -34,12 +36,23 @@ async function trackingTick() {
   }
 }
 
-log("starting — payments every 10 min, tracking every 3 h");
+async function grievanceSlaTick() {
+  try {
+    const overdue = await reportOverdueGrievances();
+    if (overdue > 0) log(`${overdue} grievance(s) past deadline - owner notified`);
+  } catch (err) {
+    console.error("[worker] grievance SLA tick failed", err);
+  }
+}
+
+log("starting - payments every 10 min, tracking every 3 h, grievance SLA daily");
 void paymentsTick();
 void trackingTick();
 
 cron.schedule("*/10 * * * *", paymentsTick);
 cron.schedule("0 */3 * * *", trackingTick);
+// 9 am IST, so an overdue complaint lands at the start of the working day
+cron.schedule("0 9 * * *", grievanceSlaTick);
 
 process.on("SIGTERM", () => {
   log("SIGTERM — bye");

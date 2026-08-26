@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Clock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import Link from "next/link";
+import { Clock, LifeBuoy, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { site } from "@/lib/site";
@@ -64,7 +65,26 @@ export default function ContactPage() {
         </div>
       </div>
 
-      <p className="mt-8 text-sm text-muted-foreground">
+      <div className="mt-8 rounded-2xl border border-saffron/50 bg-accent/50 p-5">
+        <h2 className="flex items-center gap-2 font-heading font-semibold">
+          <LifeBuoy className="size-5 text-saffron-deep" /> Something gone wrong?
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          If a payment was debited without an order, a refund has not arrived, or a delivery has gone
+          astray, file it as a formal complaint. You get a ticket number, an acknowledgement within
+          48 hours and a named grievance officer accountable for the outcome.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button size="sm" asChild>
+            <Link href="/grievance">Raise a complaint</Link>
+          </Button>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/policies/grievance">Grievance policy</Link>
+          </Button>
+        </div>
+      </div>
+
+      <p className="mt-6 text-sm text-muted-foreground">
         For order issues, please keep your order number (starts with SLPL-) handy. You can also
         track any order from Your Account, then Returns and Orders.
       </p>

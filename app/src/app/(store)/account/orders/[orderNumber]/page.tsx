@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Clock,
   ExternalLink,
+  LifeBuoy,
   MapPin,
   Package,
   Truck,
@@ -148,6 +149,12 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
               Any deducted amount is auto-refunded by the bank within 5-7 working days. Add the
               items to your cart again to reorder.
             </p>
+            <Link
+              href={`/grievance?order=${order.orderNumber}&category=PAYMENT_DEBITED_NO_ORDER`}
+              className="mt-2 inline-block font-medium underline underline-offset-2"
+            >
+              Money debited but no order? Report it
+            </Link>
           </div>
         </div>
       )}
@@ -316,6 +323,11 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
                 paid={order.payment?.status === "CAPTURED"}
               />
             )}
+          <Button variant="outline" className="w-full gap-2" asChild>
+            <Link href={`/grievance?order=${order.orderNumber}`}>
+              <LifeBuoy className="size-4" /> Report an issue
+            </Link>
+          </Button>
           <Button variant="outline" className="w-full" asChild>
             <Link href="/account">Back to my orders</Link>
           </Button>

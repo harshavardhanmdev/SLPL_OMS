@@ -428,6 +428,28 @@ async function main() {
     console.log(`price catalog: ${priced} products priced from ${Object.keys(catalog).length} entries`);
   }
 
+  // ── Kit stock is derived, never typed in ────────────────────────────────
+  // A kit is assembled from its member books, so its stock is however many
+  // complete sets the members can make. Inlined rather than imported from
+  // src/lib/stock.ts because that module is server-only.
+  {
+    const kits = await db.product.findMany({
+      where: { kind: "BUNDLE" },
+      select: {
+        id: true,
+        bundleItems: { select: { quantity: true, product: { select: { stock: true } } } },
+      },
+    });
+    for (const kit of kits) {
+      if (kit.bundleItems.length === 0) continue;
+      const buildable = Math.min(
+        ...kit.bundleItems.map((i) => Math.floor(i.product.stock / Math.max(1, i.quantity))),
+      );
+      await db.product.update({ where: { id: kit.id }, data: { stock: Math.max(0, buildable) } });
+    }
+    console.log(`kit stock: recomputed for ${kits.length} bundle(s)`);
+  }
+
   const counts = {
     categories: await db.category.count(),
     products: await db.product.count(),

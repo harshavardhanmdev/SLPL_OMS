@@ -14,6 +14,7 @@ import {
 } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { markOrderPaid, restockOrder } from "@/lib/orders";
+import { refreshBundleStock, refreshBundleStockNow } from "@/lib/stock";
 import { emailDelivered, emailOutForDelivery, emailShipped } from "@/lib/shipment-notify";
 import { createShipmentForOrder, isShiprocketConfigured } from "@/lib/shipping/shiprocket";
 import { isRazorpayConfigured, refundPayment } from "@/lib/razorpay";
@@ -146,6 +147,9 @@ export async function saveProduct(input: ProductInput): Promise<Result> {
       });
     }
   }
+  // A member's stock changed, so the kits containing it can make a different
+  // number of complete sets now.
+  await refreshBundleStockNow([row.id]);
   return { ok: true, id: row.id };
 }
 
@@ -188,6 +192,7 @@ export async function setBundleItems(
         },
       });
     }
+    await refreshBundleStock(tx, items.map((i) => i.productId));
   });
   return { ok: true };
 }

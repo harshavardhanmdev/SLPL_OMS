@@ -9,6 +9,7 @@ import { renderEmail, sendEmail, notifyOwner } from "@/lib/email";
 import { getPrefs, notifyUser } from "@/lib/notify";
 import { sendSms } from "@/lib/sms";
 import { formatINR } from "@/lib/money";
+import { StockError, releaseStock, reserveStock } from "@/lib/stock";
 import {
   fetchPaymentsForOrder,
   isRazorpayConfigured,
@@ -202,14 +203,11 @@ export async function createOrderRecord(params: {
   const orderNumber = await generateOrderNumber();
 
   const order = await db.$transaction(async (tx) => {
-    for (const item of quote.items) {
-      const res = await tx.product.updateMany({
-        where: { id: item.productId, stock: { gte: item.quantity } },
-        data: { stock: { decrement: item.quantity } },
-      });
-      if (res.count === 0) {
-        throw new OrderError(`“${item.title}” just went out of stock.`);
-      }
+    try {
+      await reserveStock(tx, quote.items);
+    } catch (err) {
+      if (err instanceof StockError) throw new OrderError(err.message);
+      throw err;
     }
 
     const created = await tx.order.create({
@@ -262,14 +260,12 @@ export async function createOrderRecord(params: {
 export async function restockOrder(orderId: string): Promise<void> {
   await db.$transaction(async (tx) => {
     const items = await tx.orderItem.findMany({ where: { orderId } });
-    for (const item of items) {
-      if (item.productId) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
-      }
-    }
+    await releaseStock(
+      tx,
+      items
+        .filter((i) => i.productId)
+        .map((i) => ({ productId: i.productId!, quantity: i.quantity })),
+    );
   });
 }
 
@@ -317,14 +313,13 @@ export async function markOrderPaid(
   // EXPIRED and PAYMENT_FAILED already restocked the items - re-reserve before paying
   if (order.status === "EXPIRED" || order.status === "PAYMENT_FAILED") {
     await db.$transaction(async (tx) => {
-      for (const item of order.items) {
-        if (item.productId) {
-          await tx.product.updateMany({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
-          });
-        }
-      }
+      await reserveStock(
+        tx,
+        order.items
+          .filter((i) => i.productId)
+          .map((i) => ({ productId: i.productId!, quantity: i.quantity })),
+        { force: true }, // payment already succeeded, never refuse it here
+      );
     });
   }
 

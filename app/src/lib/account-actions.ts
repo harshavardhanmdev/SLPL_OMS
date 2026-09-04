@@ -63,7 +63,7 @@ export async function cancelMyOrder(orderNumber: string): Promise<{ ok?: boolean
   const session = await getSession();
   if (!session) return { error: "Please log in again." };
 
-  const { restockOrder } = await import("@/lib/orders");
+  const { restockOrder, hasCollectedKit } = await import("@/lib/orders");
   const { isRazorpayConfigured, refundPayment } = await import("@/lib/razorpay");
   const { renderEmail, sendEmail } = await import("@/lib/email");
   const { formatINR } = await import("@/lib/money");
@@ -79,6 +79,9 @@ export async function cancelMyOrder(orderNumber: string): Promise<{ ok?: boolean
   }
   if (!["AWAITING_PAYMENT", "COD_PENDING_OTP", "PAID", "CONFIRMED", "PROCESSING"].includes(order.status)) {
     return { error: "This order can no longer be cancelled." };
+  }
+  if (await hasCollectedKit(order.id)) {
+    return { error: "This kit has already been collected from the school. Please contact us." };
   }
 
   const wasCaptured = order.payment?.status === "CAPTURED";

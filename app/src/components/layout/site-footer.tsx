@@ -36,6 +36,11 @@ export function SiteFooter() {
               </li>
             ))}
             <li>
+              <Link href="/kits" className="transition-colors hover:text-foreground">
+                School kits
+              </Link>
+            </li>
+            <li>
               <Link href="/account/orders" className="transition-colors hover:text-foreground">
                 Track your order
               </Link>

@@ -63,6 +63,7 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
       shipment: { include: { events: { orderBy: { occurredAt: "desc" }, take: 10 } } },
       events: { orderBy: { createdAt: "asc" } },
       payment: true,
+      kitPurchases: true,
     },
   });
   if (!order) notFound();
@@ -293,6 +294,23 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
         </section>
 
         <aside className="h-fit space-y-4">
+          {order.kitPurchases.map((kit) => (
+            <div key={kit.id} className="rounded-2xl border border-saffron/50 bg-accent/50 p-4">
+              <h2 className="mb-1 font-heading font-semibold">Collect at the school</h2>
+              <p className="text-sm text-muted-foreground">
+                {kit.studentName} · {kit.classLabel} {kit.section}
+                <br />
+                {kit.schoolName}
+              </p>
+              <Link
+                href={`/kits/receipt/${kit.accessToken}`}
+                className="mt-3 inline-flex h-9 items-center rounded-md bg-saffron px-4 text-sm font-semibold text-navy hover:bg-saffron/90"
+              >
+                Open the QR receipt
+              </Link>
+            </div>
+          ))}
+          {order.fulfilment === "SHIP" && (
           <div className="rounded-2xl border bg-card p-4">
             <h2 className="mb-2 flex items-center gap-2 font-heading font-semibold">
               <MapPin className="size-4 text-saffron-deep" /> Delivering to
@@ -308,6 +326,7 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
               {addr.phone}
             </p>
           </div>
+          )}
           <div className="rounded-2xl border bg-card p-4 text-sm">
             <h2 className="mb-2 font-heading font-semibold">Payment</h2>
             <p className="text-muted-foreground">

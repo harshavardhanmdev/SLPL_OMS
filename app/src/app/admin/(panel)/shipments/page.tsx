@@ -60,12 +60,13 @@ export default async function AdminShipmentsPage() {
 
   const [active, delivered, trackingUrlDefault] = await Promise.all([
     db.order.findMany({
-      where: { status: { in: activeStatuses as never } },
+      // Kits are collected at the school, so they never join the courier board
+      where: { status: { in: activeStatuses as never }, fulfilment: "SHIP" },
       orderBy: { createdAt: "asc" },
       include: { shipment: true, _count: { select: { items: true } } },
     }),
     db.order.findMany({
-      where: { status: "DELIVERED", updatedAt: { gte: weekAgo } },
+      where: { status: "DELIVERED", fulfilment: "SHIP", updatedAt: { gte: weekAgo } },
       orderBy: { updatedAt: "desc" },
       include: { shipment: true, _count: { select: { items: true } } },
     }),

@@ -11,5 +11,9 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
+    // Optional. The dev database is shared with the ERP fork, so `migrate dev`
+    // would offer to reset away someone else's tables. Point this at a scratch
+    // database and use `migrate diff --from-migrations` instead.
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import {
   BadgePercent,
+  Backpack,
   Boxes,
   LayoutDashboard,
   LogOut,
@@ -25,6 +26,7 @@ const nav = [
   { href: "/admin/orders", label: "Orders", icon: Package },
   { href: "/admin/shipments", label: "Shipments", icon: Truck },
   { href: "/admin/grievances", label: "Grievances", icon: MessageSquareWarning },
+  { href: "/admin/kits", label: "School kits", icon: Backpack },
   { href: "/admin/products", label: "Products", icon: Boxes },
   { href: "/admin/users", label: "Customers", icon: UsersRound },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },

@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getActiveSale, getSetting } from "@/lib/catalog";
 import { effectivePrice } from "@/lib/pricing";
@@ -9,6 +10,7 @@ import { renderEmail, sendEmail, notifyOwner } from "@/lib/email";
 import { getPrefs, notifyUser } from "@/lib/notify";
 import { sendSms } from "@/lib/sms";
 import { formatINR } from "@/lib/money";
+import { emailKitReceipt } from "@/lib/kit-notify";
 import { StockError, releaseStock, reserveStock } from "@/lib/stock";
 import {
   fetchPaymentsForOrder,
@@ -198,6 +200,13 @@ export async function createOrderRecord(params: {
   customer: { name: string; email: string; phone: string };
   method: "RAZORPAY" | "COD";
   notes?: string;
+  /** Handed over at a school instead of couriered. */
+  fulfilment?: "SHIP" | "COLLECT_AT_SCHOOL";
+  /**
+   * Written in the same transaction as the order, so a kit order can never
+   * exist without the receipt row that the school will scan.
+   */
+  kitPurchase?: Prisma.KitPurchaseCreateWithoutOrderInput;
 }): Promise<{ orderId: string; orderNumber: string }> {
   const { quote, method } = params;
   const orderNumber = await generateOrderNumber();
@@ -226,6 +235,7 @@ export async function createOrderRecord(params: {
         customerEmail: params.customer.email,
         customerPhone: params.customer.phone,
         notes: params.notes,
+        fulfilment: params.fulfilment ?? "SHIP",
         reservedUntil: new Date(Date.now() + RESERVATION_MINUTES * 60 * 1000),
         items: {
           create: quote.items.map((i) => ({
@@ -249,6 +259,7 @@ export async function createOrderRecord(params: {
             note: "Order placed",
           },
         },
+        ...(params.kitPurchase ? { kitPurchases: { create: params.kitPurchase } } : {}),
       },
     });
     return created;
@@ -267,6 +278,33 @@ export async function restockOrder(orderId: string): Promise<void> {
         .map((i) => ({ productId: i.productId!, quantity: i.quantity })),
     );
   });
+
+  // Every cancellation path sets CANCELLED and then restocks, so this is the
+  // one place that catches all of them. EXPIRED and PAYMENT_FAILED restock too
+  // but stay revivable, so their receipts are left alone.
+  const order = await db.order.findUnique({ where: { id: orderId }, select: { status: true } });
+  if (order?.status !== "CANCELLED" && order?.status !== "REFUNDED") return;
+  const purchases = await db.kitPurchase.findMany({
+    where: { orderId, status: { in: ["PENDING", "PAID", "READY"] } },
+    select: { id: true },
+  });
+  for (const purchase of purchases) {
+    await db.$transaction([
+      db.kitPurchase.update({ where: { id: purchase.id }, data: { status: "CANCELLED" } }),
+      db.kitCollectionEvent.create({
+        data: { purchaseId: purchase.id, status: "CANCELLED", note: "Order cancelled" },
+      }),
+    ]);
+  }
+}
+
+/**
+ * A collected kit cannot be unwound: the books are already with the family.
+ * Both cancel paths check this before refunding anything.
+ */
+export async function hasCollectedKit(orderId: string): Promise<boolean> {
+  const collected = await db.kitPurchase.count({ where: { orderId, status: "COLLECTED" } });
+  return collected > 0;
 }
 
 function orderEmailBody(order: {
@@ -343,6 +381,31 @@ export async function markOrderPaid(
       ? [db.coupon.updateMany({ where: { code: order.couponCode }, data: { usedCount: { increment: 1 } } })]
       : []),
   ]);
+
+  // A kit is collected at the school, never couriered, so it gets the receipt
+  // rather than the packing-and-shipping mail.
+  if (order.fulfilment === "COLLECT_AT_SCHOOL") {
+    const purchases = await db.kitPurchase.findMany({
+      where: { orderId, status: "PENDING" },
+      select: { id: true, studentName: true, accessToken: true },
+    });
+    for (const purchase of purchases) {
+      await db.$transaction([
+        db.kitPurchase.update({ where: { id: purchase.id }, data: { status: "PAID" } }),
+        db.kitCollectionEvent.create({
+          data: { purchaseId: purchase.id, status: "PAID", note: `Payment confirmed (${info.via})` },
+        }),
+      ]);
+      await emailKitReceipt(purchase.id);
+      await notifyUser(
+        order.userId,
+        "Kit receipt ready",
+        `The kit for ${purchase.studentName} is paid for. Show the receipt at the school to collect it.`,
+        `/kits/receipt/${purchase.accessToken}`,
+      );
+    }
+    return;
+  }
 
   await db.cart.deleteMany({ where: { userId: order.userId } });
   await notifyUser(

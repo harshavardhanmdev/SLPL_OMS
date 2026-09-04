@@ -13,7 +13,7 @@ import {
   recordLoginResult,
 } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
-import { markOrderPaid, restockOrder } from "@/lib/orders";
+import { hasCollectedKit, markOrderPaid, restockOrder } from "@/lib/orders";
 import { refreshBundleStock, refreshBundleStockNow } from "@/lib/stock";
 import { emailDelivered, emailOutForDelivery, emailShipped } from "@/lib/shipment-notify";
 import { createShipmentForOrder, isShiprocketConfigured } from "@/lib/shipping/shiprocket";
@@ -602,6 +602,9 @@ export async function orderCancel(orderNumber: string): Promise<Result> {
   if (!order) return { error: "Order not found." };
   if (!["AWAITING_PAYMENT", "COD_PENDING_OTP", "PAID", "CONFIRMED", "PROCESSING"].includes(order.status)) {
     return { error: "Shipped orders cannot be cancelled from here." };
+  }
+  if (await hasCollectedKit(order.id)) {
+    return { error: "This kit has already been collected from the school - cancel it manually." };
   }
 
   const wasCaptured = order.payment?.status === "CAPTURED";

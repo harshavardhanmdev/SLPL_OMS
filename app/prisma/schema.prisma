@@ -122,6 +122,7 @@ model Product {
   memberOf    BundleItem[] @relation("member")
   cartItems   CartItem[]
   orderItems  OrderItem[]
+  schoolKits  SchoolKit[]
 
   @@index([categoryId, isVisible])
   @@index([isNewRelease, isVisible])
@@ -200,14 +201,17 @@ model Order {
   customerPhone   String
   notes           String?
   reservedUntil   DateTime?
+  // COLLECT_AT_SCHOOL orders are handed over at the school, never couriered
+  fulfilment      Fulfilment    @default(SHIP)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  items      OrderItem[]
-  payment    Payment?
-  shipment   Shipment?
-  events     OrderEvent[]
-  grievances Grievance[]
+  items        OrderItem[]
+  payment      Payment?
+  shipment     Shipment?
+  events       OrderEvent[]
+  grievances   Grievance[]
+  kitPurchases KitPurchase[]
 
   @@index([userId])
   @@index([status])
@@ -498,4 +502,129 @@ model GrievanceEvent {
   createdAt         DateTime  @default(now())
 
   @@index([grievanceId])
+}
+
+// ─── School kits ──────────────────────────────────────────────────────────────
+// A parent pays online for one named student's kit, gets a receipt carrying a
+// QR code, and the school hands the kit over against that receipt.
+
+enum Fulfilment {
+  SHIP
+  COLLECT_AT_SCHOOL
+}
+
+enum KitPurchaseStatus {
+  PENDING // order created, payment not through yet
+  PAID
+  READY // school has the kit set aside
+  COLLECTED
+  CANCELLED
+}
+
+model School {
+  id           String  @id @default(cuid())
+  code         String  @unique // short code used in URLs and on receipts
+  name         String
+  city         String
+  state        String  @default("Telangana")
+  // Matches Institution.udiseCode in the ERP so the two can be joined later
+  udiseCode    String? @unique
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  // Shared secret school staff type to reach the verification screen
+  verifyPin    String?
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  kits     SchoolKit[]
+  students Student[]
+
+  @@index([isActive])
+}
+
+model SchoolKit {
+  id             String  @id @default(cuid())
+  schoolId       String
+  school         School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  // The BUNDLE product carrying the price and the contents
+  productId      String
+  product        Product @relation(fields: [productId], references: [id])
+  academicYear   String // "2026-27"
+  classLabel     String // "Grade 3"
+  collectionNote String? // "Collect from the school office, 9am to 3pm"
+  isActive       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases KitPurchase[]
+
+  @@unique([schoolId, academicYear, classLabel])
+  @@index([schoolId, isActive])
+}
+
+model Student {
+  id            String  @id @default(cuid())
+  schoolId      String
+  school        School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  fullName      String
+  classLabel    String
+  section       String  @default("A")
+  rollNumber    String
+  guardianPhone String?
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases KitPurchase[]
+
+  @@unique([schoolId, classLabel, section, rollNumber])
+  @@index([schoolId, classLabel])
+}
+
+model KitPurchase {
+  id            String            @id @default(cuid())
+  receiptNumber String            @unique // SLPL-K-YYMM-XXXXX
+  accessToken   String            @unique // the QR payload, unguessable
+  orderId       String
+  order         Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  schoolKitId   String
+  schoolKit     SchoolKit         @relation(fields: [schoolKitId], references: [id])
+  studentId     String?
+  student       Student?          @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  // Snapshots, so a roster edit or a transferred student cannot rewrite a receipt
+  studentName   String
+  classLabel    String
+  section       String
+  rollNumber    String?
+  schoolName    String
+  kitTitle      String
+  amountPaid    Int // paise
+  status        KitPurchaseStatus @default(PENDING)
+  collectedAt   DateTime?
+  collectedBy   String? // name the school staff member typed
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  events KitCollectionEvent[]
+
+  @@index([schoolKitId, status])
+  @@index([studentId])
+  @@index([orderId])
+}
+
+model KitCollectionEvent {
+  id            String      @id @default(cuid())
+  purchaseId    String
+  purchase      KitPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  status        String
+  note          String?
+  bySchoolStaff Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+
+  @@index([purchaseId])
 }

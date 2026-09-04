@@ -8,12 +8,16 @@ export const dynamic = "force-dynamic";
 const BASE = "https://store.theslpl.in";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [products, categories] = await Promise.all([
+  const [products, categories, schools] = await Promise.all([
     db.product.findMany({
       where: { isVisible: true },
       select: { slug: true, updatedAt: true },
     }),
     db.category.findMany({ select: { slug: true } }),
+    db.school.findMany({
+      where: { isActive: true, kits: { some: { isActive: true } } },
+      select: { code: true, updatedAt: true },
+    }),
   ]);
 
   const staticPages: MetadataRoute.Sitemap = [
@@ -21,6 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/categories`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${BASE}/bundles`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${BASE}/competitive-exams`, changeFrequency: "weekly", priority: 0.9 },
+    { url: `${BASE}/kits`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${BASE}/advertise`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE}/grievance`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${BASE}/policies/grievance`, changeFrequency: "yearly", priority: 0.5 },
@@ -43,6 +48,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly" as const,
         priority: 0.8,
       })),
+    ...schools.map((s) => ({
+      url: `${BASE}/kits/${s.code}`,
+      lastModified: s.updatedAt,
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    })),
     ...products.map((p) => ({
       url: `${BASE}/product/${p.slug}`,
       lastModified: p.updatedAt,

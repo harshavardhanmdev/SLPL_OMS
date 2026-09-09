@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { BOOK_GST_BP, BOOK_HSN, skuFor } from "../src/lib/sku";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
@@ -426,6 +427,30 @@ async function main() {
       priced += res.count;
     }
     console.log(`price catalog: ${priced} products priced from ${Object.keys(catalog).length} entries`);
+  }
+
+  // ── Stock register codes ────────────────────────────────────────────────
+  // Every title carries its master stock register code, so a school can be
+  // billed for one book rather than a whole series. Books are HSN 4901 and nil
+  // rated. A title the register does not cover keeps a null SKU rather than an
+  // invented one, because a made-up code cannot be reconciled against the
+  // physical pages.
+  {
+    const products = await db.product.findMany({
+      select: { id: true, slug: true, title: true, series: true, gradeLabel: true, kind: true },
+    });
+    let coded = 0;
+    let uncoded = 0;
+    for (const p of products) {
+      const sku = p.kind === "BUNDLE" ? null : skuFor(p);
+      await db.product.update({
+        where: { id: p.id },
+        data: { sku, hsnCode: BOOK_HSN, gstRate: BOOK_GST_BP, unit: "BOOK" },
+      });
+      if (sku) coded += 1;
+      else uncoded += 1;
+    }
+    console.log(`stock codes: ${coded} titles coded, ${uncoded} without a register code`);
   }
 
   // ── Kit stock is derived, never typed in ────────────────────────────────

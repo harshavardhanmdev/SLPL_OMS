@@ -92,31 +92,54 @@ enum ProductKind {
   BUNDLE
 }
 
+/// How a line is counted on an invoice.
+enum ProductUnit {
+  PCS
+  SET
+  BOOK
+  YEAR
+  SESSION
+}
+
 model Product {
-  id           String      @id @default(cuid())
-  slug         String      @unique
-  title        String
-  kind         ProductKind @default(BOOK)
-  categoryId   String
-  category     Category    @relation(fields: [categoryId], references: [id])
-  series       String?
-  gradeLabel   String?
-  description  String
-  mrp          Int
-  price        Int
-  salePrice    Int?
-  saleStart    DateTime?
-  saleEnd      DateTime?
-  stock        Int         @default(0)
-  weightGrams  Int         @default(350)
-  coverImage   String?
-  gallery      String[]    @default([])
-  samplePdf    String?
-  isNewRelease Boolean     @default(false)
-  isFeatured   Boolean     @default(false)
-  isVisible    Boolean     @default(false)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  slug            String      @unique
+  title           String
+  kind            ProductKind @default(BOOK)
+  categoryId      String
+  category        Category    @relation(fields: [categoryId], references: [id])
+  series          String?
+  gradeLabel      String?
+  description     String
+  /// Master stock register code, e.g. BS1TEL01. See lib/sku.ts for the grammar.
+  sku             String?     @unique
+  /// 4901 for printed books, nil rated. SAC 9992 at 18% for services.
+  hsnCode         String?
+  /// Basis points, so 0% and 18% are exact: 0 and 1800.
+  gstRate         Int         @default(0)
+  unit            ProductUnit @default(PCS)
+  /// What we paid. Restricted to OWNER and MANAGER on every screen.
+  purchasePrice   Int?
+  /// Selling below this needs approval.
+  minPrice        Int?
+  discountAllowed Boolean     @default(true)
+  /// Withdrawn titles stay on old invoices but cannot be added to new ones.
+  isActive        Boolean     @default(true)
+  mrp             Int
+  price           Int
+  salePrice       Int?
+  saleStart       DateTime?
+  saleEnd         DateTime?
+  stock           Int         @default(0)
+  weightGrams     Int         @default(350)
+  coverImage      String?
+  gallery         String[]    @default([])
+  samplePdf       String?
+  isNewRelease    Boolean     @default(false)
+  isFeatured      Boolean     @default(false)
+  isVisible       Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   bundleItems BundleItem[] @relation("bundle")
   memberOf    BundleItem[] @relation("member")

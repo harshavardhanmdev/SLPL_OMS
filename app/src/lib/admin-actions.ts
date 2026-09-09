@@ -66,6 +66,13 @@ const productSchema = z.object({
   id: z.string().optional(),
   title: z.string().trim().min(2).max(160),
   slug: z.string().trim().max(90).optional().or(z.literal("")),
+  sku: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{3,20}$/, "Stock code: 3-20 letters and numbers")
+    .optional()
+    .or(z.literal("")),
   kind: z.enum(["BOOK", "NOVEL", "POEMS", "BUNDLE"]),
   categoryId: z.string().min(1),
   series: z.string().trim().max(80).optional().or(z.literal("")),
@@ -105,9 +112,21 @@ export async function saveProduct(input: ProductInput): Promise<Result> {
   });
   if (clash) return { error: `Slug “${slug}” is already used by “${clash.title}”.` };
 
+  // A stock code identifies a physical shelf, so two titles sharing one would
+  // make the register impossible to reconcile.
+  const sku = d.sku?.trim() ? d.sku.trim() : null;
+  if (sku) {
+    const skuClash = await db.product.findFirst({
+      where: { sku, ...(d.id ? { NOT: { id: d.id } } : {}) },
+      select: { title: true },
+    });
+    if (skuClash) return { error: `Stock code ${sku} is already used by “${skuClash.title}”.` };
+  }
+
   const data = {
     title: d.title,
     slug,
+    sku,
     kind: d.kind,
     categoryId: d.categoryId,
     series: d.series || null,

@@ -28,6 +28,7 @@ export default async function AdminProductEditPage({ params }: Props) {
     initial = {
       title: "",
       slug: "",
+      sku: "",
       kind: "BOOK",
       categoryId: categories[0]?.id ?? "",
       series: "",
@@ -58,6 +59,7 @@ export default async function AdminProductEditPage({ params }: Props) {
       id: product.id,
       title: product.title,
       slug: product.slug,
+      sku: product.sku ?? "",
       kind: product.kind,
       categoryId: product.categoryId,
       series: product.series ?? "",

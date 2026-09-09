@@ -60,6 +60,8 @@ export default async function AdminProductsPage() {
                     <span>
                       <span className="block font-medium underline-offset-2 hover:underline">{p.title}</span>
                       <span className="text-xs text-muted-foreground">
+                        {p.sku && <span className="font-mono text-saffron-deep">{p.sku}</span>}
+                        {p.sku && " · "}
                         {[p.series, p.gradeLabel].filter(Boolean).join(" · ") || p.kind.toLowerCase()}
                       </span>
                     </span>

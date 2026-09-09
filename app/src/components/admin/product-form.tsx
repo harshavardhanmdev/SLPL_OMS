@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { UploadButton } from "@/components/admin/upload-button";
 import { deleteProduct, saveProduct, setBundleItems } from "@/lib/admin-actions";
+import { skuFor } from "@/lib/sku";
 
 type Category = { id: string; name: string };
 type MemberOption = { id: string; title: string };
@@ -28,6 +29,7 @@ export type ProductFormValue = {
   id?: string;
   title: string;
   slug: string;
+  sku: string;
   kind: "BOOK" | "NOVEL" | "POEMS" | "BUNDLE";
   categoryId: string;
   series: string;
@@ -72,6 +74,14 @@ export function ProductForm({
     setV((old) => ({ ...old, [key]: value }));
   }
 
+  // The register code follows from series, grade and title, so offer it rather
+  // than making the owner remember the grammar. A kit is billed by its members
+  // and carries no code of its own.
+  const suggestedSku =
+    v.kind === "BUNDLE"
+      ? null
+      : skuFor({ slug: v.slug, title: v.title, series: v.series, gradeLabel: v.gradeLabel });
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -80,6 +90,7 @@ export function ProductForm({
         id: v.id,
         title: v.title,
         slug: v.slug,
+        sku: v.sku,
         kind: v.kind,
         categoryId: v.categoryId,
         series: v.series,
@@ -144,6 +155,29 @@ export function ProductForm({
               Slug <span className="text-muted-foreground">(URL, auto if empty)</span>
             </Label>
             <Input value={v.slug} onChange={(e) => set("slug", e.target.value)} placeholder="auto-from-title" />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>
+              Stock code <span className="text-muted-foreground">(master stock register)</span>
+            </Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={v.sku}
+                onChange={(e) => set("sku", e.target.value.toUpperCase())}
+                placeholder="BS1TEL01"
+                className="max-w-[200px] font-mono"
+              />
+              {suggestedSku && suggestedSku !== v.sku && (
+                <Button type="button" variant="outline" size="sm" onClick={() => set("sku", suggestedSku)}>
+                  Use {suggestedSku}
+                </Button>
+              )}
+              {!suggestedSku && v.kind !== "BUNDLE" && (
+                <span className="text-xs text-muted-foreground">
+                  The register does not cover this series and grade, so type the code by hand.
+                </span>
+              )}
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label>Type</Label>

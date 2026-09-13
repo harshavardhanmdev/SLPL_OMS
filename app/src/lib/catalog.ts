@@ -125,10 +125,94 @@ export async function getProductBySlug(slug: string) {
     include: {
       category: true,
       bundleItems: {
-        include: { product: { select: productCardSelect } },
+        // isVisible so the set page can list a volume that is not sold on its
+        // own without linking to a page that would 404
+        include: { product: { select: { ...productCardSelect, isVisible: true } } },
       },
     },
   });
+}
+
+/**
+ * What to show under a book, in the order a parent actually thinks.
+ *
+ * First the kit it belongs to, because buying the set is cheaper than buying
+ * the books one by one. Then the rest of that grade, because a parent shopping
+ * for Grade 3 Maths needs Grade 3 Science next. Then the same series across
+ * other grades, for the younger or older sibling.
+ */
+export async function getRelatedProducts(product: {
+  id: string;
+  categoryId: string;
+  series: string | null;
+  gradeLabel: string | null;
+  kind: string;
+}) {
+  const visible = { isVisible: true, NOT: { id: product.id } } as const;
+
+  const [kits, sameGrade, sameSeries] = await Promise.all([
+    // Kits that contain this book
+    product.kind === "BUNDLE"
+      ? Promise.resolve([])
+      : db.product.findMany({
+          where: { ...visible, kind: "BUNDLE", bundleItems: { some: { productId: product.id } } },
+          select: productCardSelect,
+          take: 4,
+        }),
+    product.gradeLabel
+      ? db.product.findMany({
+          where: { ...visible, gradeLabel: product.gradeLabel, kind: { not: "BUNDLE" } },
+          select: productCardSelect,
+          take: 20,
+        })
+      : Promise.resolve([]),
+    product.series
+      ? db.product.findMany({
+          where: { ...visible, series: product.series, kind: { not: "BUNDLE" } },
+          select: productCardSelect,
+          take: 30,
+        })
+      : Promise.resolve([]),
+  ]);
+
+  // A title already shown in one rail should not appear again in the next
+  const shown = new Set<string>([...kits, ...sameGrade].map((p) => p.id));
+  const otherGrades = sortByGradeThenSubject(sameSeries.filter((p) => !shown.has(p.id))).slice(0, 12);
+
+  // A standalone title like a novel has no grade and no series, so fall back to
+  // the rest of its category. Small categories leave a thin rail, so top it up
+  // with what the store is promoting rather than showing two lonely cards.
+  let alsoLike: typeof sameGrade = [];
+  if (sameGrade.length === 0 && otherGrades.length === 0) {
+    alsoLike = await db.product.findMany({
+      where: { ...visible, categoryId: product.categoryId },
+      select: productCardSelect,
+      orderBy: { isFeatured: "desc" },
+      take: 12,
+    });
+    if (alsoLike.length < 6) {
+      const seen = new Set(alsoLike.map((p) => p.id));
+      const topUp = await db.product.findMany({
+        where: {
+          ...visible,
+          kind: { not: "BUNDLE" },
+          id: { notIn: [...seen] },
+          OR: [{ isFeatured: true }, { isNewRelease: true }],
+        },
+        select: productCardSelect,
+        orderBy: [{ isFeatured: "desc" }, { updatedAt: "desc" }],
+        take: 12 - alsoLike.length,
+      });
+      alsoLike = [...alsoLike, ...topUp];
+    }
+  }
+
+  return {
+    kits,
+    sameGrade: sortByGradeThenSubject(sameGrade).slice(0, 12),
+    otherGrades,
+    alsoLike,
+  };
 }
 
 // Search moved to src/lib/search.ts (synonyms + relevance scoring)

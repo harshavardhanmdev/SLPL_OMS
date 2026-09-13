@@ -10,9 +10,11 @@ import { AddToCartButton, BuyNowButton } from "@/components/store/add-to-cart-bu
 import { DeliveryEstimate } from "@/components/store/delivery-estimate";
 import { PdfPreview } from "@/components/store/pdf-preview";
 import { Price } from "@/components/store/price";
+import { ProductCard, type ProductCardData } from "@/components/store/product-card";
+import { ProductRail } from "@/components/store/product-rail";
 import { formatINR } from "@/lib/money";
-import { getActiveSale, getProductBySlug } from "@/lib/catalog";
-import { effectivePrice } from "@/lib/pricing";
+import { getActiveSale, getProductBySlug, getRelatedProducts } from "@/lib/catalog";
+import { effectivePrice, type ActiveSale } from "@/lib/pricing";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -29,6 +31,7 @@ export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
   const [product, sale] = await Promise.all([getProductBySlug(slug), getActiveSale()]);
   if (!product) notFound();
+  const related = await getRelatedProducts(product);
 
   const price = effectivePrice(product, sale);
   const out = product.stock <= 0;
@@ -149,12 +152,10 @@ export default async function ProductPage({ params }: Props) {
             <section>
               <h2 className="mb-3 font-heading text-lg font-semibold">Inside this kit</h2>
               <ul className="space-y-2">
-                {product.bundleItems.map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      href={`/product/${item.product.slug}`}
-                      className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-saffron/60"
-                    >
+                {product.bundleItems.map((item) => {
+                  // Titles sold only inside the set have no page of their own
+                  const row = (
+                    <>
                       <span className="flex items-center gap-3">
                         {item.product.coverImage && (
                           <Image
@@ -170,12 +171,30 @@ export default async function ProductPage({ params }: Props) {
                           {item.quantity > 1 && <span className="text-muted-foreground"> × {item.quantity}</span>}
                         </span>
                       </span>
-                      <span className="text-sm text-muted-foreground">
-                        {formatINR(effectivePrice(item.product, sale))}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
+                      {item.product.isVisible && (
+                        <span className="text-sm text-muted-foreground">
+                          {formatINR(effectivePrice(item.product, sale))}
+                        </span>
+                      )}
+                    </>
+                  );
+                  return (
+                    <li key={item.id}>
+                      {item.product.isVisible ? (
+                        <Link
+                          href={`/product/${item.product.slug}`}
+                          className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-saffron/60"
+                        >
+                          {row}
+                        </Link>
+                      ) : (
+                        <span className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3">
+                          {row}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}
@@ -193,6 +212,63 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Keep browsing: the kit this book belongs to, then the rest of the
+          grade, then the same series for a younger or older sibling. */}
+      <div className="mt-14 space-y-12">
+        {related.kits.map((kit) => (
+          <RelatedRail
+            key={kit.id}
+            title="Buy the whole kit"
+            subtitle={`Every ${product.gradeLabel ?? "SLPL"} book in one order, at a bundled price.`}
+            products={[kit]}
+            sale={sale}
+          />
+        ))}
+        <RelatedRail
+          title={product.gradeLabel ? `More for ${product.gradeLabel}` : "More like this"}
+          subtitle="The rest of the year, from the same SLPL team."
+          products={related.sameGrade}
+          sale={sale}
+        />
+        <RelatedRail
+          title={product.series ? `More from ${product.series}` : "Other grades"}
+          subtitle="For a younger or older sibling."
+          products={related.otherGrades}
+          sale={sale}
+        />
+        <RelatedRail
+          title="You may also like"
+          subtitle={product.category.name}
+          products={related.alsoLike}
+          sale={sale}
+        />
+      </div>
     </div>
+  );
+}
+
+function RelatedRail({
+  title,
+  subtitle,
+  products,
+  sale,
+}: {
+  title: string;
+  subtitle: string;
+  products: ProductCardData[];
+  sale: ActiveSale;
+}) {
+  if (products.length === 0) return null;
+  return (
+    <section>
+      <h2 className="font-heading text-xl font-bold sm:text-2xl">{title}</h2>
+      <p className="mb-4 text-sm text-muted-foreground">{subtitle}</p>
+      <ProductRail>
+        {products.map((p) => (
+          <ProductCard key={p.id} product={p} sale={sale} />
+        ))}
+      </ProductRail>
+    </section>
   );
 }

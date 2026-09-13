@@ -90,29 +90,35 @@ async function main() {
     "Skill Builders series for Grades 6-10 - rigorous practice modules that bridge school syllabus and competitive readiness.",
     3,
   );
+  const competitive = await upsertCategory(
+    "competitive-exams",
+    "Competitive Exams",
+    "UPSC Civils foundation material and competitive English from SLPL - built for aspirants, by educators.",
+    4,
+  );
   const seniorSec = await upsertCategory(
     "senior-secondary",
     "Senior Secondary",
     "Focused material for Grades 11-12 - clarity, depth and exam-ready practice.",
-    4,
+    5,
   );
   const novelsPoems = await upsertCategory(
     "novels-poems",
     "Novels & Poems",
     "Stories and verse from SLPL - reading that builds language and character.",
-    5,
+    6,
   );
   const magazine = await upsertCategory(
     "magazine",
     "The GenZ Times",
     "Our monthly education and youth magazine - careers, technology, leadership and ideas for the next generation.",
-    6,
+    7,
   );
   const bundles = await upsertCategory(
     "bundles",
     "Class Bundles",
     "Everything a class needs in one box - complete book sets at a bundled price.",
-    7,
+    8,
   );
 
   // ── Novels & Poems ──────────────────────────────────────────────────────
@@ -261,6 +267,88 @@ async function main() {
       isFeatured: true,
     },
   });
+
+  // ── Competitive exams (covers received 12 Sep 2026) ─────────────────────
+  // Real prices from the owner: MRP with a genuine discount, so the strike
+  // through on the card is the published rate, not a placeholder.
+  await upsertProduct({
+    slug: "advanced-english",
+    title: "Workshop on Advanced English: Student Handbook",
+    categoryId: competitive.id,
+    series: "Workshops",
+    description:
+      `Ten progressive workshops that build confidence, sharpen thinking and transform the way you communicate. ` +
+      `From grammar to public speaking, from vocabulary to interviews: everything needed to excel in academics, ` +
+      `careers and competitive exams. Inside are practice worksheets, a language reference covering vocabulary, ` +
+      `idioms, phrasal verbs and common errors, multiple tests and a Grand Competitive English Test. ` +
+      `Written by Ramesh Mamidala, Professor of English. Useful for SSC, Bank, UPSC, NID, CDS, NDA, CLAT, CAT and more.`,
+    mrp: 45900,
+    price: 37000,
+    weightGrams: 400,
+    coverImage: "/seed/covers/advanced-english.webp",
+    isNewRelease: true,
+    isFeatured: true,
+  });
+
+  // The three volumes sell only as the complete set (owner decision,
+  // 12 Sep 2026), so they stay invisible and carry the set price split three
+  // ways for internal stock and costing. The set below holds them.
+  const upscVolumes = [
+    { n: 1, chapters: 46, questions: "1,063", exercises: "500+", pyq: "50+", tests: "1 grand test" },
+    { n: 2, chapters: 31, questions: "1,146", exercises: "500+", pyq: "50+", tests: "1 grand test" },
+    { n: 3, chapters: 61, questions: "2,405", exercises: "1100+", pyq: "120+", tests: "3 grand tests" },
+  ];
+  const upscIds: string[] = [];
+  for (const v of upscVolumes) {
+    const row = await upsertProduct({
+      slug: `upsc-foundation-volume-${v.n}`,
+      title: `UPSC Foundation Volume ${v.n}: Social Science`,
+      categoryId: competitive.id,
+      series: "UPSC Foundation",
+      description:
+        `Saaradaa's CSAP UPSC Foundation Volume ${v.n} is a comprehensive guide to Social Science, designed strictly ` +
+        `as per the NCERT syllabus and aligned with the UPSC Civil Services Examination pattern. Part A History, ` +
+        `Part B Economics, Part C Political Science and Part D Geography. ` +
+        `${v.chapters} chapters, ${v.questions} questions, ${v.exercises} practice exercises and worksheets, ` +
+        `${v.pyq} previous year pattern questions from 2013 to 2025, and ${v.tests}. ` +
+        `Compiled by the Saaradaa Academic Team, edited by Ramesh Mamidala. 2026 edition. ` +
+        `Sold as part of the complete three volume set.`,
+      mrp: 106600,
+      price: 83300,
+      weightGrams: 600,
+      coverImage: `/seed/covers/upsc-foundation-volume-${v.n}.webp`,
+      isVisible: false,
+    });
+    upscIds.push(row.id);
+  }
+
+  const upscSet = await upsertProduct({
+    slug: "upsc-foundation-set",
+    title: "UPSC Foundation: Complete Set of 3 Volumes",
+    kind: "BUNDLE",
+    categoryId: competitive.id,
+    series: "UPSC Foundation",
+    description:
+      `All three volumes of Saaradaa's CSAP UPSC Foundation in one set: the complete Social Science foundation for ` +
+      `the civil services aspirant, strictly as per the NCERT syllabus and aligned with the UPSC Civil Services ` +
+      `Examination pattern. Across the three volumes: 138 chapters, 4,614 questions, 2,100 plus practice exercises ` +
+      `and worksheets, 220 plus previous year pattern questions from 2013 to 2025, and 5 grand tests. ` +
+      `Also useful for SSC, state PSCs, NDA, CDS, banking, CLAT and CAT. ` +
+      `Compiled by the Saaradaa Academic Team, edited by Ramesh Mamidala. 2026 edition.`,
+    mrp: 319900,
+    price: 249900,
+    weightGrams: 1800,
+    coverImage: "/seed/covers/upsc-foundation-set.webp",
+    isNewRelease: true,
+    isFeatured: true,
+  });
+  for (const productId of upscIds) {
+    await db.bundleItem.upsert({
+      where: { bundleId_productId: { bundleId: upscSet.id, productId } },
+      update: { quantity: 1 },
+      create: { bundleId: upscSet.id, productId, quantity: 1 },
+    });
+  }
 
   // ── Bundles ─────────────────────────────────────────────────────────────
   // Only the pre-primary kits exist for now (owner decision, 16 Jul 2026).

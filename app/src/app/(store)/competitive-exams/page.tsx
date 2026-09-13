@@ -14,7 +14,14 @@ export const metadata: Metadata = {
 };
 
 export default async function CompetitiveExamsPage() {
-  const [products, sale] = await Promise.all([
+  const [aspirantTitles, products, sale] = await Promise.all([
+    // The UPSC Foundation set and the Advanced English handbook, written for
+    // aspirants rather than for school grades
+    db.product.findMany({
+      where: { isVisible: true, category: { is: { slug: "competitive-exams" } } },
+      select: productCardSelect,
+      orderBy: [{ price: "desc" }],
+    }),
     db.product.findMany({
       where: {
         isVisible: true,
@@ -46,17 +53,38 @@ export default async function CompetitiveExamsPage() {
         </p>
       </header>
 
-      {sorted.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
-          Titles for this program are on their way - check back soon.
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {sorted.map((p) => (
-            <ProductCard key={p.id} product={p} sale={sale} />
-          ))}
-        </div>
+      {aspirantTitles.length > 0 && (
+        <section className="mb-12">
+          <h2 className="font-heading text-2xl font-bold">Built for aspirants</h2>
+          <p className="mb-4 text-muted-foreground">
+            UPSC Civils foundation material and competitive English, compiled by the Saaradaa
+            Academic Team.
+          </p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {aspirantTitles.map((p) => (
+              <ProductCard key={p.id} product={p} sale={sale} />
+            ))}
+          </div>
+        </section>
       )}
+
+      <section>
+        <h2 className="font-heading text-2xl font-bold">Start from school</h2>
+        <p className="mb-4 text-muted-foreground">
+          Skill Builders Social Studies and English for Grades 6 to 10.
+        </p>
+        {sorted.length === 0 ? (
+          <p className="rounded-xl border border-dashed p-10 text-center text-muted-foreground">
+            Titles for this program are on their way - check back soon.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {sorted.map((p) => (
+              <ProductCard key={p.id} product={p} sale={sale} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

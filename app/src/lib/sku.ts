@@ -42,6 +42,8 @@ const SPECIAL_BY_SLUG: Record<string, string> = {
   "upsc-foundation-volume-3": "UPSCFNDV03",
   "compendium-of-competitive-english": "CCE01",
   "mental-ability-test": "MAT01",
+  // Added 12 Sep 2026, a separate title from CCE01, so the register is 146
+  "advanced-english": "AEN01",
 };
 
 // ── Baby Steps ───────────────────────────────────────────────────────────────
@@ -169,9 +171,9 @@ export function skuFor(input: SkuInput): string | null {
 
 /** How many titles each section of the register holds, for reconciliation. */
 export const REGISTER_TOTALS = {
-  special: 8,
+  special: 9, // 8 printed on the register, plus AEN01
   babySteps: 31,
   littleLeaps: 60,
   skillBuilders: 46,
-  total: 145,
+  total: 146,
 } as const;

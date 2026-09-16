@@ -706,3 +706,72 @@ model Expense {
   @@index([spentAt])
   @@index([category, spentAt])
 }
+
+// ─── Staff accounts ───────────────────────────────────────────────────────────
+// Ported verbatim from the ERP fork so the two systems stay schema compatible
+// and the rest of its finance layer can follow without a rewrite.
+
+enum AdminRole {
+  OWNER // everything, including staff management
+  MANAGER // everything except staff management
+  SALES // orders, customers, catalog (read)
+  WAREHOUSE // shipments and stock
+  ACCOUNTS // finance, plus read access to what it bills
+  CA_READONLY // external auditor: reads finance, changes nothing
+  SUPPORT // grievances and order lookups
+}
+
+model AdminUser {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String
+  passwordHash       String
+  role               AdminRole @default(SUPPORT)
+  isActive           Boolean   @default(true)
+  /// Forces a password change on first login for seeded or reset accounts.
+  mustChangePassword Boolean   @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions  AdminSession[]
+  auditLogs AdminAuditLog[]
+
+  @@index([isActive])
+}
+
+model AdminSession {
+  id          String    @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  /// Set when the session ends early: logout, password change, or an owner
+  /// revoking it. A row is never deleted, so the audit trail holds.
+  revokedAt   DateTime?
+  ip          String?
+  userAgent   String?
+  lastSeenAt  DateTime  @default(now())
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId, revokedAt])
+  @@index([expiresAt])
+}
+
+model AdminAuditLog {
+  id          String     @id @default(cuid())
+  adminUserId String?
+  adminUser   AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  /// Kept alongside the relation so the trail survives a deleted staff row.
+  actorEmail  String
+  action      String // "expense.create", "product.update", "staff.create"
+  entityType  String?
+  entityId    String?
+  before      Json?
+  after       Json?
+  ip          String?
+  createdAt   DateTime   @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([adminUserId, createdAt])
+}

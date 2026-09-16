@@ -4,9 +4,10 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { isAdmin } from "@/lib/admin-auth";
+import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { isExpenseCategory, isPaidFrom } from "@/lib/expense-constants";
+import { getStaff, requireCapability } from "@/lib/staff-auth";
 
 /**
  * The director expense log. Every rupee out of the current account, recorded
@@ -18,8 +19,8 @@ import { isExpenseCategory, isPaidFrom } from "@/lib/expense-constants";
 
 type Result = { ok?: boolean; error?: string; voucherNo?: string };
 
-async function ensureAdmin(): Promise<string | null> {
-  return (await isAdmin()) ? null : "UNAUTHORIZED";
+async function ensureFinance(): Promise<string | null> {
+  return requireCapability("finance.write");
 }
 
 /** SLPL-E-YYMM-XXXXX, mirroring the order and receipt numbers. */
@@ -55,7 +56,7 @@ const expenseSchema = z.object({
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 
 export async function saveExpense(input: ExpenseInput): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureFinance();
   if (denied) return { error: denied };
 
   const parsed = expenseSchema.safeParse(input);
@@ -90,10 +91,25 @@ export async function saveExpense(input: ExpenseInput): Promise<Result> {
     vendorGstin: d.vendorGstin || null,
   };
 
+  const staff = await getStaff();
+  const before = d.id ? await db.expense.findUnique({ where: { id: d.id } }) : null;
   const row = d.id
     ? await db.expense.update({ where: { id: d.id }, data })
-    : await db.expense.create({ data: { ...data, voucherNo: await generateVoucherNo(spentAt) } });
+    : await db.expense.create({
+        data: {
+          ...data,
+          voucherNo: await generateVoucherNo(spentAt),
+          enteredBy: staff?.name ?? "Director",
+        },
+      });
 
+  await audit({
+    action: d.id ? "expense.update" : "expense.create",
+    entityType: "Expense",
+    entityId: row.id,
+    before,
+    after: row,
+  });
   revalidatePath("/erp/expenses");
   return { ok: true, voucherNo: row.voucherNo };
 }
@@ -104,7 +120,7 @@ export async function saveExpense(input: ExpenseInput): Promise<Result> {
  * voided line with a reason does not.
  */
 export async function voidExpense(id: string, reason: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureFinance();
   if (denied) return { error: denied };
   const why = reason.trim();
   if (why.length < 3) return { error: "Say why it is being voided." };
@@ -113,13 +129,20 @@ export async function voidExpense(id: string, reason: string): Promise<Result> {
   if (!existing) return { error: "That entry no longer exists." };
   if (existing.amount === 0) return { error: "This entry is already voided." };
 
-  await db.expense.update({
+  const row = await db.expense.update({
     where: { id },
     data: {
       amount: 0,
       gstAmount: null,
       note: `VOIDED: ${why}${existing.note ? ` (was: ${existing.note})` : ""}`,
     },
+  });
+  await audit({
+    action: "expense.void",
+    entityType: "Expense",
+    entityId: id,
+    before: existing,
+    after: row,
   });
   revalidatePath("/erp/expenses");
   return { ok: true };

@@ -4,19 +4,25 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Wallet } from "lucide-react";
 
+import { DeviceSetup } from "@/components/erp/device-setup";
 import { db } from "@/lib/db";
 import { financialYearOf } from "@/lib/expense-constants";
+import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
 import { formatINR } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Back office", robots: { index: false } };
 
 export default async function ErpHome() {
   const year = financialYearOf(new Date());
-  const spend = await db.expense.aggregate({
-    where: { spentAt: { gte: year.start, lte: year.end } },
-    _sum: { amount: true },
-    _count: true,
-  });
+  const [spend, trusted, pinSet] = await Promise.all([
+    db.expense.aggregate({
+      where: { spentAt: { gte: year.start, lte: year.end } },
+      _sum: { amount: true },
+      _count: true,
+    }),
+    isRememberedDevice(),
+    hasPin(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -45,6 +51,8 @@ export default async function ErpHome() {
         </span>
         <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
       </Link>
+
+      <DeviceSetup trusted={trusted && pinSet} />
     </div>
   );
 }

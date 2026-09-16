@@ -6,7 +6,8 @@ import { ChevronLeft } from "lucide-react";
 
 import { PrintButton } from "@/components/store/print-button";
 import { db } from "@/lib/db";
-import { categoryLabel, financialYearOf, paidFromLabel } from "@/lib/expense-constants";
+import { categoryLabel, paidFromLabel } from "@/lib/expense-constants";
+import { applyDayOfWeek, buildWhere, type ExpenseQuery } from "@/lib/expense-query";
 import { formatINR } from "@/lib/money";
 import { getSetting } from "@/lib/catalog";
 import { site } from "@/lib/site";
@@ -24,31 +25,39 @@ const dateIN = (d: Date) =>
 export default async function ExpenseReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fy?: string }>;
+  searchParams: Promise<ExpenseQuery>;
 }) {
-  const { fy } = await searchParams;
-  const year = fy ? financialYearOf(new Date(Number(fy), 5, 1)) : financialYearOf(new Date());
+  const query = await searchParams;
+  const { where, window, filters } = buildWhere(query);
 
-  const [expenses, byCategory, gstin, phone, email] = await Promise.all([
-    db.expense.findMany({
-      where: { spentAt: { gte: year.start, lte: year.end } },
-      orderBy: [{ spentAt: "asc" }, { voucherNo: "asc" }],
-    }),
-    db.expense.groupBy({
-      by: ["category"],
-      where: { spentAt: { gte: year.start, lte: year.end } },
-      _sum: { amount: true },
-      _count: true,
-      orderBy: { _sum: { amount: "desc" } },
-    }),
+  const [rows, gstin, phone, email] = await Promise.all([
+    db.expense.findMany({ where, orderBy: [{ spentAt: "asc" }, { voucherNo: "asc" }] }),
     getSetting<string>("company_gstin", ""),
     getSetting<string>("contact_phone", site.contact.phone),
     getSetting<string>("contact_email", site.contact.email),
   ]);
+  const expenses = applyDayOfWeek(rows, filters.days);
 
   const total = expenses.reduce((s, e) => s + e.amount, 0);
   const gstTotal = expenses.reduce((s, e) => s + (e.gstAmount ?? 0), 0);
   const voided = expenses.filter((e) => e.amount === 0).length;
+
+  // Summed from the filtered rows, so the statement always agrees with itself
+  const byCategory = [...expenses
+    .reduce(
+      (m, e) => m.set(e.category, { count: (m.get(e.category)?.count ?? 0) + 1, sum: (m.get(e.category)?.sum ?? 0) + e.amount }),
+      new Map<string, { count: number; sum: number }>(),
+    )
+    .entries()]
+    .sort((a, b) => b[1].sum - a[1].sum);
+
+  // A statement that was filtered must say so, or it reads as the full period
+  const narrowed = [
+    filters.text ? `matching "${filters.text}"` : "",
+    filters.categories.length > 0 ? `${filters.categories.length} head(s)` : "",
+    filters.modes.length > 0 ? `${filters.modes.length} payment mode(s)` : "",
+    filters.days.length > 0 ? `${filters.days.length} day(s) of the week` : "",
+  ].filter(Boolean);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -77,12 +86,17 @@ export default async function ExpenseReportPage({
             ) : null}
           </p>
           <h2 className="mt-4 font-heading text-lg font-semibold">
-            Statement of expenses, financial year {year.label}
+            Statement of expenses, {window.label}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {dateIN(year.start)} to {dateIN(year.end)} · {expenses.length} entries
+            {dateIN(window.from)} to {dateIN(window.to)} · {expenses.length} entries
             {voided > 0 ? `, of which ${voided} voided` : ""}
           </p>
+          {narrowed.length > 0 && (
+            <p className="mt-1 text-sm font-medium">
+              Filtered statement, not the full period: {narrowed.join(", ")}.
+            </p>
+          )}
         </header>
 
         <section className="mb-6">
@@ -96,11 +110,11 @@ export default async function ExpenseReportPage({
               </tr>
             </thead>
             <tbody>
-              {byCategory.map((c) => (
-                <tr key={c.category} className="border-b last:border-0">
-                  <td className="py-1.5">{categoryLabel(c.category)}</td>
-                  <td className="py-1.5 text-right text-muted-foreground">{c._count}</td>
-                  <td className="py-1.5 text-right">{formatINR(c._sum.amount ?? 0)}</td>
+              {byCategory.map(([category, agg]) => (
+                <tr key={category} className="border-b last:border-0">
+                  <td className="py-1.5">{categoryLabel(category)}</td>
+                  <td className="py-1.5 text-right text-muted-foreground">{agg.count}</td>
+                  <td className="py-1.5 text-right">{formatINR(agg.sum)}</td>
                 </tr>
               ))}
               <tr className="border-t-2 font-bold">

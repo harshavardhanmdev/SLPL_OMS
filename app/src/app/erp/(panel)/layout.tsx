@@ -6,6 +6,7 @@ import { LayoutDashboard, LogOut, Store, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { adminLogout } from "@/lib/admin-actions";
 import { isAdmin } from "@/lib/admin-auth";
+import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
 
 /**
  * The back office. Gated by the same admin session as /admin for now; per-user
@@ -17,8 +18,17 @@ const nav = [
   { href: "/erp/expenses", label: "Expenses", icon: Wallet },
 ] as const;
 
+export const metadata = {
+  appleWebApp: { capable: true, title: "SLPL", statusBarStyle: "black-translucent" as const },
+  icons: { apple: "/brand/apple-touch-icon.png" },
+};
+
 export default async function ErpLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  if (!(await isAdmin())) redirect("/admin/login?next=/erp/expenses");
+  if (!(await isAdmin())) {
+    // A phone that has been trusted gets the PIN pad; anything else the password
+    const quick = (await isRememberedDevice()) && (await hasPin());
+    redirect(quick ? "/erp/unlock?next=/erp/expenses" : "/admin/login?next=/erp/expenses");
+  }
 
   return (
     <div className="min-h-screen bg-background">

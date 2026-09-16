@@ -60,11 +60,18 @@ export default async function StockPage() {
             As counted on {asOfLabel}, transcribed from the handwritten master register.
           </p>
         </div>
-        <Button variant="outline" className="gap-2" asChild>
-          <Link href="/erp/stock/report">
-            <FileText className="size-4" /> Statement for the auditor
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button className="gap-2" asChild>
+            <Link href="/erp/stock/sheet">
+              <FileText className="size-4" /> One page sheet
+            </Link>
+          </Button>
+          <Button variant="outline" className="gap-2" asChild>
+            <Link href="/erp/stock/report">
+              <FileText className="size-4" /> Full statement
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

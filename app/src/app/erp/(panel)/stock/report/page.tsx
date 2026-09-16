@@ -153,8 +153,8 @@ export default async function StockReportPage() {
                 <th className="py-2 pr-2 text-right">Inward</th>
                 <th className="py-2 pr-2 text-right">Outward</th>
                 <th className="py-2 pr-2 text-right">Balance</th>
-                <th className="py-2 pr-2 text-right">Telugu</th>
-                <th className="py-2 text-right">Hindi</th>
+                <th className="py-2 pr-2 text-right">Tel</th>
+                <th className="px-2 py-2 text-right">Hin</th>
               </tr>
             </thead>
             <tbody>
@@ -171,7 +171,7 @@ export default async function StockReportPage() {
                   <td className="py-1.5 pr-2 text-right">
                     {r.inventoryTelugu != null ? n(r.inventoryTelugu) : "-"}
                   </td>
-                  <td className="py-1.5 text-right">
+                  <td className="px-2 py-1.5 text-right">
                     {r.inventoryHindi != null ? n(r.inventoryHindi) : "-"}
                   </td>
                 </tr>
@@ -197,7 +197,7 @@ export default async function StockReportPage() {
                 <th className="px-2 py-2">Code</th>
                 <th className="py-2 pr-2">Title</th>
                 <th className="py-2 pr-2">Group</th>
-                <th className="py-2 text-right">Copies on hand</th>
+                <th className="px-2 py-2 text-right">Copies on hand</th>
               </tr>
             </thead>
             <tbody>

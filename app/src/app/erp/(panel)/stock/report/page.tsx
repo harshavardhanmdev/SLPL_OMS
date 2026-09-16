@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
@@ -15,6 +16,11 @@ export const metadata: Metadata = { title: "Stock statement", robots: { index: f
 const n = (v: number) => v.toLocaleString("en-IN");
 const dateIN = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+
+// Literal hex, not theme tokens: this page is printed and must not follow the
+// reader's dark mode.
+const NAVY = "#1E2A5A";
+const SAFFRON = "#F5A623";
 
 /**
  * The stock statement an auditor is handed.
@@ -95,29 +101,45 @@ export default async function StockReportPage() {
         <PrintButton label="Print or save as PDF" />
       </div>
 
-      <article className="rounded-2xl border bg-card p-6 print:rounded-none print:border-0 print:p-0">
-        <header className="mb-6 border-b pb-4">
-          <h1 className="font-heading text-xl font-bold">{site.company}</h1>
-          <p className="text-sm text-muted-foreground">
-            {site.contact.address}
-            {gstin ? (
-              <>
-                <br />
-                GSTIN {gstin}
-              </>
-            ) : null}
-          </p>
-          <h2 className="mt-4 font-heading text-lg font-semibold">
-            Statement of stock as at {dateIN(latest.asOf)}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {n(totals.inward)} books received, {n(totals.outward)} issued, {n(totals.inventory)} on
-            hand across {rows.length} register lines.
-          </p>
+      <article className="overflow-hidden rounded-2xl border bg-white text-[#16213e] print:rounded-none print:border-0">
+        <header
+          className="flex items-center gap-3 px-5 py-4"
+          style={{ backgroundColor: NAVY, color: "#ffffff" }}
+        >
+          <Image
+            src="/brand/sl-logo.png"
+            alt=""
+            width={44}
+            height={44}
+            className="size-11 rounded-lg bg-white object-contain p-1"
+          />
+          <div className="min-w-0">
+            <p className="font-heading text-lg font-bold leading-tight">{site.company}</p>
+            <p className="text-xs" style={{ color: SAFFRON }}>
+              Research · Innovation · Impact
+            </p>
+          </div>
+          <div className="ml-auto text-right text-xs leading-snug">
+            <p className="font-semibold">Statement of Stock</p>
+            <p>as at {dateIN(latest.asOf)}</p>
+            {gstin ? <p>GSTIN {gstin}</p> : null}
+          </div>
         </header>
 
+        <div className="px-5 py-5">
+        <p className="mb-5 text-sm text-[#5a6478]">
+          {n(totals.inward)} books received, {n(totals.outward)} issued,{" "}
+          <b style={{ color: NAVY }}>{n(totals.inventory)} on hand</b> across {rows.length} register
+          lines.
+        </p>
+
         <section className="mb-8">
-          <h3 className="mb-1 font-heading font-semibold">Part 1: the register as kept</h3>
+          <h3
+            className="mb-1 border-b pb-1 font-heading font-bold"
+            style={{ borderColor: SAFFRON, color: NAVY }}
+          >
+            Part 1: the register as kept
+          </h3>
           <p className="mb-3 text-sm text-muted-foreground">
             Graded material is counted in sets, single titles in copies. Telugu and Hindi are held
             outside the set for Grades 1 to 5, because a school can take the core set without a
@@ -125,8 +147,8 @@ export default async function StockReportPage() {
           </p>
           <table className="w-full border-collapse text-xs">
             <thead>
-              <tr className="border-b text-left">
-                <th className="py-2 pr-2">Item</th>
+              <tr className="text-left" style={{ backgroundColor: "#eef1f8" }}>
+                <th className="px-2 py-2">Item</th>
                 <th className="py-2 pr-2">Unit</th>
                 <th className="py-2 pr-2 text-right">Inward</th>
                 <th className="py-2 pr-2 text-right">Outward</th>
@@ -159,15 +181,20 @@ export default async function StockReportPage() {
         </section>
 
         <section className="break-before-page">
-          <h3 className="mb-1 font-heading font-semibold">Part 2: the same stock, title by title</h3>
+          <h3
+            className="mb-1 border-b pb-1 font-heading font-bold"
+            style={{ borderColor: SAFFRON, color: NAVY }}
+          >
+            Part 2: the same stock, title by title
+          </h3>
           <p className="mb-3 text-sm text-muted-foreground">
             Each set expanded into the titles it holds, so the balance can be checked against a
             physical count of the shelves. Every title carries its master stock register code.
           </p>
           <table className="w-full border-collapse text-xs">
             <thead>
-              <tr className="border-b text-left">
-                <th className="py-2 pr-2">Code</th>
+              <tr className="text-left" style={{ backgroundColor: "#eef1f8" }}>
+                <th className="px-2 py-2">Code</th>
                 <th className="py-2 pr-2">Title</th>
                 <th className="py-2 pr-2">Group</th>
                 <th className="py-2 text-right">Copies on hand</th>
@@ -182,32 +209,32 @@ export default async function StockReportPage() {
                   <td className="py-1.5 text-right font-medium">{n(t.onHand)}</td>
                 </tr>
               ))}
-              <tr className="border-t-2 font-bold">
-                <td className="py-2" colSpan={3}>
+              <tr className="font-bold" style={{ backgroundColor: NAVY, color: "#ffffff" }}>
+                <td className="px-2 py-2.5" colSpan={3}>
                   Total books on hand
                 </td>
-                <td className="py-2 text-right">{n(totals.inventory)}</td>
+                <td className="px-2 py-2.5 text-right" style={{ color: SAFFRON }}>
+                  {n(totals.inventory)}
+                </td>
               </tr>
             </tbody>
           </table>
         </section>
 
-        <footer className="mt-10 grid gap-10 text-sm sm:grid-cols-2">
-          <div>
-            <div className="h-14 border-b" />
-            <p className="mt-1 text-muted-foreground">Director</p>
-          </div>
-          <div>
-            <div className="h-14 border-b" />
-            <p className="mt-1 text-muted-foreground">Auditor</p>
-          </div>
-        </footer>
-        <p className="mt-6 text-xs text-muted-foreground">
+        <p className="mt-6 text-[11px] leading-relaxed text-[#5a6478]">
           Transcribed from the handwritten master stock register and reconciled line by line:
           inward less outward equals the balance on every line. Counts are as at{" "}
           {dateIN(latest.asOf)} and are theoretical book balances, to be verified against a physical
           count.
         </p>
+        </div>
+
+        <footer
+          className="px-5 py-2 text-[10px]"
+          style={{ backgroundColor: "#eef1f8", color: "#5a6478" }}
+        >
+          {site.contact.address} · {site.contact.phone} · theslpl.in
+        </footer>
       </article>
     </div>
   );

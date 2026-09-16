@@ -9,7 +9,7 @@ import { PrintButton } from "@/components/store/print-button";
 import { db } from "@/lib/db";
 import { getSetting } from "@/lib/catalog";
 import { site } from "@/lib/site";
-import { copiesFor, type RegisterRow } from "@/lib/stock-register";
+import { copiesFor, setComposition, type RegisterRow } from "@/lib/stock-register";
 
 export const metadata: Metadata = { title: "Stock sheet", robots: { index: false } };
 
@@ -55,8 +55,8 @@ export default async function StockSheetPage() {
     { sets: 0, inward: 0, outward: 0, inventory: 0 },
   );
 
-  const th = "px-2 py-1.5 text-right font-semibold";
-  const td = "px-2 py-1 text-right tabular-nums";
+  const th = "px-2.5 py-2 text-right font-semibold";
+  const td = "px-2.5 py-1.5 text-right tabular-nums";
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -96,11 +96,11 @@ export default async function StockSheetPage() {
         </header>
 
         <div className="px-5 py-4">
-          <table className="w-full border-collapse text-[11px]">
+          <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr style={{ backgroundColor: "#eef1f8" }}>
-                <th className="px-2 py-1.5 text-left font-semibold">Item</th>
-                <th className="px-2 py-1.5 text-left font-semibold">Unit</th>
+                <th className="px-2.5 py-2 text-left font-semibold">Item</th>
+                <th className="px-2.5 py-2 text-left font-semibold">Unit</th>
                 <th className={th}>Inward</th>
                 <th className={th} style={{ color: NAVY }}>
                   Tel
@@ -134,8 +134,8 @@ export default async function StockSheetPage() {
                     style={{ backgroundColor: i % 2 ? "#fafbfe" : "#ffffff" }}
                     className="border-b border-[#e3e8f2]"
                   >
-                    <td className="px-2 py-1 font-medium">{r.label}</td>
-                    <td className="px-2 py-1 text-[#5a6478]">{r.unit === "SET" ? "Sets" : "Copies"}</td>
+                    <td className="whitespace-nowrap px-2.5 py-1.5 font-medium">{r.label}</td>
+                    <td className="px-2.5 py-1.5 text-[#5a6478]">{r.unit === "SET" ? "Sets" : "Copies"}</td>
                     <td className={td}>{n(r.inward)}</td>
                     <td className={td}>{n(r.inwardTelugu)}</td>
                     <td className={td}>{n(r.inwardHindi)}</td>
@@ -154,7 +154,7 @@ export default async function StockSheetPage() {
                 );
               })}
               <tr style={{ backgroundColor: NAVY, color: "#ffffff" }}>
-                <td className="px-2 py-2 font-bold" colSpan={8}>
+                <td className="px-2.5 py-2.5 font-bold" colSpan={8}>
                   Total
                 </td>
                 <td className={`${td} font-bold`}>{n(totals.sets)} sets</td>
@@ -166,7 +166,7 @@ export default async function StockSheetPage() {
             </tbody>
           </table>
 
-          <p className="mt-3 text-[10px] leading-relaxed text-[#5a6478]">
+          <p className="mt-4 text-[11px] leading-relaxed text-[#5a6478]">
             Graded material is counted in sets, single titles in copies. Telugu and Hindi are held
             outside the set for Grades 1 to 5, because a school can take the core set without a
             language book. The Books column expands each set into the titles it holds.{" "}
@@ -175,16 +175,30 @@ export default async function StockSheetPage() {
             request.
           </p>
 
-          <div className="mt-8 grid grid-cols-2 gap-10 text-[11px]">
-            <div>
-              <div className="h-10 border-b border-[#16213e]" />
-              <p className="mt-1 text-[#5a6478]">Director</p>
-            </div>
-            <div>
-              <div className="h-10 border-b border-[#16213e]" />
-              <p className="mt-1 text-[#5a6478]">Auditor</p>
-            </div>
-          </div>
+          <section className="mt-6">
+            <h2
+              className="mb-2 border-b pb-1 font-heading text-sm font-bold"
+              style={{ borderColor: SAFFRON, color: NAVY }}
+            >
+              What one set contains
+            </h2>
+            <ul className="grid gap-x-8 gap-y-1 text-[11px] sm:grid-cols-2">
+              {rows
+                .filter((r) => r.unit === "SET")
+                .map((r) => {
+                  const members = setComposition(r.label);
+                  if (members.length === 0) return null;
+                  return (
+                    <li key={r.label} className="leading-snug">
+                      <b style={{ color: NAVY }}>{r.label}</b>{" "}
+                      <span className="text-[#5a6478]">
+                        {members.length} titles: {members.map((m) => m.sku).join(", ")}
+                      </span>
+                    </li>
+                  );
+                })}
+            </ul>
+          </section>
         </div>
 
         <footer

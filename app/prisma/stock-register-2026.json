@@ -1,0 +1,204 @@
+{
+  "_comment": "Transcribed from the handwritten master stock register photographed 16 Sep 2026. Counts are in SETS unless unit says COPY. Telugu and Hindi are tracked separately from the set for Grades 1 to 5, because a school can take the core set without a language book. Every row below reconciles: inward minus outward equals inventory.",
+  "asOf": "2026-09-16",
+  "rows": [
+    {
+      "label": "Nursery",
+      "series": "Baby Steps 1",
+      "unit": "SET",
+      "inward": 3500,
+      "outward": 915,
+      "inventory": 2585,
+      "carriedForward": 915,
+      "note": "Outward written as 905 + 10 = 915. A Telugu/Hindi split was started and struck out."
+    },
+    {
+      "label": "LKG",
+      "series": "Baby Steps 2",
+      "unit": "SET",
+      "inward": 3500,
+      "outward": 965,
+      "inventory": 2535,
+      "carriedForward": 965,
+      "note": "A Telugu/Hindi split was started and struck out."
+    },
+    {
+      "label": "UKG",
+      "series": "Baby Steps 3",
+      "unit": "SET",
+      "inward": 3500,
+      "outward": 930,
+      "inventory": 2570,
+      "carriedForward": 930,
+      "note": "A Telugu/Hindi split was started and struck out."
+    },
+    {
+      "label": "Grade 1",
+      "series": "Little Leaps",
+      "unit": "SET",
+      "inward": 2000,
+      "outward": 832,
+      "inventory": 1168,
+      "carriedForward": 1168,
+      "inwardTelugu": 1500,
+      "inwardHindi": 1500,
+      "outwardTelugu": 130,
+      "outwardHindi": 130,
+      "inventoryTelugu": 1370,
+      "inventoryHindi": 1370
+    },
+    {
+      "label": "Grade 2",
+      "series": "Little Leaps",
+      "unit": "SET",
+      "inward": 2000,
+      "outward": 820,
+      "inventory": 1180,
+      "carriedForward": 1180,
+      "inwardTelugu": 1500,
+      "inwardHindi": 1500,
+      "outwardTelugu": 125,
+      "outwardHindi": 125,
+      "inventoryTelugu": 1375,
+      "inventoryHindi": 1375
+    },
+    {
+      "label": "Grade 3",
+      "series": "Little Leaps",
+      "unit": "SET",
+      "inward": 2000,
+      "outward": 820,
+      "inventory": 1180,
+      "carriedForward": 1190,
+      "inwardTelugu": 1500,
+      "inwardHindi": 1500,
+      "outwardTelugu": 101,
+      "outwardHindi": 101,
+      "inventoryTelugu": 1399,
+      "inventoryHindi": 1399
+    },
+    {
+      "label": "Grade 4",
+      "series": "Little Leaps",
+      "unit": "SET",
+      "inward": 2000,
+      "outward": 820,
+      "inventory": 1180,
+      "carriedForward": 1180,
+      "inwardTelugu": 1500,
+      "inwardHindi": 1500,
+      "outwardTelugu": 95,
+      "outwardHindi": 95,
+      "inventoryTelugu": 1405,
+      "inventoryHindi": 1405
+    },
+    {
+      "label": "Grade 5",
+      "series": "Little Leaps",
+      "unit": "SET",
+      "inward": 2000,
+      "outward": 810,
+      "inventory": 1190,
+      "carriedForward": 1190,
+      "inwardTelugu": 1500,
+      "inwardHindi": 1500,
+      "outwardTelugu": 96,
+      "outwardHindi": 96,
+      "inventoryTelugu": 1404,
+      "inventoryHindi": 1404
+    },
+    {
+      "label": "Grade 6",
+      "series": "Skill Builders",
+      "unit": "SET",
+      "inward": 1000,
+      "outward": 692,
+      "inventory": 308,
+      "extra": 100
+    },
+    {
+      "label": "Grade 7",
+      "series": "Skill Builders",
+      "unit": "SET",
+      "inward": 1000,
+      "outward": 680,
+      "inventory": 320,
+      "extra": 100,
+      "note": "Outward written as 650 + 30 = 680."
+    },
+    {
+      "label": "Grade 8",
+      "series": "Skill Builders",
+      "unit": "SET",
+      "inward": 1000,
+      "outward": 662,
+      "inventory": 338,
+      "extra": 100
+    },
+    {
+      "label": "Grade 9",
+      "series": "Skill Builders",
+      "unit": "SET",
+      "inward": 1000,
+      "outward": 674,
+      "inventory": 326,
+      "extra": 100
+    },
+    {
+      "label": "Grade 10",
+      "series": "Skill Builders",
+      "unit": "SET",
+      "inward": 1000,
+      "outward": 816,
+      "inventory": 184
+    },
+    {
+      "label": "Advanced English Workshop",
+      "sku": "AEN01",
+      "unit": "COPY",
+      "inward": 1000,
+      "outward": 850,
+      "inventory": 150
+    },
+    {
+      "label": "Life of Student",
+      "sku": "LOS01",
+      "unit": "COPY",
+      "inward": 1000,
+      "outward": 180,
+      "inventory": 820
+    },
+    {
+      "label": "Pusthakavilapam",
+      "sku": "PUS01",
+      "unit": "COPY",
+      "inward": 1000,
+      "outward": 6,
+      "inventory": 994
+    },
+    {
+      "label": "Seasons of My Soul",
+      "sku": "SMS01",
+      "unit": "COPY",
+      "inward": 200,
+      "outward": 75,
+      "inventory": 125
+    },
+    {
+      "label": "The GenZ Times, August 2026",
+      "unit": "COPY",
+      "inward": 150,
+      "outward": 89,
+      "inventory": 61,
+      "note": "Read from a row written per issue. Inward is inferred as outward plus inventory, not written on the sheet."
+    },
+    {
+      "label": "The GenZ Times, September 2026",
+      "unit": "COPY",
+      "inward": 100,
+      "outward": 0,
+      "inventory": 100,
+      "note": "Recorded on the sheet as available 100, nothing issued yet."
+    }
+  ]
+}

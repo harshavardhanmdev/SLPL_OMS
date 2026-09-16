@@ -775,3 +775,49 @@ model AdminAuditLog {
   @@index([entityType, entityId])
   @@index([adminUserId, createdAt])
 }
+
+// ─── Stock register ───────────────────────────────────────────────────────────
+// A point in time count, transcribed from the handwritten master register.
+// Counts are in sets for graded material and in copies for single titles,
+// because that is how the physical register is kept and an auditor reconciles
+// against the physical register, not against our convenience.
+
+enum StockUnit {
+  SET
+  COPY
+}
+
+model StockCount {
+  id        String    @id @default(cuid())
+  asOf      DateTime
+  label     String
+  sortOrder Int       @default(0)
+  series    String?
+  /// Set only for single titles that carry a register code of their own.
+  sku       String?
+  unit      StockUnit @default(SET)
+
+  inward    Int
+  outward   Int
+  inventory Int
+
+  /// Telugu and Hindi are tracked apart from the set, because a school can
+  /// take the core set without a language book.
+  inwardTelugu    Int?
+  inwardHindi     Int?
+  outwardTelugu   Int?
+  outwardHindi    Int?
+  inventoryTelugu Int?
+  inventoryHindi  Int?
+
+  /// The register's own "extra" and "from last year" columns, kept as written.
+  carriedForward Int?
+  extra          Int?
+  note           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([asOf, label])
+  @@index([asOf])
+}

@@ -59,7 +59,8 @@ export default async function StockSheetPage() {
   const td = "px-2.5 py-1.5 text-right tabular-nums";
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-6xl">
+      <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Link
           href="/erp/stock"

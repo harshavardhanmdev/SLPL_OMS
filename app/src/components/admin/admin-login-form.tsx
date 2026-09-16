@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { adminLogin } from "@/lib/admin-actions";
 
-export function AdminLoginForm() {
+export function AdminLoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(adminLogin, {});
 
   return (
     <form action={formAction} className="space-y-4">
+      {next && <input type="hidden" name="next" value={next} />}
       <Input
         type="password"
         name="password"

@@ -651,3 +651,58 @@ model KitCollectionEvent {
 
   @@index([purchaseId])
 }
+
+// ─── Director expense log ─────────────────────────────────────────────────────
+// Every rupee that leaves the current account, logged as it is spent, so an
+// audit can be answered with a printed statement instead of a shoebox.
+
+enum ExpenseCategory {
+  FUEL
+  TRAVEL
+  STATIONERY
+  PRINTING
+  COURIER
+  OFFICE
+  UTILITIES
+  RENT
+  REPAIRS
+  PROFESSIONAL_FEES
+  SALARIES
+  MARKETING
+  MEALS
+  BANK_CHARGES
+  MISC
+}
+
+enum PaidFrom {
+  CURRENT_ACCOUNT
+  CASH
+  CARD
+  UPI
+  CHEQUE
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  voucherNo   String          @unique // SLPL-E-YYMM-XXXXX
+  /// The date on the bill, not the date it was typed in
+  spentAt     DateTime
+  amount      Int // paise
+  category    ExpenseCategory
+  paidFrom    PaidFrom        @default(CURRENT_ACCOUNT)
+  payee       String?
+  note        String?
+  /// Cheque number, UPI reference or the bank narration, for reconciliation
+  reference   String?
+  /// Photo of the bill, stored admin-only because bills carry addresses
+  billImage   String?
+  /// Filled only when the bill shows GST we could reclaim
+  gstAmount   Int?
+  vendorGstin String?
+  enteredBy   String          @default("Director")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([spentAt])
+  @@index([category, spentAt])
+}

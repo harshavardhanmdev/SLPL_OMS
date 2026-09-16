@@ -38,7 +38,11 @@ export async function adminLogin(
   recordLoginResult(ip, ok);
   if (!ok) return { error: "Wrong password." };
   await createAdminSession();
-  redirect("/admin");
+  // Land back where they were headed, so a director opening the expense log on
+  // their phone is not dumped on the store dashboard. Relative paths only: a
+  // full URL here would be an open redirect.
+  const next = String(formData.get("next") ?? "");
+  redirect(/^\/[^/\\]/.test(next) ? next : "/admin");
 }
 
 export async function adminLogout(): Promise<void> {

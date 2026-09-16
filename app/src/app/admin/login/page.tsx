@@ -7,8 +7,15 @@ import { AdminLoginForm } from "@/components/admin/admin-login-form";
 
 export const metadata: Metadata = { title: "Admin login", robots: { index: false } };
 
-export default async function AdminLoginPage() {
-  if (await isAdmin()) redirect("/admin");
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  // Relative paths only; a full URL here would be an open redirect
+  const safeNext = next && /^\/[^/\\]/.test(next) ? next : undefined;
+  if (await isAdmin()) redirect(safeNext ?? "/admin");
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-secondary via-background to-accent/40 px-4 dark:from-card dark:via-background dark:to-card">
@@ -24,7 +31,7 @@ export default async function AdminLoginPage() {
           <h1 className="font-heading text-xl font-bold">SLPL Store Admin</h1>
           <p className="text-sm text-muted-foreground">Enter the store password to continue.</p>
         </div>
-        <AdminLoginForm />
+        <AdminLoginForm next={safeNext} />
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import cron from "node-cron";
 import { releaseExpiredOrders, reconcilePendingPayments } from "../src/lib/orders";
 import { syncShipmentTracking } from "../src/lib/shipping/tracking-sync";
 import { reportOverdueGrievances } from "../src/lib/grievance-sla";
+import { remindExpiringSubscriptions } from "../src/lib/subscription-notify";
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), "[worker]", ...args);
 
@@ -36,6 +37,15 @@ async function trackingTick() {
   }
 }
 
+async function subscriptionTick() {
+  try {
+    const warned = await remindExpiringSubscriptions();
+    if (warned > 0) log(`${warned} subscription(s) nearing the end of their term - reader notified`);
+  } catch (err) {
+    console.error("[worker] subscription renewal tick failed", err);
+  }
+}
+
 async function grievanceSlaTick() {
   try {
     const overdue = await reportOverdueGrievances();
@@ -53,6 +63,8 @@ cron.schedule("*/10 * * * *", paymentsTick);
 cron.schedule("0 */3 * * *", trackingTick);
 // 9 am IST, so an overdue complaint lands at the start of the working day
 cron.schedule("0 9 * * *", grievanceSlaTick);
+// 10 am, after the grievance digest, so the two never collide
+cron.schedule("0 10 * * *", subscriptionTick);
 
 process.on("SIGTERM", () => {
   log("SIGTERM — bye");

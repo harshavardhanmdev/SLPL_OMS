@@ -236,7 +236,32 @@ async function main() {
     isFeatured: true,
   };
 
-  const allBooks = [...subjectBooks, novel, genzTimes, ...poems];
+  const genzTimes02: ProductSeed = {
+    slug: "genz-times-issue-02",
+    title: "The GenZ Times, Issue 02 (September 2026)",
+    kind: "BOOK",
+    categoryId: magazine.id,
+    series: "The GenZ Times",
+    description:
+      `The September 2026 Future-Ready Edition. If the world has changed, have you changed with it? ` +
+      `This issue is about redesigning yourself for the world that is arriving, not the one that has gone.\n\n` +
+      `Inside Issue 02: The Time We Kill, the Future We Lose (India's quiet epidemic of wasted hours and what it ` +
+      `really costs), The Great Academic Crossover (science to civics, law, finance, policy and public life), ` +
+      `When the Scientist Starts Studying Society, The Narrow Side of the Human Brain (what convenience is quietly ` +
+      `doing to attention), Your Stream Is Not Your Destiny, The Crossover Map (the centre spread: every route out ` +
+      `of one marksheet), Stop Choosing Careers for Your Children, and Speaking Skills and Grooming.\n\n` +
+      `Written for students of Grade 6 and above, college students, parents, teachers and school leaders. ` +
+      `Preview the opening pages below before you order.`,
+    mrp: 23400,
+    price: 23400, // cover price ₹234
+    weightGrams: 250,
+    coverImage: "/seed/covers/genz-times-issue-02.webp",
+    samplePdf: "/seed/genz-times-issue-02-preview.pdf",
+    isNewRelease: true,
+    isFeatured: true,
+  };
+
+  const allBooks = [...subjectBooks, novel, genzTimes, genzTimes02, ...poems];
   const created: Record<string, { id: string; price: number }> = {};
   for (const p of allBooks) {
     const row = await upsertProduct(p);
@@ -254,7 +279,8 @@ async function main() {
       isFeatured: true,
     },
   });
-  // Same for the magazine: cover price and artwork are owner-final
+  // Same for the magazine: cover price and artwork are owner-final. Issue 01
+  // stays on sale as a back issue, but the current issue is the one featured.
   await db.product.update({
     where: { slug: "genz-times-issue-01" },
     data: {
@@ -264,6 +290,20 @@ async function main() {
       price: genzTimes.price,
       coverImage: genzTimes.coverImage,
       samplePdf: genzTimes.samplePdf,
+      isNewRelease: false,
+      isFeatured: false,
+    },
+  });
+  await db.product.update({
+    where: { slug: "genz-times-issue-02" },
+    data: {
+      title: genzTimes02.title,
+      description: genzTimes02.description,
+      mrp: genzTimes02.mrp,
+      price: genzTimes02.price,
+      coverImage: genzTimes02.coverImage,
+      samplePdf: genzTimes02.samplePdf,
+      isNewRelease: true,
       isFeatured: true,
     },
   });

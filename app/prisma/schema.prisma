@@ -30,6 +30,7 @@ model User {
   cart          Cart?
   notifications Notification[]
   grievances    Grievance[]
+  subscriptions Subscription[]
 }
 
 model Notification {
@@ -229,12 +230,13 @@ model Order {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  items        OrderItem[]
-  payment      Payment?
-  shipment     Shipment?
-  events       OrderEvent[]
-  grievances   Grievance[]
-  kitPurchases KitPurchase[]
+  items         OrderItem[]
+  payment       Payment?
+  shipment      Shipment?
+  events        OrderEvent[]
+  grievances    Grievance[]
+  kitPurchases  KitPurchase[]
+  subscriptions Subscription[]
 
   @@index([userId])
   @@index([status])
@@ -820,4 +822,71 @@ model StockCount {
 
   @@unique([asOf, label])
   @@index([asOf])
+}
+
+// ─── Magazine subscriptions ───────────────────────────────────────────────────
+// Prepaid terms: the reader pays once for a fixed number of issues and we post
+// each one as it prints. No mandate to manage, and it reuses the live Razorpay
+// flow. Auto-renewal can be added later against the same record.
+
+enum SubscriptionStatus {
+  PENDING // order placed, payment not through
+  ACTIVE
+  COMPLETED // every issue in the term was sent
+  CANCELLED
+  REFUNDED
+}
+
+model Subscription {
+  id      String  @id @default(cuid())
+  /// SLPL-S-YYMM-XXXXX, printed on the welcome email and quoted by the reader
+  code    String  @unique
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  userId  String?
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Snapshotted so a later profile edit cannot rewrite where issues were sent
+  subscriberName String
+  email          String
+  phone          String
+  addressLine1   String
+  addressLine2   String?
+  city           String
+  state          String
+  pincode        String
+
+  termMonths      Int
+  issuesTotal     Int
+  issuesSent      Int                @default(0)
+  amountPaid      Int // paise
+  status          SubscriptionStatus @default(PENDING)
+  startIssue      String // "September 2026", the first issue they receive
+  startedAt       DateTime?
+  endsAt          DateTime?
+  /// Set when the pre-expiry reminder has gone out, so it is sent only once
+  renewalNoticeAt DateTime?
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dispatches SubscriptionDispatch[]
+
+  @@index([status, endsAt])
+  @@index([email])
+}
+
+/// One row per issue posted, so a reader asking "did you send October" has an
+/// answer, and the count of issues sent is never a guess.
+model SubscriptionDispatch {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  issueLabel     String
+  sentAt         DateTime     @default(now())
+  note           String?
+
+  @@unique([subscriptionId, issueLabel])
+  @@index([subscriptionId])
 }

@@ -11,6 +11,7 @@ import { getPrefs, notifyUser } from "@/lib/notify";
 import { sendSms } from "@/lib/sms";
 import { formatINR } from "@/lib/money";
 import { emailKitReceipt } from "@/lib/kit-notify";
+import { activateSubscriptions } from "@/lib/subscription-notify";
 import { StockError, releaseStock, reserveStock } from "@/lib/stock";
 import {
   fetchPaymentsForOrder,
@@ -381,6 +382,21 @@ export async function markOrderPaid(
       ? [db.coupon.updateMany({ where: { code: order.couponCode }, data: { usedCount: { increment: 1 } } })]
       : []),
   ]);
+
+  // A subscription has no parcel to pack: activate the term and welcome them
+  // rather than sending the packing mail.
+  const subs = await db.subscription.count({ where: { orderId } });
+  if (subs > 0) {
+    await db.cart.deleteMany({ where: { userId: order.userId } });
+    await activateSubscriptions(orderId);
+    await notifyUser(
+      order.userId,
+      "Subscription active",
+      "Your GenZ Times subscription is confirmed. The first issue is posted as it prints.",
+      "/account/subscriptions",
+    );
+    return;
+  }
 
   // A kit is collected at the school, never couriered, so it gets the receipt
   // rather than the packing-and-shipping mail.

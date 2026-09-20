@@ -41,5 +41,6 @@ export const mainNav = [
   { href: "/bundles", label: "Bundles" },
   { href: "/competitive-exams", label: "Competitive Exams" },
   { href: "/category/magazine", label: "The GenZ Times" },
+  { href: "/subscribe", label: "Subscribe" },
   { href: "/services", label: "Services" },
 ] as const;

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { generateOrderNumber, OrderError, RESERVATION_MINUTES } from "@/lib/orders";
+import { generateOrderNumber, OrderError } from "@/lib/orders";
 import { createRazorpayOrder, isMockPaymentMode, isRazorpayConfigured } from "@/lib/razorpay";
 import { endIssueFor, planById, startIssueFor } from "@/lib/subscription-plans";
 
@@ -74,17 +74,13 @@ export async function subscribe(input: SubscribeInput): Promise<SubscribeResult>
   const plan = planById(d.planId);
   if (!plan) return { error: "Pick a subscription plan." };
 
+  // The order table needs an owner, and the only proof of who that is comes
+  // from the session. Matching a typed email to an account instead would let a
+  // stranger hang a subscription on somebody else's account, and a logged out
+  // reader is sent to sign in either way.
   const session = await getSession();
-  // A subscription can be bought without an account, but the order table needs
-  // an owner, so an existing account with this email is linked when there is one.
-  const user = session
-    ? await db.user.findUnique({ where: { id: session.uid } })
-    : await db.user.findUnique({ where: { email: d.email } });
-  if (!user) {
-    return {
-      error: "AUTH_REQUIRED",
-    };
-  }
+  const user = session ? await db.user.findUnique({ where: { id: session.uid } }) : null;
+  if (!user) return { error: "AUTH_REQUIRED" };
 
   const start = startIssueFor();
   const end = endIssueFor(start.date, plan.issues);
@@ -118,7 +114,11 @@ export async function subscribe(input: SubscribeInput): Promise<SubscribeResult>
       customerEmail: d.email,
       customerPhone: d.phone,
       notes: `The GenZ Times, ${plan.label} subscription from ${start.label}`,
-      reservedUntil: new Date(Date.now() + RESERVATION_MINUTES * 60 * 1000),
+      // Deliberately no reservedUntil. A subscription holds no stock, so there
+      // is nothing for the expiry sweeper to release, and leaving it set meant
+      // a reader who took longer than 30 minutes to pay had the payment
+      // auto-refunded by reconciliation and was told to order again.
+      reservedUntil: null,
       items: {
         create: [
           {

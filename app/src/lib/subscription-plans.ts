@@ -58,6 +58,16 @@ export function perIssue(plan: Plan): number {
   return Math.round(plan.price / plan.issues / 100) * 100;
 }
 
+/** The cutoff for "this term is running out", used to count renewals due. */
+export function endsWithin(days: number): Date {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
+/** The issue of a given month, spelled the one way everything else spells it. */
+export function issueLabelFor(d = new Date()): string {
+  return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
+
 /**
  * The issue a subscription starting today should begin with.
  *

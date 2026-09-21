@@ -1,7 +1,16 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { Boxes, LayoutDashboard, LogOut, ScrollText, Store, UsersRound, Wallet } from "lucide-react";
+import {
+  Boxes,
+  LayoutDashboard,
+  LogOut,
+  Newspaper,
+  ScrollText,
+  Store,
+  UsersRound,
+  Wallet,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
@@ -17,6 +26,7 @@ const nav: { href: string; label: string; icon: typeof Wallet; needs: Capability
   { href: "/erp", label: "Overview", icon: LayoutDashboard, needs: "finance.read" },
   { href: "/erp/expenses", label: "Expenses", icon: Wallet, needs: "finance.read" },
   { href: "/erp/stock", label: "Stock", icon: Boxes, needs: "finance.read" },
+  { href: "/erp/subscriptions", label: "Subs", icon: Newspaper, needs: "finance.read" },
   { href: "/erp/audit", label: "Audit", icon: ScrollText, needs: "staff.manage" },
   { href: "/erp/staff", label: "Staff", icon: UsersRound, needs: "staff.manage" },
 ];

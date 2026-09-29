@@ -12,7 +12,7 @@
 export const COVER_PRICE = 23400; // paise, the printed cover price
 
 export type Plan = {
-  id: "half-year" | "annual";
+  id: "quarterly" | "half-year" | "annual";
   label: string;
   months: number;
   issues: number;
@@ -24,6 +24,15 @@ export type Plan = {
 };
 
 export const PLANS: Plan[] = [
+  {
+    id: "quarterly",
+    label: "3 months",
+    months: 3,
+    issues: 3,
+    listPrice: COVER_PRICE * 3,
+    price: 65000,
+    blurb: "Try it for a term.",
+  },
   {
     id: "half-year",
     label: "6 months",

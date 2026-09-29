@@ -9,12 +9,20 @@ import { SubscribeForm } from "@/components/store/subscribe-form";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
-import { PLANS, endIssueFor, perIssue, savingsPercent, startIssueFor } from "@/lib/subscription-plans";
+import { site } from "@/lib/site";
+import {
+  COVER_PRICE,
+  PLANS,
+  endIssueFor,
+  perIssue,
+  savingsPercent,
+  startIssueFor,
+} from "@/lib/subscription-plans";
 
 export const metadata: Metadata = {
   title: "Subscribe to The GenZ Times",
   description:
-    "Subscribe to The GenZ Times, the monthly education and youth magazine from Saaradaa Learknowations. Six or twelve issues delivered to your door, at up to 29% off the cover price.",
+    "Subscribe to The GenZ Times, the monthly education and youth magazine from Saaradaa Learknowations. Three, six or twelve issues delivered to your door in Hyderabad, at up to 29% off the cover price.",
   keywords: [
     "GenZ Times subscription",
     "student magazine India",
@@ -53,7 +61,7 @@ export default async function SubscribePage() {
           </p>
           <ul className="mt-5 grid gap-2 text-sm sm:grid-cols-3">
             {[
-              [Truck, "Posted across India, no delivery charge"],
+              [Truck, "Delivered in Hyderabad, no delivery charge"],
               [BookOpen, "Never miss an issue or hunt for a copy"],
               [Mail, "We remind you before it runs out"],
             ].map(([Icon, text]) => (
@@ -74,7 +82,7 @@ export default async function SubscribePage() {
               className="rounded-xl border shadow-lg"
             />
             <p className="mt-2 text-center text-xs text-muted-foreground">
-              Current issue. Buy a single copy instead.
+              Current issue. A single copy is {formatINR(COVER_PRICE)}.
             </p>
           </Link>
         )}
@@ -82,7 +90,7 @@ export default async function SubscribePage() {
 
       <section className="mb-10">
         <h2 className="mb-4 font-heading text-xl font-semibold">Choose a term</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           {PLANS.map((plan) => {
             const end = endIssueFor(start.date, plan.issues);
             return (
@@ -118,6 +126,10 @@ export default async function SubscribePage() {
             );
           })}
         </div>
+        <p className="mt-4 text-sm text-muted-foreground">
+          These prices include delivery within Hyderabad. If you are outside the city, write to us
+          at {site.contact.email} and we will quote the posting before you pay.
+        </p>
       </section>
 
       <section className="rounded-2xl border bg-card p-5 sm:p-6">
@@ -149,6 +161,10 @@ export default async function SubscribePage() {
             [
               "Can I change my address?",
               "Yes. Reply to your welcome email with your subscription number and we will update it before the next issue goes out.",
+            ],
+            [
+              "Do you deliver outside Hyderabad?",
+              `Yes, but the prices above are for delivery within Hyderabad. Write to ${site.contact.email} with your address and we will quote the posting first.`,
             ],
             [
               "Can I gift it?",

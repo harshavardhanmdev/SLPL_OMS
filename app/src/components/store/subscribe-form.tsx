@@ -131,7 +131,7 @@ export function SubscribeForm({
     <form onSubmit={submit} className="space-y-5">
       <fieldset>
         <legend className="mb-2 text-sm font-medium">Term</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           {PLANS.map((p) => (
             <label
               key={p.id}

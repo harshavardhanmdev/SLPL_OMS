@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronDown, Package, ShoppingCart } from "lucide-react";
+import { ChevronDown, Newspaper, Package, ShoppingCart } from "lucide-react";
 
 import { getSession } from "@/lib/auth";
 import { mainNav, site } from "@/lib/site";
@@ -67,6 +67,13 @@ export async function SiteHeader() {
             <span className="text-sm font-semibold">& Orders</span>
           </Link>
 
+          <Link
+            href="/subscribe"
+            className="hidden items-center gap-1.5 rounded-full bg-saffron px-3 py-1.5 text-sm font-bold text-navy transition hover:brightness-95 sm:flex"
+          >
+            <Newspaper className="size-4" /> Subscribe
+          </Link>
+
           {/* Cart - top RIGHT */}
           <Link
             href="/cart"
@@ -100,7 +107,9 @@ export async function SiteHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className="shrink-0 rounded px-2.5 py-1 text-sm ring-white/60 transition hover:ring-1"
+              className={`shrink-0 rounded px-2.5 py-1 text-sm ring-white/60 transition hover:ring-1 ${
+                item.href === "/subscribe" ? "font-bold text-saffron sm:hidden" : ""
+              }`}
             >
               {item.label}
             </Link>

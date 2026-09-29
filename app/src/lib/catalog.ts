@@ -116,7 +116,13 @@ export async function getCategoryWithProducts(slug: string) {
     },
   });
   if (!category) return null;
-  return { ...category, products: sortByGradeThenSubject(category.products) };
+  // A monthly leads with the current issue, not the first one ever printed.
+  // The slug carries the issue number, so descending is newest first.
+  const products =
+    slug === "magazine"
+      ? [...category.products].sort((a, b) => b.slug.localeCompare(a.slug))
+      : sortByGradeThenSubject(category.products);
+  return { ...category, products };
 }
 
 export async function getProductBySlug(slug: string) {

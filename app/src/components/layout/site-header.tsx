@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronDown, Newspaper, Package, ShoppingCart } from "lucide-react";
+import { ChevronDown, LibraryBig, Newspaper, Package, ShoppingCart } from "lucide-react";
 
 import { getSession } from "@/lib/auth";
 import { mainNav, site } from "@/lib/site";
@@ -117,6 +117,14 @@ export async function SiteHeader() {
           <Link href="/account" className="shrink-0 rounded px-2.5 py-1 text-sm ring-white/60 transition hover:ring-1">
             Track Order
           </Link>
+          {session && (
+            <Link
+              href="/account/library"
+              className="flex shrink-0 items-center gap-1 rounded px-2.5 py-1 text-sm ring-white/60 transition hover:ring-1"
+            >
+              <LibraryBig className="size-4" /> My library
+            </Link>
+          )}
         </div>
       </nav>
     </header>

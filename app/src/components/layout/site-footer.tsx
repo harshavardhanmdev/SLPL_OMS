@@ -41,6 +41,11 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
+              <Link href="/account/library" className="transition-colors hover:text-foreground">
+                My library
+              </Link>
+            </li>
+            <li>
               <Link href="/account/orders" className="transition-colors hover:text-foreground">
                 Track your order
               </Link>

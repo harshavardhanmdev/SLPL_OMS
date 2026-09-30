@@ -48,9 +48,13 @@ export function EditionReader({
           throw new Error(
             res.status === 429
               ? "Turning pages a little fast. Wait a moment and try again."
-              : res.status === 403 || res.status === 401
-                ? "Sign in with the account that bought this issue."
-                : "That page could not be loaded.",
+              : res.status === 401
+                ? "Your session has expired. Sign in again to carry on reading."
+                : res.status === 403
+                  ? "This copy belongs to a different account. Sign in with the one that bought it."
+                  : res.status === 404
+                    ? `Page ${page} is missing from this issue. Please tell us and we will put it right.`
+                    : "Something went wrong loading that page. Try again in a moment.",
           );
         }
         const bitmap = await createImageBitmap(await res.blob());

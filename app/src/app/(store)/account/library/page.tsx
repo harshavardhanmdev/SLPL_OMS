@@ -44,46 +44,64 @@ export default async function LibraryPage() {
           </Button>
         </div>
       ) : (
-        <ul className="space-y-4">
-          {licences.map((l) => (
-            <li key={l.id} className="flex gap-4 rounded-2xl border bg-card p-4">
-              {l.product.coverImage && (
-                <Image
-                  src={l.product.coverImage}
-                  alt=""
-                  width={78}
-                  height={104}
-                  className="h-26 w-[78px] shrink-0 rounded-lg border object-cover"
-                />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="font-heading font-semibold">{l.product.title}</p>
-                <p className="mt-0.5 font-mono text-xs text-muted-foreground">{l.code}</p>
-                {l.revokedAt ? (
-                  <>
-                    <Badge className="mt-2 bg-muted text-muted-foreground">Access withdrawn</Badge>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Write to us if you think this is a mistake.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {l.product.pageCount ?? 0} pages
-                      {l.lastViewedAt
-                        ? ` · last opened ${l.lastViewedAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
-                        : " · not opened yet"}
-                    </p>
-                    <Button size="sm" className="mt-3 gap-1.5" asChild>
-                      <Link href={`/read/${l.product.slug}`}>
-                        <Monitor className="size-3.5" /> Read
-                      </Link>
-                    </Button>
-                  </>
+        <ul className="space-y-5">
+          {licences.map((l) => {
+            const opened = l.lastViewedAt
+              ? `Last opened ${l.lastViewedAt.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+              : "Not opened yet";
+
+            // The whole card is the way in. Having to find a small button was
+            // the first thing the owner tripped over.
+            const inside = (
+              <>
+                {l.product.coverImage && (
+                  <Image
+                    src={l.product.coverImage}
+                    alt=""
+                    width={150}
+                    height={200}
+                    className="w-[110px] shrink-0 rounded-xl border object-cover shadow-sm sm:w-[150px]"
+                  />
                 )}
-              </div>
-            </li>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <p className="font-heading text-lg font-semibold sm:text-xl">{l.product.title}</p>
+                  <p className="mt-1 font-mono text-xs text-muted-foreground">{l.code}</p>
+                  {l.revokedAt ? (
+                    <>
+                      <Badge className="mt-3 bg-muted text-muted-foreground">Access withdrawn</Badge>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Write to us if you think this is a mistake.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {l.product.pageCount ?? 0} pages · {opened}
+                      </p>
+                      <span className="mt-4 inline-flex h-11 items-center gap-2 rounded-md bg-primary px-6 font-medium text-primary-foreground transition group-hover:brightness-110">
+                        <Monitor className="size-4" /> Read now
+                      </span>
+                    </>
+                  )}
+                </div>
+              </>
+            );
+
+            return (
+              <li key={l.id}>
+                {l.revokedAt ? (
+                  <div className="flex gap-5 rounded-2xl border bg-card p-5">{inside}</div>
+                ) : (
+                  <Link
+                    href={`/read/${l.product.slug}`}
+                    className="group flex gap-5 rounded-2xl border bg-card p-5 transition hover:border-saffron hover:shadow-lg"
+                  >
+                    {inside}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

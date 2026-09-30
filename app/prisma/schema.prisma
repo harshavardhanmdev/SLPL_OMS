@@ -31,6 +31,7 @@ model User {
   notifications Notification[]
   grievances    Grievance[]
   subscriptions Subscription[]
+  entitlements  DigitalEntitlement[]
 }
 
 model Notification {
@@ -91,6 +92,8 @@ enum ProductKind {
   NOVEL
   POEMS
   BUNDLE
+  /// Read online only. No file is ever handed over, so no stock and no parcel.
+  DIGITAL
 }
 
 /// How a line is counted on an invoice.
@@ -136,17 +139,22 @@ model Product {
   coverImage      String?
   gallery         String[]    @default([])
   samplePdf       String?
+  /// DIGITAL only: how many pages the reader can turn.
+  pageCount       Int?
+  /// DIGITAL only: the folder under UPLOADS_DIR/editions holding the page images.
+  editionKey      String?
   isNewRelease    Boolean     @default(false)
   isFeatured      Boolean     @default(false)
   isVisible       Boolean     @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  bundleItems BundleItem[] @relation("bundle")
-  memberOf    BundleItem[] @relation("member")
-  cartItems   CartItem[]
-  orderItems  OrderItem[]
-  schoolKits  SchoolKit[]
+  bundleItems  BundleItem[]         @relation("bundle")
+  memberOf     BundleItem[]         @relation("member")
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+  schoolKits   SchoolKit[]
+  entitlements DigitalEntitlement[]
 
   @@index([categoryId, isVisible])
   @@index([isNewRelease, isVisible])
@@ -237,6 +245,7 @@ model Order {
   grievances    Grievance[]
   kitPurchases  KitPurchase[]
   subscriptions Subscription[]
+  entitlements  DigitalEntitlement[]
 
   @@index([userId])
   @@index([status])
@@ -889,4 +898,47 @@ model SubscriptionDispatch {
 
   @@unique([subscriptionId, issueLabel])
   @@index([subscriptionId])
+}
+
+// ─── Digital editions ─────────────────────────────────────────────────────────
+// Read in the browser, never downloaded. A browser cannot stop a screenshot, so
+// the deterrent is that every page carries the buyer's name: a leaked page is a
+// signed page. The entitlement is the licence; the order stays at PAID, exactly
+// as kits and subscriptions do.
+
+model DigitalEntitlement {
+  id           String    @id @default(cuid())
+  /// SLPL-D-YYMM-XXXXX, printed in the watermark so a leak names its source
+  code         String    @unique
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product   @relation(fields: [productId], references: [id])
+  orderId      String?
+  order        Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  grantedAt    DateTime  @default(now())
+  /// Set by hand from the back office when the view log shows a shared login
+  revokedAt    DateTime?
+  revokeReason String?
+  lastViewedAt DateTime?
+  viewCount    Int       @default(0)
+
+  views DigitalViewLog[]
+
+  /// One licence per reader per issue: paying twice cannot make two
+  @@unique([userId, productId])
+  @@index([productId, revokedAt])
+}
+
+/// Enough to spot one login being passed around a classroom.
+model DigitalViewLog {
+  id            String             @id @default(cuid())
+  entitlementId String
+  entitlement   DigitalEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  page          Int
+  ip            String?
+  userAgent     String?
+  at            DateTime           @default(now())
+
+  @@index([entitlementId, at])
 }

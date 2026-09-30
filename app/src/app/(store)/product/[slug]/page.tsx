@@ -12,8 +12,11 @@ import { PdfPreview } from "@/components/store/pdf-preview";
 import { Price } from "@/components/store/price";
 import { ProductCard, type ProductCardData } from "@/components/store/product-card";
 import { ProductRail } from "@/components/store/product-rail";
+import { BuyDigitalButton } from "@/components/store/buy-digital-button";
 import { formatINR } from "@/lib/money";
 import { getActiveSale, getProductBySlug, getRelatedProducts } from "@/lib/catalog";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { effectivePrice, type ActiveSale } from "@/lib/pricing";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -34,7 +37,18 @@ export default async function ProductPage({ params }: Props) {
   const related = await getRelatedProducts(product);
 
   const price = effectivePrice(product, sale);
-  const out = product.stock <= 0;
+  // A digital edition has no shelf, no parcel and no stock to run out of
+  const digital = product.kind === "DIGITAL";
+  const out = !digital && product.stock <= 0;
+  const session = digital ? await getSession() : null;
+  const owned = session
+    ? Boolean(
+        await db.digitalEntitlement.findFirst({
+          where: { userId: session.uid, productId: product.id, revokedAt: null },
+          select: { id: true },
+        }),
+      )
+    : false;
   const memberTotal = product.bundleItems.reduce(
     (sum, item) => sum + effectivePrice(item.product, sale) * item.quantity,
     0,
@@ -108,36 +122,61 @@ export default async function ProductPage({ params }: Props) {
             </p>
           )}
 
-          <p className={out ? "text-sm font-medium text-destructive" : "text-sm font-medium text-green-700 dark:text-green-400"}>
-            {out ? "Currently out of stock" : product.stock <= 10 ? `Only ${product.stock} left in stock` : "In stock"}
-          </p>
+          {digital ? (
+            <p className="text-sm font-medium text-green-700 dark:text-green-400">
+              Read online, on any device you sign in on. Nothing is posted.
+            </p>
+          ) : (
+            <p className={out ? "text-sm font-medium text-destructive" : "text-sm font-medium text-green-700 dark:text-green-400"}>
+              {out ? "Currently out of stock" : product.stock <= 10 ? `Only ${product.stock} left in stock` : "In stock"}
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-3">
-            <AddToCartButton
-              size="lg"
-              disabled={out}
-              product={{
-                productId: product.id,
-                slug: product.slug,
-                title: product.title,
-                unitPrice: price,
-                image: product.coverImage,
-              }}
-            />
-            <BuyNowButton
-              disabled={out}
-              product={{
-                productId: product.id,
-                slug: product.slug,
-                title: product.title,
-                unitPrice: price,
-                image: product.coverImage,
-              }}
-            />
+            {digital ? (
+              <BuyDigitalButton
+                slug={product.slug}
+                title={product.title}
+                price={formatINR(price)}
+                owned={owned}
+              />
+            ) : (
+              <>
+                <AddToCartButton
+                  size="lg"
+                  disabled={out}
+                  product={{
+                    productId: product.id,
+                    slug: product.slug,
+                    title: product.title,
+                    unitPrice: price,
+                    image: product.coverImage,
+                  }}
+                />
+                <BuyNowButton
+                  disabled={out}
+                  product={{
+                    productId: product.id,
+                    slug: product.slug,
+                    title: product.title,
+                    unitPrice: price,
+                    image: product.coverImage,
+                  }}
+                />
+              </>
+            )}
             {product.samplePdf && <PdfPreview url={product.samplePdf} title={product.title} />}
           </div>
 
-          <DeliveryEstimate weightGrams={product.weightGrams} />
+          {digital ? (
+            <p className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
+              This is your personal copy. It opens in your browser whenever you are signed in, and
+              every page carries your name and licence number, so please do not pass pages on. There
+              is no file to download.
+            </p>
+          ) : (
+            <DeliveryEstimate weightGrams={product.weightGrams} />
+          )}
 
           <Separator />
 
@@ -203,12 +242,25 @@ export default async function ProductPage({ params }: Props) {
             <span className="flex items-center gap-2">
               <ShieldCheck className="size-4 shrink-0 text-saffron-deep" /> Secure payment
             </span>
-            <span className="flex items-center gap-2">
-              <PackageCheck className="size-4 shrink-0 text-saffron-deep" /> Carefully packed
-            </span>
-            <span className="flex items-center gap-2">
-              <Undo2 className="size-4 shrink-0 text-saffron-deep" /> Damage replacement
-            </span>
+            {digital ? (
+              <>
+                <span className="flex items-center gap-2">
+                  <PackageCheck className="size-4 shrink-0 text-saffron-deep" /> Read instantly
+                </span>
+                <span className="flex items-center gap-2">
+                  <Undo2 className="size-4 shrink-0 text-saffron-deep" /> Yours, with no expiry
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="flex items-center gap-2">
+                  <PackageCheck className="size-4 shrink-0 text-saffron-deep" /> Carefully packed
+                </span>
+                <span className="flex items-center gap-2">
+                  <Undo2 className="size-4 shrink-0 text-saffron-deep" /> Damage replacement
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

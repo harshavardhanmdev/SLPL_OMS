@@ -42,6 +42,8 @@ export async function expandToStockLines(tx: Tx, lines: StockLine[]): Promise<Ma
   for (const line of lines) {
     const p = byId.get(line.productId);
     if (!p) continue; // product deleted since the order was placed
+    // Nothing leaves a shelf for a digital edition, so it never moves stock
+    if (p.kind === "DIGITAL") continue;
     if (p.kind === "BUNDLE" && p.bundleItems.length > 0) {
       for (const member of p.bundleItems) add(member.productId, member.quantity * line.quantity);
     } else {

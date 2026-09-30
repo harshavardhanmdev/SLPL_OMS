@@ -34,6 +34,10 @@ export default function RefundPolicyPage() {
       <h2>What is not returnable</h2>
       <p>Books that have been used, written in, or damaged after delivery are not eligible for return. Since our products are printed books, we do not accept change-of-mind returns once a parcel has been opened, except for the defect cases above.</p>
 
+      <h2>Digital editions</h2>
+      <p>A digital edition is delivered to your account the moment payment succeeds, so it cannot be returned once you have opened it. If you have not opened a single page, write to {site.contact.email} with your order number within 7 days and we will refund it in full. If an edition will not open, or pages are missing, tell us and we will fix it or refund you.</p>
+      <p>A digital edition is licensed to one reader for their own use. Every page carries the buyer&apos;s name and licence number. Passing pages on, republishing them, or sharing the account is a breach of that licence, and we may withdraw access without a refund.</p>
+
       <h2>If a refund does not arrive</h2>
       <p>
         If a refund has not reached you within the timelines above, or an amount was debited without

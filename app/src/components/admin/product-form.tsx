@@ -30,7 +30,7 @@ export type ProductFormValue = {
   title: string;
   slug: string;
   sku: string;
-  kind: "BOOK" | "NOVEL" | "POEMS" | "BUNDLE";
+  kind: "BOOK" | "NOVEL" | "POEMS" | "BUNDLE" | "DIGITAL";
   categoryId: string;
   series: string;
   gradeLabel: string;
@@ -190,6 +190,7 @@ export function ProductForm({
                 <SelectItem value="NOVEL">Novel</SelectItem>
                 <SelectItem value="POEMS">Poems</SelectItem>
                 <SelectItem value="BUNDLE">Bundle</SelectItem>
+                <SelectItem value="DIGITAL">Digital edition, read online</SelectItem>
               </SelectContent>
             </Select>
           </div>

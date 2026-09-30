@@ -1,17 +1,18 @@
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Layers } from "lucide-react";
+import { BookOpen, Layers, Monitor } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/store/price";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
+import { Button } from "@/components/ui/button";
 import { effectivePrice, type ActiveSale, type PricedProduct } from "@/lib/pricing";
 
 export type ProductCardData = PricedProduct & {
   id: string;
   slug: string;
   title: string;
-  kind: "BOOK" | "NOVEL" | "POEMS" | "BUNDLE";
+  kind: "BOOK" | "NOVEL" | "POEMS" | "BUNDLE" | "DIGITAL";
   series: string | null;
   gradeLabel: string | null;
   stock: number;
@@ -29,7 +30,8 @@ export function ProductCard({
   className?: string;
 }) {
   const price = effectivePrice(product, sale);
-  const out = product.stock <= 0;
+  const digital = product.kind === "DIGITAL";
+  const out = !digital && product.stock <= 0;
 
   return (
     <div
@@ -65,6 +67,11 @@ export function ProductCard({
               <Layers className="size-3" /> Bundle
             </Badge>
           )}
+          {digital && (
+            <Badge variant="secondary" className="gap-1 shadow-sm">
+              <Monitor className="size-3" /> Read online
+            </Badge>
+          )}
           {price < product.price && (
             <Badge className="bg-green-600 text-white shadow-sm">Sale</Badge>
           )}
@@ -87,18 +94,24 @@ export function ProductCard({
         </Link>
         <div className="mt-auto space-y-2.5">
           <Price amount={price} mrp={product.mrp} size="sm" />
-          <AddToCartButton
-            size="sm"
-            className="w-full"
-            disabled={out}
-            product={{
-              productId: product.id,
-              slug: product.slug,
-              title: product.title,
-              unitPrice: price,
-              image: product.coverImage,
-            }}
-          />
+          {digital ? (
+            <Button size="sm" className="w-full" asChild>
+              <Link href={`/product/${product.slug}`}>Read online</Link>
+            </Button>
+          ) : (
+            <AddToCartButton
+              size="sm"
+              className="w-full"
+              disabled={out}
+              product={{
+                productId: product.id,
+                slug: product.slug,
+                title: product.title,
+                unitPrice: price,
+                image: product.coverImage,
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

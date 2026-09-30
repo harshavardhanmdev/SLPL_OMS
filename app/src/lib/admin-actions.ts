@@ -77,7 +77,7 @@ const productSchema = z.object({
     .regex(/^[A-Z0-9]{3,20}$/, "Stock code: 3-20 letters and numbers")
     .optional()
     .or(z.literal("")),
-  kind: z.enum(["BOOK", "NOVEL", "POEMS", "BUNDLE"]),
+  kind: z.enum(["BOOK", "NOVEL", "POEMS", "BUNDLE", "DIGITAL"]),
   categoryId: z.string().min(1),
   series: z.string().trim().max(80).optional().or(z.literal("")),
   gradeLabel: z.string().trim().max(40).optional().or(z.literal("")),

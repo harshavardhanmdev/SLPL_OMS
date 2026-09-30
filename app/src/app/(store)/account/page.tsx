@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Backpack, Bell, LifeBuoy, LogOut, MapPin, Newspaper, Package, Settings2, UserRound } from "lucide-react";
+import { Backpack, Bell, LibraryBig, LifeBuoy, LogOut, MapPin, Newspaper, Package, Settings2, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -83,6 +83,11 @@ export default async function AccountPage() {
           <Button variant="outline" className="gap-2" asChild>
             <Link href="/account/subscriptions">
               <Newspaper className="size-4" /> My subscriptions
+            </Link>
+          </Button>
+          <Button variant="outline" className="gap-2" asChild>
+            <Link href="/account/library">
+              <LibraryBig className="size-4" /> My library
             </Link>
           </Button>
           <Button variant="outline" className="gap-2" asChild>

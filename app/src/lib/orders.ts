@@ -12,6 +12,7 @@ import { sendSms } from "@/lib/sms";
 import { formatINR } from "@/lib/money";
 import { emailKitReceipt } from "@/lib/kit-notify";
 import { activateSubscriptions } from "@/lib/subscription-notify";
+import { grantEntitlement } from "@/lib/digital-access";
 import { StockError, releaseStock, reserveStock } from "@/lib/stock";
 import {
   fetchPaymentsForOrder,
@@ -396,6 +397,53 @@ export async function markOrderPaid(
       "/account/subscriptions",
     );
     return;
+  }
+
+  // A digital edition is delivered the moment it is paid for: grant the licence
+  // and send them to read it, rather than telling them we are packing books.
+  const digitalItems = order.items.filter((i) => i.productId);
+  if (digitalItems.length > 0) {
+    const digital = await db.product.findMany({
+      where: { id: { in: digitalItems.map((i) => i.productId!) }, kind: "DIGITAL" },
+      select: { id: true, slug: true, title: true },
+    });
+    if (digital.length > 0) {
+      await db.cart.deleteMany({ where: { userId: order.userId } });
+      for (const product of digital) {
+        const licence = await grantEntitlement({
+          userId: order.userId,
+          productId: product.id,
+          orderId: order.id,
+        });
+        await sendEmail({
+          to: order.customerEmail,
+          subject: `${product.title} is ready to read`,
+          template: "digital-ready",
+          html: renderEmail(
+            "Your digital edition is ready",
+            `<p style="margin:0 0 14px">Hi ${order.customerName}, thank you. <b>${product.title}</b> is now in your library.</p>
+             <p style="margin:0 0 18px">
+               <a href="${process.env.APP_URL ?? "https://store.theslpl.in"}/read/${product.slug}" style="display:inline-block;background:#f5a623;color:#16213e;font-weight:bold;padding:11px 20px;border-radius:8px;text-decoration:none">Start reading</a>
+             </p>
+             <p style="margin:0 0 10px;font-size:13px;color:#5a6478">
+               It opens in your browser whenever you are signed in, on any device, for as long as
+               you have your account. There is no file to download and no expiry.
+             </p>
+             <p style="margin:0;font-size:13px;color:#5a6478">
+               This is your personal copy. Every page carries your name and licence number
+               ${licence.code}, so please do not pass pages on.
+             </p>`,
+          ),
+        });
+        await notifyUser(
+          order.userId,
+          "Ready to read",
+          `${product.title} is in your library.`,
+          `/read/${product.slug}`,
+        );
+      }
+      return;
+    }
   }
 
   // A kit is collected at the school, never couriered, so it gets the receipt

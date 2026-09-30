@@ -5,6 +5,7 @@ import {
   Boxes,
   LayoutDashboard,
   LogOut,
+  Monitor,
   Newspaper,
   ScrollText,
   Store,
@@ -27,6 +28,7 @@ const nav: { href: string; label: string; icon: typeof Wallet; needs: Capability
   { href: "/erp/expenses", label: "Expenses", icon: Wallet, needs: "finance.read" },
   { href: "/erp/stock", label: "Stock", icon: Boxes, needs: "finance.read" },
   { href: "/erp/subscriptions", label: "Subs", icon: Newspaper, needs: "finance.read" },
+  { href: "/erp/digital", label: "Digital", icon: Monitor, needs: "finance.read" },
   { href: "/erp/audit", label: "Audit", icon: ScrollText, needs: "staff.manage" },
   { href: "/erp/staff", label: "Staff", icon: UsersRound, needs: "staff.manage" },
 ];

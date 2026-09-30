@@ -180,7 +180,10 @@ export function EditionReader({
       className="fixed inset-0 flex flex-col overflow-hidden bg-navy"
       onContextMenu={(e) => e.preventDefault()}
     >
-      <style>{"@media print { body { display: none !important } }"}</style>
+      <style>
+        {"@media print { body { display: none !important } }" +
+          "html, body { overscroll-behavior-x: none; }"}
+      </style>
 
       <header className="flex shrink-0 items-center gap-2 border-b border-white/10 px-2 py-1.5 text-white sm:px-3">
         <Link
@@ -224,8 +227,12 @@ export function EditionReader({
 
       {/* The overlay sits outside the scroller, so the arrows stay put when zoomed */}
       <div className="relative min-h-0 flex-1">
+        {/* pan-y hands vertical scrolling to the browser and keeps horizontal
+            gestures for us. Without it a swipe back is Chrome's history back,
+            which threw the reader out of the issue entirely. */}
         <main
           className="h-full overflow-auto overscroll-contain"
+          style={{ touchAction: zoom > 1 ? "auto" : "pan-y" }}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >

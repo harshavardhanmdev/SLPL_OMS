@@ -54,7 +54,9 @@ export function EditionReader({
                   ? "This copy belongs to a different account. Sign in with the one that bought it."
                   : res.status === 404
                     ? `Page ${page} is missing from this issue. Please tell us and we will put it right.`
-                    : "Something went wrong loading that page. Try again in a moment.",
+                    : res.status === 503
+                      ? "Reading is briefly unavailable while we fix something at our end. Please try again shortly."
+                      : "Something went wrong loading that page. Try again in a moment.",
           );
         }
         const bitmap = await createImageBitmap(await res.blob());

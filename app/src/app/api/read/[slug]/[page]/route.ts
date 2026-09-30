@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 
 import { getSession } from "@/lib/auth";
-import { findLicence, recordView, renderPage } from "@/lib/digital-access";
+import { WatermarkError, findLicence, recordView, renderPage } from "@/lib/digital-access";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -48,6 +48,11 @@ export async function GET(
     body = await renderPage(licence, page);
   } catch (err) {
     console.error("[digital] could not render", slug, page, err);
+    // An unmarked page is worse than no page, so a broken watermark is an
+    // outage rather than something we quietly paper over.
+    if (err instanceof WatermarkError) {
+      return NextResponse.json({ error: "Reading is temporarily unavailable" }, { status: 503 });
+    }
     return NextResponse.json({ error: "That page is missing" }, { status: 404 });
   }
 

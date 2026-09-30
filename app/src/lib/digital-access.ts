@@ -139,6 +139,42 @@ function watermarkSvg(width: number, licence: Licence): Buffer {
   );
 }
 
+/** Thrown when a page cannot be marked, so it is never served unmarked. */
+export class WatermarkError extends Error {}
+
+let fontCheck: Promise<void> | null = null;
+
+/**
+ * Proves the container can actually draw text before any page goes out.
+ *
+ * sharp renders the watermark through librsvg, which silently draws nothing
+ * when no font is installed. Alpine ships none, so the first production build
+ * served a blank navy bar and would have handed out unmarked pages while
+ * looking entirely healthy. Checked once per process, and we fail closed:
+ * an unmarked page is worse than no page.
+ */
+async function assertCanDrawText(): Promise<void> {
+  fontCheck ??= (async () => {
+    const svg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="40">
+         <rect width="100%" height="100%" fill="#000000"/>
+         <text x="8" y="28" font-family="DejaVu Sans, Helvetica, Arial, sans-serif"
+               font-size="22" fill="#ffffff">Licence check</text>
+       </svg>`,
+    );
+    const { data } = await sharp(svg).greyscale().raw().toBuffer({ resolveWithObject: true });
+    const lit = data.reduce((n, v) => (v > 190 ? n + 1 : n), 0);
+    if (lit < 50) {
+      console.error(
+        "[digital] no font available to draw the watermark. " +
+          "Install font-dejavu in the image. Refusing to serve unmarked pages.",
+      );
+      throw new WatermarkError("Watermarking is unavailable on this server.");
+    }
+  })();
+  return fontCheck;
+}
+
 /**
  * One page, watermarked for one reader.
  *
@@ -147,6 +183,8 @@ function watermarkSvg(width: number, licence: Licence): Buffer {
  * every reader and then having to expire it when a licence is revoked.
  */
 export async function renderPage(licence: Licence, page: number): Promise<Buffer> {
+  await assertCanDrawText();
+
   const name = `p${String(page).padStart(3, "0")}.webp`;
   const file = path.join(EDITIONS_DIR, licence.editionKey, name);
   const source = await readFile(file);

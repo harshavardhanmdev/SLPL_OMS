@@ -19,6 +19,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# Fonts, because sharp draws the digital edition watermark from an SVG and
+# alpine ships none: without this the licence line renders as an empty bar and
+# every page goes out unmarked, which is the whole point of the feature.
+RUN apk add --no-cache font-dejavu fontconfig && fc-cache -f
 RUN addgroup -S app && adduser -S app -G app && mkdir -p /app/uploads && chown app:app /app/uploads
 COPY --from=builder --chown=app:app /app/.next/standalone ./
 COPY --from=builder --chown=app:app /app/.next/static ./.next/static

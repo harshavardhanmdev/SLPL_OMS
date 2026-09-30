@@ -229,8 +229,14 @@ export function EditionReader({
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >
+          {/* At fit, the wrapper has a definite height so the canvas can be
+              capped against it. Zoomed, it grows and the scroller takes over. */}
           <div
-            className={`flex min-h-full min-w-full p-2 ${zoom > 1 ? "" : "items-center justify-center"}`}
+            className={
+              zoom > 1
+                ? "flex min-h-full min-w-full p-2"
+                : "flex h-full w-full items-center justify-center p-2"
+            }
           >
             {error ? (
               <div className="m-auto max-w-sm rounded-2xl bg-white/10 p-8 text-center">
@@ -251,8 +257,10 @@ export function EditionReader({
               <canvas
                 ref={canvasRef}
                 onDragStart={(e) => e.preventDefault()}
-                className={`m-auto block select-none rounded shadow-2xl transition-[transform,opacity] duration-300 ease-out ${slide}`}
-                style={{ maxWidth: `${zoom * 100}%`, maxHeight: `${zoom * 100}%` }}
+                className={`m-auto block select-none rounded shadow-2xl transition-[transform,opacity] duration-300 ease-out ${slide} ${
+                  zoom > 1 ? "" : "max-h-full max-w-full"
+                }`}
+                style={zoom > 1 ? { width: `${zoom * 100}%`, height: "auto" } : undefined}
               />
             )}
           </div>

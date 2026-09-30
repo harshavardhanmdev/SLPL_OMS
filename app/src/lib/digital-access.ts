@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import sharp from "sharp";
+import * as opentype from "opentype.js";
 
 import { db } from "@/lib/db";
 
@@ -108,13 +109,75 @@ export async function findLicence(userId: string, slug: string): Promise<Licence
   };
 }
 
-/** Escapes text going into the watermark SVG. A reader's name is their input. */
-function xml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+/** Thrown when a page cannot be marked, so it is never served unmarked. */
+export class WatermarkError extends Error {}
+
+/**
+ * The watermark is drawn as vector outlines, not as SVG text.
+ *
+ * sharp's bundled libvips here has no pango and no text operator, so `<text>`
+ * renders as nothing at all: production happily composited an empty navy bar
+ * and would have served every page unmarked while looking healthy. Installing
+ * fonts does not fix that, because there is no text engine to use them.
+ * Converting the line to `<path>` sidesteps the whole question, since paths
+ * render everywhere, and it makes the output identical on any machine.
+ */
+const FONT_CANDIDATES = [
+  "/usr/share/fonts/dejavu/DejaVuSans.ttf", // alpine, font-dejavu
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", // debian and ubuntu
+  "/usr/share/fonts/TTF/DejaVuSans.ttf", // arch
+];
+
+let fontPromise: Promise<opentype.Font> | null = null;
+
+async function watermarkFont(): Promise<opentype.Font> {
+  fontPromise ??= (async () => {
+    for (const candidate of FONT_CANDIDATES) {
+      try {
+        return opentype.parse(toArrayBuffer(await readFile(candidate)));
+      } catch {
+        // try the next location
+      }
+    }
+    console.error(
+      "[digital] no DejaVuSans.ttf found in " +
+        FONT_CANDIDATES.join(", ") +
+        ". Refusing to serve unmarked pages.",
+    );
+    throw new WatermarkError("Watermarking is unavailable on this server.");
+  })();
+  return fontPromise;
+}
+
+function toArrayBuffer(buf: Buffer): ArrayBuffer {
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
+
+/**
+ * Glyph by glyph, rather than font.getPath.
+ *
+ * opentype.js runs the font's substitution tables on a whole string and throws
+ * on the ones DejaVu uses ("substitutionType : 62 ... is not yet supported").
+ * A licence line is plain Latin with no ligatures or joining to lose, so
+ * placing each glyph at its own advance is both safe and exact.
+ */
+function textPath(
+  font: opentype.Font,
+  text: string,
+  x: number,
+  y: number,
+  size: number,
+): { d: string; width: number } {
+  const scale = size / font.unitsPerEm;
+  const parts: string[] = [];
+  let cursor = x;
+  for (const character of text) {
+    const glyph = font.charToGlyph(character);
+    const d = glyph.getPath(cursor, y, size).toPathData(2);
+    if (d) parts.push(d);
+    cursor += (glyph.advanceWidth ?? 0) * scale;
+  }
+  return { d: parts.join(" "), width: cursor - x };
 }
 
 /**
@@ -122,57 +185,37 @@ function xml(value: string): string {
  * Drawn over a translucent strip so it stays legible on a dark page and on a
  * white one.
  */
-function watermarkSvg(width: number, licence: Licence): Buffer {
-  const barHeight = Math.max(28, Math.round(width * 0.026));
-  const fontSize = Math.round(barHeight * 0.46);
+async function watermarkSvg(width: number, barHeight: number, licence: Licence): Promise<Buffer> {
+  const font = await watermarkFont();
   const phone = licence.readerPhone ? ` · ${licence.readerPhone}` : "";
   const line = `Licensed to ${licence.readerName}${phone} · ${licence.code} · Not for redistribution`;
+
+  // Shrink to fit rather than run off the edge of a narrow page
+  const margin = Math.round(width * 0.02);
+  let size = Math.round(barHeight * 0.46);
+  let drawn = textPath(font, line, 0, 0, size);
+  while (size > 8 && drawn.width > width - margin * 2) {
+    size -= 1;
+    drawn = textPath(font, line, 0, 0, size);
+  }
+
+  const { d: path } = textPath(
+    font,
+    line,
+    (width - drawn.width) / 2,
+    Math.round(barHeight * 0.68),
+    size,
+  );
+  if (!path || path.length < 20) {
+    throw new WatermarkError("The watermark came out empty.");
+  }
 
   return Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${barHeight}">
        <rect width="100%" height="100%" fill="#1E2A5A" fill-opacity="0.82"/>
-       <text x="${Math.round(width / 2)}" y="${Math.round(barHeight * 0.66)}"
-             text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif"
-             font-size="${fontSize}" fill="#ffffff" fill-opacity="0.92"
-             letter-spacing="0.4">${xml(line)}</text>
+       <path d="${path}" fill="#ffffff" fill-opacity="0.92"/>
      </svg>`,
   );
-}
-
-/** Thrown when a page cannot be marked, so it is never served unmarked. */
-export class WatermarkError extends Error {}
-
-let fontCheck: Promise<void> | null = null;
-
-/**
- * Proves the container can actually draw text before any page goes out.
- *
- * sharp renders the watermark through librsvg, which silently draws nothing
- * when no font is installed. Alpine ships none, so the first production build
- * served a blank navy bar and would have handed out unmarked pages while
- * looking entirely healthy. Checked once per process, and we fail closed:
- * an unmarked page is worse than no page.
- */
-async function assertCanDrawText(): Promise<void> {
-  fontCheck ??= (async () => {
-    const svg = Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="40">
-         <rect width="100%" height="100%" fill="#000000"/>
-         <text x="8" y="28" font-family="DejaVu Sans, Helvetica, Arial, sans-serif"
-               font-size="22" fill="#ffffff">Licence check</text>
-       </svg>`,
-    );
-    const { data } = await sharp(svg).greyscale().raw().toBuffer({ resolveWithObject: true });
-    const lit = data.reduce((n, v) => (v > 190 ? n + 1 : n), 0);
-    if (lit < 50) {
-      console.error(
-        "[digital] no font available to draw the watermark. " +
-          "Install font-dejavu in the image. Refusing to serve unmarked pages.",
-      );
-      throw new WatermarkError("Watermarking is unavailable on this server.");
-    }
-  })();
-  return fontCheck;
 }
 
 /**
@@ -183,16 +226,14 @@ async function assertCanDrawText(): Promise<void> {
  * every reader and then having to expire it when a licence is revoked.
  */
 export async function renderPage(licence: Licence, page: number): Promise<Buffer> {
-  await assertCanDrawText();
-
   const name = `p${String(page).padStart(3, "0")}.webp`;
   const file = path.join(EDITIONS_DIR, licence.editionKey, name);
   const source = await readFile(file);
 
   const image = sharp(source);
   const { width = 1800, height = 2330 } = await image.metadata();
-  const bar = watermarkSvg(width, licence);
   const barHeight = Math.max(28, Math.round(width * 0.026));
+  const bar = await watermarkSvg(width, barHeight, licence);
 
   return image
     .composite([{ input: bar, top: Math.max(0, height - barHeight), left: 0 }])

@@ -105,6 +105,26 @@ async function main() {
   check("a voided issue stops counting", octAfterLine.issued === 0, String(octAfterLine.issued));
   check("and the closing moves back up", octAfterLine.closing === 517, String(octAfterLine.closing));
 
+  console.log("\nThe counted register ties out");
+  const live = await monthlyStatement("2026-09");
+  const counted = live.lines.filter((l) => l.label !== LABEL);
+  const books = counted.reduce((sum, l) => sum + l.closingCopies, 0);
+  const languages = counted.reduce((sum, l) => sum + l.closingTelugu + l.closingHindi, 0);
+  if (counted.length > 0) {
+    check(
+      "Telugu and Hindi are counted, not dropped",
+      languages > 0,
+      `${languages.toLocaleString("en-IN")} language books`,
+    );
+    check(
+      "books on hand match the transcribed register",
+      books === 137731,
+      `${books.toLocaleString("en-IN")} vs 1,37,731`,
+    );
+  } else {
+    console.log("  --   no counted register on this database, skipped");
+  }
+
   await cleanup();
   console.log(
     process.exitCode === 1 ? "\nSomething above failed.\n" : "\nEvery step passed. Cleaned up.\n",

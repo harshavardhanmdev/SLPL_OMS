@@ -30,6 +30,17 @@ export type LedgerLine = {
   returnedOut: number;
   adjusted: number;
   closing: number;
+  /**
+   * Telugu and Hindi are held outside the Grade 1 to 5 sets, because a school
+   * can take the core set without a language book. They are 13,906 books on
+   * the shelf, so leaving them out of a bank statement understates it badly.
+   */
+  openingTelugu: number;
+  openingHindi: number;
+  movedTelugu: number;
+  movedHindi: number;
+  closingTelugu: number;
+  closingHindi: number;
   /** Books rather than sets, which is what an auditor counts on a shelf. */
   closingCopies: number;
 };
@@ -46,6 +57,8 @@ export type MonthlyStatement = {
     returnedOut: number;
     adjusted: number;
     closing: number;
+    closingTelugu: number;
+    closingHindi: number;
     closingCopies: number;
   };
 };
@@ -94,6 +107,12 @@ export async function monthlyStatement(key?: string | null): Promise<MonthlyStat
         returnedOut: 0,
         adjusted: 0,
         closing: 0,
+        openingTelugu: 0,
+        openingHindi: 0,
+        movedTelugu: 0,
+        movedHindi: 0,
+        closingTelugu: 0,
+        closingHindi: 0,
         closingCopies: 0,
       };
       lines.set(label, line);
@@ -106,6 +125,8 @@ export async function monthlyStatement(key?: string | null): Promise<MonthlyStat
   for (const row of counts) {
     const line = ensure(row.label, row.series ?? null, row.unit);
     line.opening = row.inventory;
+    line.openingTelugu = row.inventoryTelugu ?? 0;
+    line.openingHindi = row.inventoryHindi ?? 0;
   }
 
   for (const m of movements) {
@@ -115,6 +136,8 @@ export async function monthlyStatement(key?: string | null): Promise<MonthlyStat
     // Between the count and this month, it has already moved the opening figure
     if (m.movedAt < window.start) {
       line.opening += m.quantity;
+      line.openingTelugu += m.quantityTelugu ?? 0;
+      line.openingHindi += m.quantityHindi ?? 0;
       continue;
     }
     if (m.kind === "INWARD") line.received += m.quantity;
@@ -122,6 +145,8 @@ export async function monthlyStatement(key?: string | null): Promise<MonthlyStat
     else if (m.kind === "RETURN_IN") line.returnedIn += m.quantity;
     else if (m.kind === "RETURN_OUT") line.returnedOut += Math.abs(m.quantity);
     else line.adjusted += m.quantity;
+    line.movedTelugu += m.quantityTelugu ?? 0;
+    line.movedHindi += m.quantityHindi ?? 0;
   }
 
   const totals = {
@@ -132,6 +157,8 @@ export async function monthlyStatement(key?: string | null): Promise<MonthlyStat
     returnedOut: 0,
     adjusted: 0,
     closing: 0,
+    closingTelugu: 0,
+    closingHindi: 0,
     closingCopies: 0,
   };
 
@@ -140,8 +167,13 @@ export async function monthlyStatement(key?: string | null): Promise<MonthlyStat
     const line = lines.get(label)!;
     line.closing =
       line.opening + line.received + line.returnedIn - line.issued - line.returnedOut + line.adjusted;
+    line.closingTelugu = line.openingTelugu + line.movedTelugu;
+    line.closingHindi = line.openingHindi + line.movedHindi;
+    // A set expands to its titles; the language books are already single copies
     line.closingCopies =
-      line.unit === "COPY" ? line.closing : line.closing * Math.max(1, line.titlesPerSet);
+      (line.unit === "COPY" ? line.closing : line.closing * Math.max(1, line.titlesPerSet)) +
+      line.closingTelugu +
+      line.closingHindi;
     out.push(line);
     for (const k of Object.keys(totals) as (keyof typeof totals)[]) totals[k] += line[k];
   }

@@ -120,7 +120,11 @@ export default async function StockStatementPage({
             ["Received", n(totals.received), "sets and copies"],
             ["Issued", n(totals.issued), "sets and copies"],
             ["Closing", n(totals.closing), "sets and copies"],
-            ["Books on hand", n(totals.closingCopies), "sets expanded to titles"],
+            [
+              "Books on hand",
+              n(totals.closingCopies),
+              `sets expanded, plus ${n(totals.closingTelugu + totals.closingHindi)} language books`,
+            ],
           ].map(([head, value, hint]) => (
             <div key={head} className="rounded border p-2" style={{ borderColor: "#e3e8f2" }}>
               <p className="text-xs" style={{ color: "#5a6478" }}>
@@ -161,6 +165,11 @@ export default async function StockStatementPage({
                   {l.series && (
                     <span className="block text-[10px]" style={{ color: "#5a6478" }}>
                       {l.series}
+                    </span>
+                  )}
+                  {(l.closingTelugu > 0 || l.closingHindi > 0) && (
+                    <span className="block text-[10px]" style={{ color: "#5a6478" }}>
+                      Telugu {n(l.closingTelugu)} · Hindi {n(l.closingHindi)}, held outside the set
                     </span>
                   )}
                 </td>

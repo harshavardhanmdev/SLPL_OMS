@@ -745,8 +745,9 @@ model AdminUser {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  sessions  AdminSession[]
-  auditLogs AdminAuditLog[]
+  sessions       AdminSession[]
+  auditLogs      AdminAuditLog[]
+  stockMovements StockMovement[]
 
   @@index([isActive])
 }
@@ -941,4 +942,58 @@ model DigitalViewLog {
   at            DateTime           @default(now())
 
   @@index([entitlementId, at])
+}
+
+// ─── Stock movements ──────────────────────────────────────────────────────────
+// The StockCount rows are a snapshot: the register as it stood on one day. This
+// is everything that has happened since, so any month's statement is opening
+// plus movements equals closing, and the closing rolls into the next month.
+// Nothing here is ever deleted: a mistake is reversed by its own line, because
+// a statement that goes to a bank cannot have silent edits in its history.
+
+enum StockMoveKind {
+  INWARD // received from the printer
+  OUTWARD // issued to a school or a customer
+  RETURN_IN // came back from a school
+  RETURN_OUT // sent back to the printer
+  ADJUSTMENT // correction after a physical count
+}
+
+model StockMovement {
+  id  String @id @default(cuid())
+  /// SLPL-M-YYMM-XXXXX, so a line can be quoted in a letter to the bank
+  ref String @unique
+
+  movedAt DateTime
+  kind    StockMoveKind
+  /// The register line this moves, e.g. "Grade 1 Term 2". Matches StockCount.label.
+  label   String
+  series  String?
+  unit    StockUnit     @default(SET)
+
+  /// Signed: positive adds to the balance, negative takes away. The form asks
+  /// for a positive number and the kind decides the sign.
+  quantity       Int
+  /// Telugu and Hindi move apart from the set, as the register keeps them
+  quantityTelugu Int?
+  quantityHindi  Int?
+
+  /// The school, printer or customer on the other side
+  party    String?
+  /// Delivery challan, invoice or credit note number
+  document String?
+  note     String?
+
+  recordedById  String?
+  recordedBy    AdminUser? @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  /// Kept alongside the relation so the trail survives a staff row being removed
+  recordedEmail String
+
+  voidedAt   DateTime?
+  voidReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([movedAt])
+  @@index([label, movedAt])
 }

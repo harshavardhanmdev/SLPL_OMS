@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, Layers } from "lucide-react";
+import { FileText, Layers, Truck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,16 @@ export default async function StockPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button className="gap-2" asChild>
+            <Link href="/erp/stock/statement">
+              <FileText className="size-4" /> Monthly statement
+            </Link>
+          </Button>
+          <Button variant="outline" className="gap-2" asChild>
+            <Link href="/erp/stock/movements">
+              <Truck className="size-4" /> Movements
+            </Link>
+          </Button>
+          <Button variant="outline" className="gap-2" asChild>
             <Link href="/erp/stock/sheet">
               <FileText className="size-4" /> One page sheet
             </Link>

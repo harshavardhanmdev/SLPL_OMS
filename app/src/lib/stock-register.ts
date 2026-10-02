@@ -21,6 +21,15 @@ const LL_SUBJECTS: [string, string][] = [
   ["GKB", "General Knowledge"],
 ];
 
+/**
+ * Computer and General Knowledge are printed once for the year, and Telugu and
+ * Hindi are outside the set anyway, so a Term 2 set is four books rather than
+ * six. Getting this wrong overstates the shelf by a third.
+ */
+const LL_TERM2_SUBJECTS: [string, string][] = LL_SUBJECTS.filter(
+  ([subject]) => !["COM", "GKB"].includes(subject),
+);
+
 const SKB_LOWER: [string, string][] = [
   ["ENG", "English"],
   ["MAT", "Maths"],
@@ -89,6 +98,12 @@ const BABY_STEPS: Record<string, { level: number; members: [string, string][] }>
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 /** The titles inside one set of the given register row, in register order. */
+/** "Grade 1 Term 2" is term 2; anything that does not say so is term 1. */
+export function termOf(label: string): number {
+  const m = /term\s*(\d)/i.exec(label);
+  return m ? Number(m[1]) : 1;
+}
+
 export function setComposition(label: string): SetMember[] {
   const baby = BABY_STEPS[label];
   if (baby) {
@@ -98,9 +113,14 @@ export function setComposition(label: string): SetMember[] {
     }));
   }
 
-  const grade = Number(/(\d+)/.exec(label)?.[1] ?? NaN);
+  const term = termOf(label);
+  const grade = Number(/(?:Grade|Class)\s*(\d+)/i.exec(label)?.[1] ?? /(\d+)/.exec(label)?.[1] ?? NaN);
   if (grade >= 1 && grade <= 5) {
-    return LL_SUBJECTS.map(([subject, name]) => ({ sku: `LL${grade}${subject}01`, subject: name }));
+    const table = term === 2 ? LL_TERM2_SUBJECTS : LL_SUBJECTS;
+    return table.map(([subject, name]) => ({
+      sku: `LL${grade}${subject}${pad2(term)}`,
+      subject: name,
+    }));
   }
   if (grade >= 6 && grade <= 10) {
     const table = grade <= 7 ? SKB_LOWER : SKB_UPPER;
@@ -111,7 +131,9 @@ export function setComposition(label: string): SetMember[] {
 
 /** Language titles tracked outside the set, for the rows that do that. */
 export function languageComposition(label: string): { telugu?: SetMember; hindi?: SetMember } {
-  const grade = Number(/(\d+)/.exec(label)?.[1] ?? NaN);
+  // Telugu and Hindi are printed once for the year, so a term 2 line has none
+  if (termOf(label) !== 1) return {};
+  const grade = Number(/(?:Grade|Class)\s*(\d+)/i.exec(label)?.[1] ?? /(\d+)/.exec(label)?.[1] ?? NaN);
   if (grade >= 1 && grade <= 5) {
     return {
       telugu: { sku: `LL${grade}TEL01`, subject: "Telugu" },

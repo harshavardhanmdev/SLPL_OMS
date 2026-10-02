@@ -82,7 +82,7 @@ export default async function StockStatementPage({
           >
             {next.label}
           </Link>
-          <PrintButton />
+          <PrintButton label="Print the statement" />
         </div>
       </div>
 
@@ -112,18 +112,24 @@ export default async function StockStatementPage({
           </div>
         </header>
 
-        <div className="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        {/* The first four are sets and copies added together, which is what the
+            register itself does; books on hand is the unambiguous figure. */}
+        <div className="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
           {[
-            ["Opening", `${n(totals.opening)} sets`],
-            ["Received", `${n(totals.received)} sets`],
-            ["Issued", `${n(totals.issued)} sets`],
-            ["Closing", `${n(totals.closing)} sets`],
-          ].map(([head, value]) => (
+            ["Opening", n(totals.opening), "sets and copies"],
+            ["Received", n(totals.received), "sets and copies"],
+            ["Issued", n(totals.issued), "sets and copies"],
+            ["Closing", n(totals.closing), "sets and copies"],
+            ["Books on hand", n(totals.closingCopies), "sets expanded to titles"],
+          ].map(([head, value, hint]) => (
             <div key={head} className="rounded border p-2" style={{ borderColor: "#e3e8f2" }}>
               <p className="text-xs" style={{ color: "#5a6478" }}>
                 {head}
               </p>
               <p className="font-heading text-base font-bold">{value}</p>
+              <p className="text-[10px]" style={{ color: "#5a6478" }}>
+                {hint}
+              </p>
             </div>
           ))}
         </div>

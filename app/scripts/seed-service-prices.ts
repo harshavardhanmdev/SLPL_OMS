@@ -15,7 +15,7 @@ import { db } from "../src/lib/db";
 
 /** Rupees, as the owner quoted them. GST is added on top at 18%. */
 const PRICES: { match: RegExp; label: string; rupees: number }[] = [
-  { match: /english\s*work?shop/i, label: "English workshop", rupees: 25_000 },
+  { match: /english.*work?shop/i, label: "English workshop", rupees: 25_000 },
   { match: /radio/i, label: "Radio", rupees: 3_00_000 },
   { match: /\bfdp\b|faculty\s*development/i, label: "FDP", rupees: 25_000 },
   { match: /coun[cs]ell?ing/i, label: "Student counselling", rupees: 25_000 },

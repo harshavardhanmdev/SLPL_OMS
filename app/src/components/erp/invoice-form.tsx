@@ -11,17 +11,16 @@ import { Label } from "@/components/ui/label";
 import { formatINR } from "@/lib/money";
 import { OUR_STATE, documentTotals, lineTotals, ratePercent } from "@/lib/quotation-math";
 import { saveInvoice } from "@/lib/invoice-actions";
-import type { CatalogItem } from "@/components/erp/quotation-form";
+import { LinePicker, type CatalogItem, type OrgOption } from "@/components/erp/line-picker";
+import { todayLocalIso } from "@/lib/utils";
 
 const selectClass =
   "flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
-export type OrgOption = {
-  id: string;
-  name: string;
-  code: string;
-  placeOfSupply: string;
-};
+export type { OrgOption } from "@/components/erp/line-picker";
+
+/** A visit that has not turned into money yet, offered as this bill's origin. */
+export type OpenVisit = { id: string; organizationId: string; label: string };
 
 type Row = {
   productId: string | null;
@@ -57,6 +56,8 @@ export type InvoiceDraft = {
   billDiscountBp: string;
   terms: string;
   notes: string;
+  quotationId?: string | null;
+  visitId: string;
   lines: Row[];
 };
 
@@ -68,15 +69,17 @@ const DEFAULT_TERMS = [
 export function InvoiceForm({
   catalog,
   organizations,
+  visits = [],
   initial,
 }: {
   catalog: CatalogItem[];
   organizations: OrgOption[];
+  visits?: OpenVisit[];
   initial?: InvoiceDraft;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
 
   const [v, setV] = React.useState<InvoiceDraft>(
     initial ?? {
@@ -88,6 +91,7 @@ export function InvoiceForm({
       billDiscountBp: "0",
       terms: DEFAULT_TERMS,
       notes: "",
+      visitId: "",
       lines: [{ ...blankRow }],
     },
   );
@@ -103,11 +107,12 @@ export function InvoiceForm({
       ...old,
       organizationId: id,
       placeOfSupply: org?.placeOfSupply || old.placeOfSupply,
+      // A visit to one school cannot have produced a bill for another
+      visitId: "",
     }));
   }
 
-  function pickProduct(i: number, productId: string) {
-    const item = catalog.find((c) => c.id === productId);
+  function pickProduct(i: number, item: CatalogItem | null) {
     if (!item) {
       setRow(i, { productId: null });
       return;
@@ -117,11 +122,13 @@ export function InvoiceForm({
       description: item.title,
       hsnCode: item.hsnCode ?? "",
       unit: item.unit,
-      mrp: (item.price / 100).toString(),
+      mrp: ((item.mrp ?? item.price) / 100).toString(),
       unitPrice: (item.price / 100).toString(),
       gstRate: String(item.gstRate),
     });
   }
+
+  const orgVisits = visits.filter((x) => x.organizationId === v.organizationId);
 
   const parsed = v.lines.map((r) => ({
     description: r.description,
@@ -150,6 +157,8 @@ export function InvoiceForm({
         billDiscountBp,
         terms: v.terms,
         notes: v.notes,
+        quotationId: v.quotationId ?? null,
+        visitId: v.visitId || null,
         lines: v.lines.map((r) => ({
           productId: r.productId,
           description: r.description,
@@ -243,6 +252,28 @@ export function InvoiceForm({
                 : "Inside Telangana, so CGST and SGST apply."}
             </p>
           </div>
+          {orgVisits.length > 0 && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="in-visit">Which visit won this order?</Label>
+              <select
+                id="in-visit"
+                className={selectClass}
+                value={v.visitId}
+                onChange={(e) => set("visitId", e.target.value)}
+              >
+                <option value="">None, or not sure</option>
+                {orgVisits.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                The visit is marked as converted, which is how the sales page counts what visits
+                turn into.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -258,19 +289,12 @@ export function InvoiceForm({
                     <Label htmlFor={`in-pick-${i}`} className="text-xs">
                       Pick from the catalogue, or type anything
                     </Label>
-                    <select
+                    <LinePicker
                       id={`in-pick-${i}`}
-                      className={selectClass}
-                      value={row.productId ?? ""}
-                      onChange={(e) => pickProduct(i, e.target.value)}
-                    >
-                      <option value="">Custom line, typed below</option>
-                      {catalog.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.title} - {formatINR(c.price)}
-                        </option>
-                      ))}
-                    </select>
+                      catalog={catalog}
+                      value={row.productId}
+                      onPick={(item) => pickProduct(i, item)}
+                    />
                   </div>
                   <div className="space-y-1.5 sm:col-span-4">
                     <Label htmlFor={`in-desc-${i}`} className="text-xs">
@@ -402,24 +426,28 @@ export function InvoiceForm({
               <dd className="tabular-nums">- {formatINR(totals.discount)}</dd>
             </div>
           )}
-          {taxed && !totals.interState && (
-            <>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">CGST</dt>
-                <dd className="tabular-nums">{formatINR(totals.cgst)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">SGST</dt>
-                <dd className="tabular-nums">{formatINR(totals.sgst)}</dd>
-              </div>
-            </>
-          )}
-          {taxed && totals.interState && (
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">IGST</dt>
-              <dd className="tabular-nums">{formatINR(totals.igst)}</dd>
-            </div>
-          )}
+          {taxed &&
+            totals.byRate
+              .filter((r) => r.rate > 0)
+              .map((r) =>
+                totals.interState ? (
+                  <div key={r.rate} className="flex justify-between">
+                    <dt className="text-muted-foreground">IGST @{ratePercent(r.rate)}</dt>
+                    <dd className="tabular-nums">{formatINR(r.tax)}</dd>
+                  </div>
+                ) : (
+                  <React.Fragment key={r.rate}>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">CGST @{ratePercent(r.rate / 2)}</dt>
+                      <dd className="tabular-nums">{formatINR(r.cgst)}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">SGST @{ratePercent(r.rate / 2)}</dt>
+                      <dd className="tabular-nums">{formatINR(r.sgst)}</dd>
+                    </div>
+                  </React.Fragment>
+                ),
+              )}
           <div className="flex justify-between border-t pt-2 font-heading text-lg font-bold">
             <dt>Total</dt>
             <dd className="tabular-nums">{formatINR(totals.total)}</dd>

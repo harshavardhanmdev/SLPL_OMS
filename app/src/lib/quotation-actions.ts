@@ -5,9 +5,10 @@ import { z } from "zod";
 
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
-import { financialYearOf } from "@/lib/expense-constants";
+import { nextQuotationNumber } from "@/lib/number-series";
+import { storeProductId } from "@/lib/quoting";
+import { lineTotals, quoteTotals, type QuoteLine } from "@/lib/quotation-math";
 import { getStaff, requireCapability } from "@/lib/staff-auth";
-import { quoteTotals, type QuoteLine } from "@/lib/quotation-math";
 
 /**
  * Raising a quotation.
@@ -15,6 +16,10 @@ import { quoteTotals, type QuoteLine } from "@/lib/quotation-math";
  * Every figure the school sees is recomputed on the server from the lines, so
  * a tampered form cannot quote a price we did not set, and the stored totals
  * always tie to the lines beneath them.
+ *
+ * A quotation belongs to a school in the customer master, so it shows on that
+ * school's history. An executive's quotation waits for the sales manager, as
+ * an invoice does; a manager's is approved as it is saved.
  */
 
 type Result = { ok?: boolean; error?: string; id?: string; number?: string };
@@ -24,24 +29,6 @@ const DENIED: Record<string, string> = {
   FORBIDDEN: "Your role can read quotations but not raise them.",
 };
 
-/**
- * SLPL/Q/26-27/0001, continuous within a financial year.
- *
- * Counted inside a transaction against the highest number already issued, so
- * two people pressing save at once cannot land on the same number.
- */
-async function nextNumber(): Promise<string> {
-  const year = financialYearOf(new Date());
-  const prefix = `SLPL/Q/${year.label.replace(/\s/g, "")}/`;
-  const last = await db.quotation.findFirst({
-    where: { number: { startsWith: prefix } },
-    orderBy: { number: "desc" },
-    select: { number: true },
-  });
-  const serial = last ? Number(last.number.slice(prefix.length)) + 1 : 1;
-  return `${prefix}${String(serial).padStart(4, "0")}`;
-}
-
 const lineSchema = z.object({
   productId: z.string().optional().nullable(),
   description: z.string().trim().min(2, "Every line needs a description").max(200),
@@ -49,23 +36,22 @@ const lineSchema = z.object({
   unit: z.string().trim().max(12).optional().or(z.literal("")),
   quantity: z.number().int().min(1, "Quantity must be at least one").max(1_000_000),
   /** Rupees as typed on the form, converted to paise here. */
+  mrp: z.number().min(0).max(100_000_000).optional().nullable(),
   unitPrice: z.number().min(0).max(100_000_000),
   discountBp: z.number().int().min(0).max(10000).optional(),
+  /** Rupees off the whole line, when the discount was given as money. */
+  discountAmount: z.number().min(0).max(100_000_000).optional(),
   gstRate: z.number().int().min(0).max(5000),
 });
 
 const schema = z.object({
   id: z.string().optional(),
-  customerName: z.string().trim().min(2, "Who is this quotation for?").max(120),
+  organizationId: z.string().min(1, "Pick the school this is for"),
   contactPerson: z.string().trim().max(80).optional().or(z.literal("")),
-  phone: z.string().trim().max(20).optional().or(z.literal("")),
-  email: z.string().trim().max(120).optional().or(z.literal("")),
-  addressLine: z.string().trim().max(200).optional().or(z.literal("")),
-  city: z.string().trim().max(60).optional().or(z.literal("")),
-  state: z.string().trim().max(60).optional().or(z.literal("")),
-  pincode: z.string().trim().max(10).optional().or(z.literal("")),
-  gstin: z.string().trim().max(20).optional().or(z.literal("")),
+  shipToName: z.string().trim().max(120).optional().or(z.literal("")),
+  shipToAddress: z.string().trim().max(300).optional().or(z.literal("")),
   placeOfSupply: z.string().trim().min(2, "Place of supply decides the GST split").max(60),
+  quotedOn: z.string().min(1, "Pick the quotation date"),
   validDays: z.number().int().min(1).max(365),
   terms: z.string().trim().max(2000).optional().or(z.literal("")),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
@@ -84,31 +70,52 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const d = parsed.data;
 
+  const org = await db.organization.findUnique({ where: { id: d.organizationId } });
+  if (!org) return { error: "That school is no longer on record." };
+
+  const quotedOn = new Date(d.quotedOn);
+  if (Number.isNaN(quotedOn.getTime())) return { error: "That date is not valid." };
+  const validUntil = new Date(quotedOn);
+  validUntil.setDate(validUntil.getDate() + d.validDays);
+
   const lines: QuoteLine[] = d.lines.map((l) => ({
     description: l.description,
     hsnCode: l.hsnCode || null,
-    unit: l.unit || "Nos",
+    unit: (l.unit || "PCS").toUpperCase(),
     quantity: l.quantity,
     unitPrice: Math.round(l.unitPrice * 100),
-    discountBp: l.discountBp ?? 0,
+    discountBp: l.discountAmount ? 0 : (l.discountBp ?? 0),
+    discountAmount: l.discountAmount ? Math.round(l.discountAmount * 100) : 0,
     gstRate: l.gstRate,
   }));
   const totals = quoteTotals(lines, d.placeOfSupply);
 
-  const validUntil = new Date();
-  validUntil.setDate(validUntil.getDate() + d.validDays);
+  // An approver's save stands; anyone else's goes to the manager, including
+  // an edit to something already approved, so a figure cannot change unseen
+  const approver = (await requireCapability("invoices.approve")) === null;
+  const approval = approver
+    ? {
+        status: "APPROVED" as const,
+        approvedById: staff.breakGlass ? null : staff.id,
+        approvedAt: new Date(),
+      }
+    : { status: "PENDING_APPROVAL" as const, approvedById: null, approvedAt: null };
 
   const header = {
-    customerName: d.customerName,
-    contactPerson: d.contactPerson || null,
-    phone: d.phone || null,
-    email: d.email || null,
-    addressLine: d.addressLine || null,
-    city: d.city || null,
-    state: d.state || null,
-    pincode: d.pincode || null,
-    gstin: d.gstin || null,
+    organizationId: org.id,
+    customerName: org.name,
+    contactPerson: d.contactPerson || org.contactPerson,
+    phone: org.phone,
+    email: org.email,
+    addressLine: org.addressLine,
+    city: org.city,
+    state: org.state,
+    pincode: org.pincode,
+    gstin: org.gstin,
+    shipToName: d.shipToName || null,
+    shipToAddress: d.shipToAddress || null,
     placeOfSupply: d.placeOfSupply,
+    quotedOn,
     validUntil,
     subtotal: totals.subtotal,
     discount: totals.discount,
@@ -119,21 +126,24 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
     total: totals.total,
     terms: d.terms || null,
     notes: d.notes || null,
+    rejectedReason: null,
+    ...approval,
   };
 
   const itemRows = d.lines.map((l, i) => {
     const line = lines[i];
-    const t = quoteTotals([line], d.placeOfSupply);
     return {
-      productId: l.productId || null,
+      productId: storeProductId(l.productId),
       description: line.description,
       hsnCode: line.hsnCode,
-      unit: line.unit ?? "Nos",
+      unit: line.unit ?? "PCS",
       quantity: line.quantity,
+      mrp: l.mrp ? Math.round(l.mrp * 100) : null,
       unitPrice: line.unitPrice,
       discountBp: line.discountBp ?? 0,
+      discountAmount: line.discountAmount ?? 0,
       gstRate: line.gstRate,
-      lineTotal: t.total,
+      lineTotal: lineTotals(line).total,
       sortOrder: i,
     };
   });
@@ -142,7 +152,7 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
     const before = await db.quotation.findUnique({ where: { id: d.id } });
     if (!before) return { error: "That quotation no longer exists." };
     // Once it has gone out, the figures a school is holding must not change
-    if (before.status !== "DRAFT") {
+    if (!["DRAFT", "PENDING_APPROVAL", "APPROVED"].includes(before.status)) {
       return { error: "This quotation has already been sent. Raise a revised one instead." };
     }
     const row = await db.$transaction(async (tx) => {
@@ -156,63 +166,109 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
       action: "quotation.update",
       entityType: "Quotation",
       entityId: row.id,
-      after: { number: row.number, total: row.total, customer: row.customerName },
+      before: { status: before.status, total: before.total },
+      after: { number: row.number, status: row.status, total: row.total, customer: row.customerName },
     });
     revalidatePath("/erp/quotations");
+    revalidatePath(`/erp/organizations/${org.id}`);
     return { ok: true, id: row.id, number: row.number };
   }
 
-  const row = await db.quotation.create({
-    data: {
-      ...header,
-      number: await nextNumber(),
-      createdById: staff.breakGlass ? null : staff.id,
-      createdEmail: staff.email,
-      items: { create: itemRows },
-    },
-  });
+  const row = await db.$transaction(async (tx) =>
+    tx.quotation.create({
+      data: {
+        ...header,
+        number: await nextQuotationNumber(tx, quotedOn),
+        createdById: staff.breakGlass ? null : staff.id,
+        createdEmail: staff.email,
+        items: { create: itemRows },
+      },
+    }),
+  );
 
   await audit({
     action: "quotation.create",
     entityType: "Quotation",
     entityId: row.id,
-    after: { number: row.number, total: row.total, customer: row.customerName },
+    after: { number: row.number, status: row.status, total: row.total, customer: row.customerName },
   });
   revalidatePath("/erp/quotations");
+  revalidatePath(`/erp/organizations/${org.id}`);
   return { ok: true, id: row.id, number: row.number };
 }
 
-const statusSchema = z.object({
+const decideSchema = z.object({
   id: z.string().min(1),
-  status: z.enum(["DRAFT", "SENT", "ACCEPTED", "REJECTED", "EXPIRED"]),
+  decision: z.enum(["APPROVED", "REJECTED_BACK", "SENT", "ACCEPTED", "REJECTED", "EXPIRED"]),
+  reason: z.string().trim().max(200).optional().or(z.literal("")),
 });
 
-export async function setQuotationStatus(input: z.infer<typeof statusSchema>): Promise<Result> {
-  const denied = await requireCapability("quotes.write");
-  if (denied) return { error: DENIED[denied] };
-
-  const parsed = statusSchema.safeParse(input);
+/**
+ * Moving a quotation along.
+ *
+ * Approving, and sending back with a reason, is the manager's call. Sending
+ * it out needs approval first. After that the school decides: accepted, not
+ * taken up, or lapsed.
+ */
+export async function decideQuotation(input: z.infer<typeof decideSchema>): Promise<Result> {
+  const parsed = decideSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { id, decision, reason } = parsed.data;
 
-  const before = await db.quotation.findUnique({ where: { id: parsed.data.id } });
+  const needed = ["APPROVED", "REJECTED_BACK"].includes(decision) ? "invoices.approve" : "quotes.write";
+  const denied = await requireCapability(needed);
+  if (denied) {
+    return {
+      error: denied === "FORBIDDEN" ? "Only a sales manager or an owner can do that." : "Sign in again.",
+    };
+  }
+  const staff = await getStaff();
+  if (!staff) return { error: DENIED.UNAUTHORIZED };
+
+  const before = await db.quotation.findUnique({ where: { id } });
   if (!before) return { error: "That quotation no longer exists." };
 
+  if (decision === "REJECTED_BACK" && !reason) {
+    return { error: "Say what needs fixing, so it can be put right." };
+  }
+  if (decision === "APPROVED" && !["DRAFT", "PENDING_APPROVAL"].includes(before.status)) {
+    return { error: "Only a quotation waiting for approval can be approved." };
+  }
+  if (decision === "SENT" && !["APPROVED", "SENT"].includes(before.status)) {
+    return { error: "It has to be approved before it goes to the school." };
+  }
+  if (["ACCEPTED", "REJECTED", "EXPIRED"].includes(decision) && before.status === "PENDING_APPROVAL") {
+    return { error: "It has not been approved yet." };
+  }
+
+  const now = new Date();
   const row = await db.quotation.update({
-    where: { id: parsed.data.id },
-    data: {
-      status: parsed.data.status,
-      sentAt: parsed.data.status === "SENT" ? (before.sentAt ?? new Date()) : before.sentAt,
-      decidedAt: ["ACCEPTED", "REJECTED"].includes(parsed.data.status) ? new Date() : null,
-    },
+    where: { id },
+    data:
+      decision === "APPROVED"
+        ? {
+            status: "APPROVED",
+            approvedById: staff.breakGlass ? null : staff.id,
+            approvedAt: now,
+            rejectedReason: null,
+          }
+        : decision === "REJECTED_BACK"
+          ? { status: "DRAFT", rejectedReason: reason || null, approvedById: null, approvedAt: null }
+          : {
+              status: decision,
+              sentAt: decision === "SENT" ? (before.sentAt ?? now) : before.sentAt,
+              decidedAt: ["ACCEPTED", "REJECTED"].includes(decision) ? now : null,
+            },
   });
 
   await audit({
-    action: "quotation.status",
+    action: `quotation.${decision.toLowerCase()}`,
     entityType: "Quotation",
     entityId: row.id,
     before: { status: before.status },
-    after: { number: row.number, status: row.status },
+    after: { number: row.number, status: row.status, reason: reason || null },
   });
   revalidatePath("/erp/quotations");
+  if (row.organizationId) revalidatePath(`/erp/organizations/${row.organizationId}`);
   return { ok: true, id: row.id, number: row.number };
 }

@@ -3,10 +3,11 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Truck } from "lucide-react";
 import QRCode from "qrcode";
 
 import { PrintButton } from "@/components/store/print-button";
+import { Button } from "@/components/ui/button";
 import { InvoiceDecisions } from "@/components/erp/invoice-decisions";
 import {
   BankBlock,
@@ -47,9 +48,17 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     include: {
       items: { orderBy: { sortOrder: "asc" } },
       createdBy: { select: { name: true } },
+      visits: { select: { id: true, visitedOn: true, by: { select: { name: true } } } },
+      challans: { select: { id: true, number: true } },
     },
   });
   if (!invoice) notFound();
+  const quotation = invoice.quotationId
+    ? await db.quotation.findUnique({
+        where: { id: invoice.quotationId },
+        select: { id: true, number: true },
+      })
+    : null;
 
   const company = await getCompany();
   const balances = await invoiceBalances(invoice.id);
@@ -97,9 +106,44 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             canApprove={roleCan(staff.role, "invoices.approve")}
             canWrite={roleCan(staff.role, "invoices.write")}
           />
+          {roleCan(staff.role, "challan.write") &&
+            ["APPROVED", "SENT", "PAID"].includes(invoice.status) && (
+              <Button variant="outline" className="gap-2" asChild>
+                <Link href={`/erp/challans/new?invoiceId=${invoice.id}`}>
+                  <Truck className="size-4" /> Delivery challan
+                </Link>
+              </Button>
+            )}
           <PrintButton label="Print the invoice" />
         </div>
       </div>
+
+      {(quotation || invoice.visits.length > 0 || invoice.challans.length > 0) && (
+        <p className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground print:hidden">
+          {quotation && (
+            <span>
+              From quotation{" "}
+              <Link href={`/erp/quotations/${quotation.id}`} className="font-medium text-foreground underline">
+                {quotation.number}
+              </Link>
+            </span>
+          )}
+          {invoice.visits.map((v) => (
+            <span key={v.id}>
+              Won on the visit of {v.visitedOn.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+              {v.by ? ` by ${v.by.name}` : ""}
+            </span>
+          ))}
+          {invoice.challans.map((c) => (
+            <span key={c.id}>
+              Delivered on{" "}
+              <Link href={`/erp/challans/${c.id}`} className="font-medium text-foreground underline">
+                {c.number}
+              </Link>
+            </span>
+          ))}
+        </p>
+      )}
 
       {invoice.rejectedReason && (
         <p className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive print:hidden">
@@ -203,24 +247,34 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 <dd className="tabular-nums">- {formatINR(totals.discount)}</dd>
               </div>
             )}
-            {taxed && !totals.interState && (
-              <>
-                <div className="flex justify-between">
-                  <dt style={{ color: DOC_MUTED }}>CGST</dt>
-                  <dd className="tabular-nums">{formatINR(totals.cgst)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt style={{ color: DOC_MUTED }}>SGST</dt>
-                  <dd className="tabular-nums">{formatINR(totals.sgst)}</dd>
-                </div>
-              </>
-            )}
-            {taxed && totals.interState && (
+            {taxed && (
               <div className="flex justify-between">
-                <dt style={{ color: DOC_MUTED }}>IGST</dt>
-                <dd className="tabular-nums">{formatINR(totals.igst)}</dd>
+                <dt style={{ color: DOC_MUTED }}>Taxable Amount</dt>
+                <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>
               </div>
             )}
+            {taxed &&
+              totals.byRate
+                .filter((r) => r.rate > 0)
+                .map((r) =>
+                  totals.interState ? (
+                    <div key={r.rate} className="flex justify-between">
+                      <dt style={{ color: DOC_MUTED }}>IGST @{ratePercent(r.rate)}</dt>
+                      <dd className="tabular-nums">{formatINR(r.tax)}</dd>
+                    </div>
+                  ) : (
+                    <div key={r.rate} className="space-y-1">
+                      <div className="flex justify-between">
+                        <dt style={{ color: DOC_MUTED }}>CGST @{ratePercent(r.rate / 2)}</dt>
+                        <dd className="tabular-nums">{formatINR(r.cgst)}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt style={{ color: DOC_MUTED }}>SGST @{ratePercent(r.rate / 2)}</dt>
+                        <dd className="tabular-nums">{formatINR(r.sgst)}</dd>
+                      </div>
+                    </div>
+                  ),
+                )}
             <div
               className="flex justify-between border-y py-1 text-sm font-bold"
               style={{ borderColor: DOC_RULE }}

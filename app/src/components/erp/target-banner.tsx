@@ -53,7 +53,7 @@ export function TargetBanner({
 
       <div className="relative mt-3 h-3 overflow-hidden rounded-full bg-muted">
         <div
-          className={`h-full rounded-full transition-all ${
+          className={`h-full origin-left rounded-full transition-all motion-safe:animate-[erp-grow_900ms_ease-out] ${
             pace.behind ? "bg-saffron" : "bg-green-600"
           }`}
           style={{ width: `${pct * 100}%` }}

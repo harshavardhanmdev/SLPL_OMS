@@ -6,9 +6,9 @@ import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 import { InvoiceForm } from "@/components/erp/invoice-form";
-import { catalogForQuoting } from "@/app/erp/(panel)/quotations/new/page";
-import { organizationsForBilling } from "@/app/erp/(panel)/invoices/new/page";
 import { db } from "@/lib/db";
+import { openVisits } from "@/lib/open-visits";
+import { catalogForQuoting, organizationsForBilling } from "@/lib/quoting";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Edit invoice", robots: { index: false } };
@@ -18,10 +18,11 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
   const staff = await getStaff();
   if (!staff || !roleCan(staff.role, "invoices.write")) redirect("/erp/invoices");
 
-  const [invoice, catalog, organizations] = await Promise.all([
+  const [invoice, catalog, organizations, visits] = await Promise.all([
     db.invoice.findUnique({ where: { id }, include: { items: { orderBy: { sortOrder: "asc" } } } }),
     catalogForQuoting(),
     organizationsForBilling(),
+    openVisits(),
   ]);
   if (!invoice) notFound();
   // Once approved, the figures a school is holding must not change underneath
@@ -46,6 +47,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
       <InvoiceForm
         catalog={catalog}
         organizations={organizations}
+        visits={visits}
         initial={{
           id: invoice.id,
           organizationId: invoice.organizationId ?? "",
@@ -56,6 +58,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
           billDiscountBp: String(invoice.billDiscountBp),
           terms: invoice.terms ?? "",
           notes: invoice.notes ?? "",
+          quotationId: invoice.quotationId,
+          visitId: "",
           lines: invoice.items.map((i) => ({
             productId: i.productId,
             description: i.description,

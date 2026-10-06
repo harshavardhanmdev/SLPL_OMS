@@ -69,7 +69,18 @@ export default async function GiftsPage() {
         ))}
       </div>
 
-      {canWrite && organizations.length > 0 && <GiftLogger organizations={organizations} />}
+      {canWrite &&
+        (organizations.length > 0 ? (
+          <GiftLogger organizations={organizations} />
+        ) : (
+          <p className="rounded-2xl border border-dashed bg-card p-4 text-sm text-muted-foreground">
+            A gift is recorded against a school, and there are none on record yet.{" "}
+            <Link href="/erp/organizations/new" className="font-medium text-foreground underline">
+              Add the school
+            </Link>{" "}
+            first.
+          </p>
+        ))}
 
       {gifts.length === 0 ? (
         <div className="rounded-2xl border bg-card p-10 text-center">

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -8,110 +9,128 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LinePicker, UNITS, type CatalogItem, type OrgOption } from "@/components/erp/line-picker";
 import { formatINR } from "@/lib/money";
 import { OUR_STATE, lineTotals, quoteTotals, ratePercent } from "@/lib/quotation-math";
 import { saveQuotation } from "@/lib/quotation-actions";
+import { cn, todayLocalIso } from "@/lib/utils";
+
+export type { CatalogItem } from "@/components/erp/line-picker";
 
 const selectClass =
   "flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
-export type CatalogItem = {
-  id: string;
-  title: string;
-  hsnCode: string | null;
-  gstRate: number;
-  /** Paise. */
-  price: number;
-  unit: string;
-};
-
-type Row = {
+export type QuoteRow = {
   productId: string | null;
   description: string;
   hsnCode: string;
   unit: string;
   quantity: string;
+  mrp: string;
   /** Rupees as typed. */
   unitPrice: string;
-  discountBp: string;
+  /** Rupees off the line, or a percentage, as chosen. */
+  discount: string;
+  discountMode: "amount" | "percent";
   gstRate: string;
 };
 
-const blankRow: Row = {
+const blankRow: QuoteRow = {
   productId: null,
   description: "",
   hsnCode: "",
-  unit: "Nos",
+  unit: "PCS",
   quantity: "1",
+  mrp: "",
   unitPrice: "",
-  discountBp: "0",
+  discount: "",
+  discountMode: "amount",
   gstRate: "0",
 };
 
 export type QuotationDraft = {
   id?: string;
-  customerName: string;
+  organizationId: string;
   contactPerson: string;
-  phone: string;
-  email: string;
-  addressLine: string;
-  city: string;
-  state: string;
-  pincode: string;
-  gstin: string;
+  shipElsewhere: boolean;
+  shipToName: string;
+  shipToAddress: string;
   placeOfSupply: string;
+  quotedOn: string;
   validDays: string;
   terms: string;
   notes: string;
-  lines: Row[];
+  lines: QuoteRow[];
 };
 
 const DEFAULT_TERMS = [
-  "Prices are quoted per copy and are valid for the period shown above.",
+  "Prices are valid until the expiry date shown above.",
   "Delivery within 7 to 10 working days of a confirmed order.",
   "Payment: 50% with the order, balance before dispatch.",
   "Printed books are nil rated under HSN 4901. Services attract GST at 18%.",
 ].join("\n");
 
+/** What the server and the totals both read a row as. */
+function toLine(r: QuoteRow) {
+  const discount = Number(r.discount) || 0;
+  return {
+    description: r.description,
+    hsnCode: r.hsnCode,
+    unit: r.unit,
+    quantity: Number(r.quantity) || 0,
+    unitPrice: Math.round((Number(r.unitPrice) || 0) * 100),
+    discountBp: r.discountMode === "percent" ? Math.round(discount * 100) : 0,
+    discountAmount: r.discountMode === "amount" ? Math.round(discount * 100) : 0,
+    gstRate: Number(r.gstRate) || 0,
+  };
+}
+
+function expiryLabel(quotedOn: string, days: string): string {
+  const d = new Date(quotedOn);
+  if (Number.isNaN(d.getTime())) return "";
+  d.setDate(d.getDate() + (Number(days) || 0));
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export function QuotationForm({
   catalog,
+  organizations,
   initial,
 }: {
   catalog: CatalogItem[];
+  organizations: OrgOption[];
   initial?: QuotationDraft;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
   const [v, setV] = React.useState<QuotationDraft>(
-    initial ?? {
-      customerName: "",
-      contactPerson: "",
-      phone: "",
-      email: "",
-      addressLine: "",
-      city: "",
-      state: OUR_STATE,
-      pincode: "",
-      gstin: "",
-      placeOfSupply: OUR_STATE,
-      validDays: "30",
-      terms: DEFAULT_TERMS,
-      notes: "",
-      lines: [{ ...blankRow }],
-    },
+    () =>
+      initial ?? {
+        organizationId: organizations[0]?.id ?? "",
+        contactPerson: "",
+        shipElsewhere: false,
+        shipToName: "",
+        shipToAddress: "",
+        placeOfSupply: organizations[0]?.placeOfSupply ?? OUR_STATE,
+        quotedOn: todayLocalIso(),
+        validDays: "30",
+        terms: DEFAULT_TERMS,
+        notes: "",
+        lines: [{ ...blankRow }],
+      },
   );
 
   const set = <K extends keyof QuotationDraft>(k: K, value: QuotationDraft[K]) =>
     setV((old) => ({ ...old, [k]: value }));
+  const setRow = (i: number, patch: Partial<QuoteRow>) =>
+    setV((old) => ({ ...old, lines: old.lines.map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
 
-  const setRow = (i: number, patch: Partial<Row>) =>
-    setV((old) => ({
-      ...old,
-      lines: old.lines.map((r, j) => (j === i ? { ...r, ...patch } : r)),
-    }));
+  function pickOrg(id: string) {
+    const org = organizations.find((o) => o.id === id);
+    setV((old) => ({ ...old, organizationId: id, placeOfSupply: org?.placeOfSupply || old.placeOfSupply }));
+  }
 
-  function pickProduct(i: number, productId: string) {
-    const item = catalog.find((c) => c.id === productId);
+  function pick(i: number, item: CatalogItem | null) {
     if (!item) {
       setRow(i, { productId: null });
       return;
@@ -121,21 +140,15 @@ export function QuotationForm({
       description: item.title,
       hsnCode: item.hsnCode ?? "",
       unit: item.unit,
-      unitPrice: (item.price / 100).toString(),
+      mrp: item.mrp ? String(item.mrp / 100) : "",
+      unitPrice: String(item.price / 100),
       gstRate: String(item.gstRate),
     });
   }
 
-  const parsed = v.lines.map((r) => ({
-    description: r.description,
-    hsnCode: r.hsnCode,
-    unit: r.unit,
-    quantity: Number(r.quantity) || 0,
-    unitPrice: Math.round((Number(r.unitPrice) || 0) * 100),
-    discountBp: Number(r.discountBp) || 0,
-    gstRate: Number(r.gstRate) || 0,
-  }));
+  const parsed = v.lines.map(toLine);
   const totals = quoteTotals(parsed, v.placeOfSupply);
+  const qty = parsed.reduce((s, l) => s + l.quantity, 0);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,29 +156,30 @@ export function QuotationForm({
     try {
       const res = await saveQuotation({
         id: v.id,
-        customerName: v.customerName,
+        organizationId: v.organizationId,
         contactPerson: v.contactPerson,
-        phone: v.phone,
-        email: v.email,
-        addressLine: v.addressLine,
-        city: v.city,
-        state: v.state,
-        pincode: v.pincode,
-        gstin: v.gstin,
+        shipToName: v.shipElsewhere ? v.shipToName : "",
+        shipToAddress: v.shipElsewhere ? v.shipToAddress : "",
         placeOfSupply: v.placeOfSupply,
+        quotedOn: v.quotedOn,
         validDays: Number(v.validDays) || 30,
         terms: v.terms,
         notes: v.notes,
-        lines: v.lines.map((r) => ({
-          productId: r.productId,
-          description: r.description,
-          hsnCode: r.hsnCode,
-          unit: r.unit,
-          quantity: Number(r.quantity) || 0,
-          unitPrice: Number(r.unitPrice) || 0,
-          discountBp: Number(r.discountBp) || 0,
-          gstRate: Number(r.gstRate) || 0,
-        })),
+        lines: v.lines.map((r) => {
+          const l = toLine(r);
+          return {
+            productId: r.productId,
+            description: l.description,
+            hsnCode: l.hsnCode,
+            unit: l.unit,
+            quantity: l.quantity,
+            mrp: r.mrp ? Number(r.mrp) : null,
+            unitPrice: Number(r.unitPrice) || 0,
+            discountBp: l.discountBp,
+            discountAmount: l.discountAmount / 100,
+            gstRate: l.gstRate,
+          };
+        }),
       });
       if (res.error) {
         toast.error(res.error);
@@ -184,76 +198,36 @@ export function QuotationForm({
         <h2 className="mb-3 font-heading font-semibold">Who it is for</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="q-name">School or organisation</Label>
-            <Input
-              id="q-name"
-              value={v.customerName}
-              onChange={(e) => set("customerName", e.target.value)}
-              className="h-11"
+            <Label htmlFor="q-org">School</Label>
+            <select
+              id="q-org"
+              className={selectClass}
+              value={v.organizationId}
+              onChange={(e) => pickOrg(e.target.value)}
               required
-            />
+            >
+              {organizations.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name} ({o.code})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              The bill-to address comes from the school&apos;s record.{" "}
+              <Link href="/erp/organizations/new" className="underline">
+                Add a new school
+              </Link>{" "}
+              if it is not listed.
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="q-contact">Contact person</Label>
+            <Label htmlFor="q-contact">Kind attention</Label>
             <Input
               id="q-contact"
               value={v.contactPerson}
               onChange={(e) => set("contactPerson", e.target.value)}
               className="h-11"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="q-phone">Phone</Label>
-            <Input
-              id="q-phone"
-              value={v.phone}
-              onChange={(e) => set("phone", e.target.value)}
-              className="h-11"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="q-email">Email</Label>
-            <Input
-              id="q-email"
-              value={v.email}
-              onChange={(e) => set("email", e.target.value)}
-              className="h-11"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="q-gstin">Their GSTIN</Label>
-            <Input
-              id="q-gstin"
-              value={v.gstin}
-              onChange={(e) => set("gstin", e.target.value.toUpperCase())}
-              className="h-11"
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="q-address">Address</Label>
-            <Input
-              id="q-address"
-              value={v.addressLine}
-              onChange={(e) => set("addressLine", e.target.value)}
-              className="h-11"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="q-city">City</Label>
-            <Input
-              id="q-city"
-              value={v.city}
-              onChange={(e) => set("city", e.target.value)}
-              className="h-11"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="q-pincode">Pincode</Label>
-            <Input
-              id="q-pincode"
-              value={v.pincode}
-              onChange={(e) => set("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="h-11"
+              placeholder="Leave blank for the school's contact"
             />
           </div>
           <div className="space-y-1.5">
@@ -272,6 +246,17 @@ export function QuotationForm({
             </p>
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="q-date">Quotation date</Label>
+            <Input
+              id="q-date"
+              type="date"
+              value={v.quotedOn}
+              onChange={(e) => set("quotedOn", e.target.value)}
+              className="h-11"
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="q-valid">Valid for, in days</Label>
             <Input
               id="q-valid"
@@ -280,12 +265,51 @@ export function QuotationForm({
               onChange={(e) => set("validDays", e.target.value.replace(/\D/g, ""))}
               className="h-11"
             />
+            <p className="text-xs text-muted-foreground">
+              Expires {expiryLabel(v.quotedOn, v.validDays)}
+            </p>
           </div>
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={v.shipElsewhere}
+              onChange={(e) => set("shipElsewhere", e.target.checked)}
+              className="size-4"
+            />
+            Ship to a different address than the bill-to
+          </label>
+          {v.shipElsewhere && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="q-shipname">Ship to</Label>
+                <Input
+                  id="q-shipname"
+                  value={v.shipToName}
+                  onChange={(e) => set("shipToName", e.target.value)}
+                  className="h-11"
+                  placeholder="Branch or campus name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="q-shipaddr">Ship-to address</Label>
+                <Input
+                  id="q-shipaddr"
+                  value={v.shipToAddress}
+                  onChange={(e) => set("shipToAddress", e.target.value)}
+                  className="h-11"
+                />
+              </div>
+            </>
+          )}
         </div>
       </section>
 
       <section className="rounded-2xl border bg-card p-4 sm:p-5">
-        <h2 className="mb-3 font-heading font-semibold">What we are quoting</h2>
+        <h2 className="mb-1 font-heading font-semibold">Items and services</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          The school price list comes first in the picker. A line at 0 lists something included
+          in a bundle, as the radio quotation does.
+        </p>
         <div className="space-y-4">
           {v.lines.map((row, i) => {
             const t = lineTotals(parsed[i]);
@@ -294,23 +318,16 @@ export function QuotationForm({
                 <div className="grid gap-2 sm:grid-cols-12">
                   <div className="space-y-1.5 sm:col-span-12">
                     <Label htmlFor={`q-pick-${i}`} className="text-xs">
-                      Pick from the catalogue, or type anything for a service
+                      Pick from the price list, or type anything
                     </Label>
-                    <select
+                    <LinePicker
                       id={`q-pick-${i}`}
-                      className={selectClass}
-                      value={row.productId ?? ""}
-                      onChange={(e) => pickProduct(i, e.target.value)}
-                    >
-                      <option value="">Custom line, typed below</option>
-                      {catalog.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.title} - {formatINR(c.price)}
-                        </option>
-                      ))}
-                    </select>
+                      catalog={catalog}
+                      value={row.productId}
+                      onPick={(item) => pick(i, item)}
+                    />
                   </div>
-                  <div className="space-y-1.5 sm:col-span-5">
+                  <div className="space-y-1.5 sm:col-span-6">
                     <Label htmlFor={`q-desc-${i}`} className="text-xs">
                       Description
                     </Label>
@@ -333,7 +350,7 @@ export function QuotationForm({
                       className="h-10"
                     />
                   </div>
-                  <div className="space-y-1.5 sm:col-span-1">
+                  <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor={`q-qty-${i}`} className="text-xs">
                       Qty
                     </Label>
@@ -346,6 +363,21 @@ export function QuotationForm({
                     />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor={`q-unit-${i}`} className="text-xs">
+                      Unit
+                    </Label>
+                    <select
+                      id={`q-unit-${i}`}
+                      className="flex h-10 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                      value={row.unit}
+                      onChange={(e) => setRow(i, { unit: e.target.value })}
+                    >
+                      {[...new Set([...UNITS, row.unit])].map((u) => (
+                        <option key={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-3">
                     <Label htmlFor={`q-rate-${i}`} className="text-xs">
                       Rate, rupees
                     </Label>
@@ -353,13 +385,42 @@ export function QuotationForm({
                       id={`q-rate-${i}`}
                       inputMode="decimal"
                       value={row.unitPrice}
-                      onChange={(e) =>
-                        setRow(i, { unitPrice: e.target.value.replace(/[^\d.]/g, "") })
-                      }
+                      onChange={(e) => setRow(i, { unitPrice: e.target.value.replace(/[^\d.]/g, "") })}
                       className="h-10"
                     />
                   </div>
-                  <div className="space-y-1.5 sm:col-span-2">
+                  <div className="space-y-1.5 sm:col-span-5">
+                    <Label htmlFor={`q-disc-${i}`} className="text-xs">
+                      Discount
+                    </Label>
+                    <div className="flex gap-1">
+                      <Input
+                        id={`q-disc-${i}`}
+                        inputMode="decimal"
+                        value={row.discount}
+                        onChange={(e) => setRow(i, { discount: e.target.value.replace(/[^\d.]/g, "") })}
+                        className="h-10"
+                        placeholder="0"
+                      />
+                      <div className="flex shrink-0 overflow-hidden rounded-md border text-sm">
+                        {(["amount", "percent"] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setRow(i, { discountMode: m })}
+                            className={cn(
+                              "px-3 transition-colors",
+                              row.discountMode === m ? "bg-navy text-white" : "hover:bg-muted",
+                            )}
+                            aria-pressed={row.discountMode === m}
+                          >
+                            {m === "amount" ? "Rs" : "%"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-4">
                     <Label htmlFor={`q-gst-${i}`} className="text-xs">
                       GST
                     </Label>
@@ -378,8 +439,10 @@ export function QuotationForm({
                 </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
                   <span className="text-muted-foreground">
-                    {formatINR(t.taxable)} taxable
-                    {t.tax > 0 ? ` plus ${formatINR(t.tax)} GST` : ", nil rated"} ={" "}
+                    {formatINR(t.gross)}
+                    {t.discount > 0 &&
+                      ` less ${formatINR(t.discount)} (${ratePercent(Math.round((t.discount / Math.max(1, t.gross)) * 10000))})`}
+                    {t.tax > 0 ? ` plus ${formatINR(t.tax)} GST` : ""} ={" "}
                     <b className="text-foreground">{formatINR(t.total)}</b>
                   </span>
                   {v.lines.length > 1 && (
@@ -388,12 +451,7 @@ export function QuotationForm({
                       variant="ghost"
                       size="sm"
                       className="gap-1.5 text-destructive"
-                      onClick={() =>
-                        set(
-                          "lines",
-                          v.lines.filter((_, j) => j !== i),
-                        )
-                      }
+                      onClick={() => set("lines", v.lines.filter((_, j) => j !== i))}
                     >
                       <Trash2 className="size-3.5" /> Remove
                     </Button>
@@ -403,54 +461,70 @@ export function QuotationForm({
             );
           })}
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-3 gap-2"
-          onClick={() => set("lines", [...v.lines, { ...blankRow }])}
-        >
-          <Plus className="size-4" /> Add a line
-        </Button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => set("lines", [...v.lines, { ...blankRow }])}
+          >
+            <Plus className="size-4" /> Add a line
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-2"
+            onClick={() =>
+              set("lines", [...v.lines, { ...blankRow, unitPrice: "0", gstRate: v.lines[0]?.gstRate ?? "0" }])
+            }
+          >
+            <Plus className="size-4" /> Add an included item at 0
+          </Button>
+        </div>
       </section>
 
       <section className="rounded-2xl border bg-card p-4 sm:p-5">
         <h2 className="mb-3 font-heading font-semibold">Totals</h2>
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between">
-            <dt className="text-muted-foreground">Taxable value</dt>
+            <dt className="text-muted-foreground">{qty} items, before discount</dt>
+            <dd className="tabular-nums">{formatINR(totals.subtotal)}</dd>
+          </div>
+          {totals.discount > 0 && (
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Discount</dt>
+              <dd className="tabular-nums">- {formatINR(totals.discount)}</dd>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Taxable amount</dt>
             <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>
           </div>
           {totals.byRate
             .filter((r) => r.rate > 0)
-            .map((r) => (
-              <div key={r.rate} className="flex justify-between">
-                <dt className="text-muted-foreground">
-                  GST at {ratePercent(r.rate)} on {formatINR(r.taxable)}
-                </dt>
-                <dd className="tabular-nums">{formatINR(r.tax)}</dd>
-              </div>
-            ))}
-          {!totals.interState && totals.cgst > 0 && (
-            <>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">CGST</dt>
-                <dd className="tabular-nums">{formatINR(totals.cgst)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">SGST</dt>
-                <dd className="tabular-nums">{formatINR(totals.sgst)}</dd>
-              </div>
-            </>
-          )}
-          {totals.interState && totals.igst > 0 && (
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">IGST</dt>
-              <dd className="tabular-nums">{formatINR(totals.igst)}</dd>
-            </div>
-          )}
+            .map((r) =>
+              totals.interState ? (
+                <div key={r.rate} className="flex justify-between">
+                  <dt className="text-muted-foreground">IGST @{ratePercent(r.rate)}</dt>
+                  <dd className="tabular-nums">{formatINR(r.tax)}</dd>
+                </div>
+              ) : (
+                <React.Fragment key={r.rate}>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">CGST @{ratePercent(r.rate / 2)}</dt>
+                    <dd className="tabular-nums">{formatINR(r.cgst)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">SGST @{ratePercent(r.rate / 2)}</dt>
+                    <dd className="tabular-nums">{formatINR(r.sgst)}</dd>
+                  </div>
+                </React.Fragment>
+              ),
+            )}
           <div className="flex justify-between border-t pt-2 font-heading text-lg font-bold">
-            <dt>Total</dt>
+            <dt>Total amount</dt>
             <dd className="tabular-nums">{formatINR(totals.total)}</dd>
           </div>
         </dl>
@@ -481,7 +555,7 @@ export function QuotationForm({
         </div>
       </section>
 
-      <Button type="submit" size="lg" disabled={busy} className="gap-2">
+      <Button type="submit" size="lg" disabled={busy || !v.organizationId} className="gap-2">
         {busy ? <Loader2 className="size-4 animate-spin" /> : null}
         {v.id ? "Save changes" : "Create the quotation"}
       </Button>

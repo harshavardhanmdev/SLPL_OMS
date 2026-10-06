@@ -1,24 +1,9 @@
-import Link from "next/link";
-import Image from "next/image";
 import { redirect } from "next/navigation";
-import {
-  Boxes,
-  Building2,
-  FileSignature,
-  Landmark,
-  LayoutDashboard,
-  LogOut,
-  Monitor,
-  Newspaper,
-  ReceiptText,
-  ScrollText,
-  Store,
-  TrendingUp,
-  UsersRound,
-  Wallet,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ErpShell, type NavGroup, type NavItem } from "@/components/erp/erp-shell";
+import { canEnterAdmin } from "@/lib/admin-gate";
 import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
 import { staffSignOut } from "@/lib/staff-actions";
 import { canEnterErp, getStaff, roleCan, type Capability } from "@/lib/staff-auth";
@@ -28,19 +13,51 @@ import { canEnterErp, getStaff, roleCan, type Capability } from "@/lib/staff-aut
  * needs rather than naming roles, so adding a role later does not mean hunting
  * through pages.
  */
-const nav: { href: string; label: string; icon: typeof Wallet; needs: Capability | "erp.enter" }[] = [
-  { href: "/erp", label: "Overview", icon: LayoutDashboard, needs: "erp.enter" },
-  { href: "/erp/sales", label: "Sales", icon: TrendingUp, needs: "crm.read" },
-  { href: "/erp/organizations", label: "Schools", icon: Building2, needs: "crm.read" },
-  { href: "/erp/quotations", label: "Quotations", icon: FileSignature, needs: "quotes.read" },
-  { href: "/erp/invoices", label: "Invoices", icon: ReceiptText, needs: "crm.read" },
-  { href: "/erp/expenses", label: "Expenses", icon: Wallet, needs: "finance.read" },
-  { href: "/erp/stock", label: "Stock", icon: Boxes, needs: "finance.read" },
-  { href: "/erp/subscriptions", label: "Subs", icon: Newspaper, needs: "finance.read" },
-  { href: "/erp/digital", label: "Digital", icon: Monitor, needs: "finance.read" },
-  { href: "/erp/audit", label: "Audit", icon: ScrollText, needs: "staff.manage" },
-  { href: "/erp/staff", label: "Staff", icon: UsersRound, needs: "staff.manage" },
-  { href: "/erp/company", label: "Company", icon: Landmark, needs: "staff.manage" },
+type Entry = NavItem & { needs: Capability | "erp.enter" | "admin.enter" };
+
+const groups: { label: string | null; items: Entry[] }[] = [
+  {
+    label: null,
+    items: [{ href: "/erp", label: "Overview", icon: "overview", needs: "erp.enter" }],
+  },
+  {
+    label: "Sales",
+    items: [
+      { href: "/erp/sales", label: "Sales home", icon: "sales", needs: "crm.read" },
+      { href: "/erp/organizations", label: "Schools", icon: "schools", needs: "crm.read" },
+      { href: "/erp/quotations", label: "Quotations", icon: "quotations", needs: "quotes.read" },
+      { href: "/erp/invoices", label: "Invoices", icon: "invoices", needs: "crm.read" },
+      { href: "/erp/challans", label: "Delivery challans", icon: "challans", needs: "crm.read" },
+      { href: "/erp/samples", label: "Samples", icon: "samples", needs: "crm.read" },
+      { href: "/erp/gifts", label: "Gifts", icon: "gifts", needs: "crm.read" },
+      { href: "/erp/targets", label: "Targets", icon: "targets", needs: "crm.read" },
+      { href: "/erp/prices", label: "Price list", icon: "prices", needs: "quotes.read" },
+    ],
+  },
+  {
+    label: "Money",
+    items: [
+      { href: "/erp/payments", label: "Payments in", icon: "payments", needs: "finance.read" },
+      { href: "/erp/expenses", label: "Expenses", icon: "expenses", needs: "finance.read" },
+    ],
+  },
+  {
+    label: "Stock and titles",
+    items: [
+      { href: "/erp/stock", label: "Stock", icon: "stock", needs: "finance.read" },
+      { href: "/erp/subscriptions", label: "Subscriptions", icon: "subs", needs: "finance.read" },
+      { href: "/erp/digital", label: "Digital editions", icon: "digital", needs: "finance.read" },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { href: "/erp/staff", label: "Staff", icon: "staff", needs: "staff.manage" },
+      { href: "/erp/audit", label: "Audit trail", icon: "audit", needs: "staff.manage" },
+      { href: "/erp/company", label: "Company profile", icon: "company", needs: "staff.manage" },
+      { href: "/admin", label: "Online store", icon: "store", needs: "admin.enter" },
+    ],
+  },
 ];
 
 export const metadata = {
@@ -76,62 +93,53 @@ export default async function ErpLayout({ children }: Readonly<{ children: React
     );
   }
 
-  const visible = nav.filter((item) => item.needs === "erp.enter" || roleCan(staff.role, item.needs));
+  const visible: NavGroup[] = groups
+    .map((g) => ({
+      label: g.label,
+      items: g.items
+        .filter((i) =>
+          i.needs === "erp.enter"
+            ? true
+            : i.needs === "admin.enter"
+              ? canEnterAdmin(staff.role)
+              : roleCan(staff.role, i.needs),
+        )
+        .map(({ href, label, icon }) => ({ href, label, icon })),
+    }))
+    .filter((g) => g.items.length > 0);
+
+  // The phone bar carries what each person reaches for between visits
+  const quick: NavItem[] = roleCan(staff.role, "crm.write")
+    ? [
+        { href: "/erp/sales", label: "Today", icon: "sales" },
+        { href: "/erp/organizations", label: "Schools", icon: "schools" },
+        { href: "/erp/visits/new", label: "Log visit", icon: "plus" },
+      ]
+    : roleCan(staff.role, "finance.read")
+      ? [
+          { href: "/erp", label: "Overview", icon: "overview" },
+          { href: "/erp/expenses", label: "Expenses", icon: "expenses" },
+          { href: "/erp/stock", label: "Stock", icon: "stock" },
+        ]
+      : [];
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-navy text-white print:hidden">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link href="/erp" className="flex items-center gap-2.5">
-            <Image
-              src="/brand/sl-logo.png"
-              alt=""
-              width={28}
-              height={28}
-              className="size-7 rounded bg-white object-contain p-0.5"
-            />
-            <span className="font-heading text-base font-bold">SLPL Back office</span>
-          </Link>
-          <nav className="ml-auto flex items-center gap-1">
-            {visible.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm ring-white/60 transition hover:ring-1"
-              >
-                <item.icon className="size-4" /> <span className="hidden sm:inline">{item.label}</span>
-              </Link>
-            ))}
-            {roleCan(staff.role, "store.manage") && (
-              <Link
-                href="/admin"
-                className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm ring-white/60 transition hover:ring-1"
-              >
-                <Store className="size-4" /> <span className="hidden sm:inline">Store</span>
-              </Link>
-            )}
-            <form action={staffSignOut}>
-              <Button variant="ghost" size="sm" className="gap-1.5 text-white hover:bg-white/10">
-                <LogOut className="size-4" />
-                <span className="hidden sm:inline">
-                  {staff.breakGlass ? "Owner" : staff.name.split(" ")[0]}
-                </span>
-              </Button>
-            </form>
-          </nav>
-        </div>
-      </header>
-
-      {staff.breakGlass && (
-        <p className="bg-saffron/20 px-4 py-2 text-center text-sm text-saffron-deep print:hidden">
-          Signed in with the shared owner password. Use a personal account so the audit trail names
-          you.
-        </p>
-      )}
-
-      <main className="mx-auto max-w-6xl px-4 py-6 print:max-w-none print:px-0 print:py-0">
-        {children}
-      </main>
-    </div>
+    <ErpShell
+      groups={visible}
+      quick={quick}
+      name={staff.breakGlass ? "Owner" : staff.name}
+      role={staff.breakGlass ? "shared password" : staff.role.toLowerCase().replace("_", " ")}
+      signOut={staffSignOut}
+      banner={
+        staff.breakGlass ? (
+          <p className="bg-saffron/20 px-4 py-2 text-center text-sm text-saffron-deep print:hidden">
+            Signed in with the shared owner password. Use a personal account so the audit trail
+            names you.
+          </p>
+        ) : null
+      }
+    >
+      {children}
+    </ErpShell>
   );
 }

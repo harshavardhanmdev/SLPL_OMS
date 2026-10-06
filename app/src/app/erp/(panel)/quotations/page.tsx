@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { FileSignature, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,9 @@ import { getStaff, roleCan } from "@/lib/staff-auth";
 export const metadata: Metadata = { title: "Quotations", robots: { index: false } };
 
 const tone: Record<string, string> = {
-  DRAFT: "bg-muted text-muted-foreground border-border",
+  DRAFT: "bg-destructive/10 text-destructive border-destructive/30",
+  PENDING_APPROVAL: "bg-saffron/15 text-saffron-deep border-saffron/40",
+  APPROVED: "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-200",
   SENT: "bg-saffron/20 text-saffron-deep border-saffron/40",
   ACCEPTED: "bg-green-100 text-green-800 border-green-300 dark:bg-green-950 dark:text-green-200",
   REJECTED: "bg-muted text-muted-foreground border-border",
@@ -21,7 +24,9 @@ const tone: Record<string, string> = {
 };
 
 const label: Record<string, string> = {
-  DRAFT: "Draft",
+  DRAFT: "Sent back",
+  PENDING_APPROVAL: "Needs approval",
+  APPROVED: "Approved",
   SENT: "Sent",
   ACCEPTED: "Accepted",
   REJECTED: "Not taken up",
@@ -33,7 +38,8 @@ const dateIN = (d: Date) =>
 
 export default async function QuotationsPage() {
   const staff = await getStaff();
-  const canWrite = staff ? roleCan(staff.role, "quotes.write") : false;
+  if (!staff || !roleCan(staff.role, "quotes.read")) redirect("/erp");
+  const canWrite = roleCan(staff.role, "quotes.write");
 
   const quotations = await db.quotation.findMany({
     orderBy: { createdAt: "desc" },
@@ -41,7 +47,9 @@ export default async function QuotationsPage() {
     include: { createdBy: { select: { name: true } }, _count: { select: { items: true } } },
   });
 
-  const open = quotations.filter((q) => ["DRAFT", "SENT"].includes(q.status));
+  const open = quotations.filter((q) =>
+    ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT"].includes(q.status),
+  );
   const won = quotations.filter((q) => q.status === "ACCEPTED");
 
   return (
@@ -64,7 +72,7 @@ export default async function QuotationsPage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          ["Open", String(open.length), "draft or awaiting a decision"],
+          ["Open", String(open.length), "not yet decided by the school"],
           ["Value out", formatINR(open.reduce((s, q) => s + q.total, 0)), "sitting with schools"],
           ["Accepted", String(won.length), "turned into orders"],
           ["Won value", formatINR(won.reduce((s, q) => s + q.total, 0)), "across all time"],

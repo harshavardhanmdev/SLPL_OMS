@@ -195,3 +195,46 @@
 .group:hover .conveyor-y-reverse {
   animation-play-state: paused;
 }
+
+/* Back office loading bar: a short saffron sweep across the top while a screen loads */
+@keyframes erp-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+/* Cards that can be tapped lift slightly, so a phone user can tell what is live */
+@layer utilities {
+  .erp-lift {
+    transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  }
+  .erp-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -12px rgb(30 42 90 / 0.35);
+  }
+  .erp-lift:active {
+    transform: translateY(0) scale(0.98);
+  }
+  /* Children appear one after another instead of all at once */
+  .erp-stagger > * {
+    animation: erp-rise 420ms ease-out both;
+  }
+  .erp-stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .erp-stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .erp-stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .erp-stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .erp-stagger > *:nth-child(6) { animation-delay: 200ms; }
+  .erp-stagger > *:nth-child(n + 7) { animation-delay: 240ms; }
+}
+@keyframes erp-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .erp-stagger > * { animation: none; }
+  .erp-lift, .erp-lift:hover, .erp-lift:active { transform: none; }
+}
+/* Progress bars fill from the left when a screen opens */
+@keyframes erp-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}

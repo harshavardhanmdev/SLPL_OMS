@@ -93,56 +93,6 @@ export async function saveVisit(input: VisitInput): Promise<Result> {
   return { ok: true, id: row.id };
 }
 
-// ── Samples ──────────────────────────────────────────────────────────────────
-
-const sampleSchema = z.object({
-  id: z.string().optional(),
-  organizationId: z.string().min(1, "Pick the school"),
-  description: z.string().trim().min(2, "What was left with them?").max(200),
-  quantity: z.number().int().min(1).max(10000),
-  issuedOn: z.string().min(1, "Pick the date"),
-  status: z.enum(["WITH_SCHOOL", "RETURNED", "CONVERTED", "WRITTEN_OFF"]),
-  returnedOn: z.string().optional().or(z.literal("")),
-  notes: z.string().trim().max(500).optional().or(z.literal("")),
-});
-
-export async function saveSample(input: z.infer<typeof sampleSchema>): Promise<Result> {
-  const denied = await requireCapability("crm.write");
-  if (denied) return { error: DENIED[denied] };
-  const staff = await getStaff();
-  if (!staff) return { error: DENIED.UNAUTHORIZED };
-
-  const parsed = sampleSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const d = parsed.data;
-
-  const data = {
-    organizationId: d.organizationId,
-    description: d.description,
-    quantity: d.quantity,
-    issuedOn: new Date(d.issuedOn),
-    status: d.status,
-    returnedOn: d.returnedOn ? new Date(d.returnedOn) : null,
-    notes: d.notes || null,
-  };
-
-  const row = d.id
-    ? await db.sampleIssue.update({ where: { id: d.id }, data })
-    : await db.sampleIssue.create({
-        data: { ...data, issuedById: staff.breakGlass ? null : staff.id, issuedEmail: staff.email },
-      });
-
-  await audit({
-    action: d.id ? "sample.update" : "sample.create",
-    entityType: "SampleIssue",
-    entityId: row.id,
-    after: { organizationId: row.organizationId, description: row.description, status: row.status },
-  });
-  revalidatePath("/erp/samples");
-  revalidatePath(`/erp/organizations/${d.organizationId}`);
-  return { ok: true, id: row.id };
-}
-
 // ── Gifts ────────────────────────────────────────────────────────────────────
 
 const giftSchema = z.object({
@@ -217,18 +167,25 @@ export async function recordReceipt(input: z.infer<typeof receiptSchema>): Promi
   const amount = Math.round(d.amount * 100);
   const receivedOn = new Date(d.receivedOn);
 
-  // Settle the oldest unpaid bills first unless specific ones were chosen
-  const candidates = await db.invoice.findMany({
-    where: {
-      organizationId: d.organizationId,
-      status: { in: ["APPROVED", "SENT"] },
-      ...(d.invoiceIds?.length ? { id: { in: d.invoiceIds } } : {}),
-    },
-    orderBy: { invoiceDate: "asc" },
-    include: { allocations: { select: { amount: true } } },
-  });
-
   const row = await db.$transaction(async (tx) => {
+    // Lock this school's bills before reading what is owed on them, so two
+    // payments recorded at the same moment queue instead of both settling the
+    // same bill and paying it twice over.
+    await tx.$queryRaw`
+      SELECT "id" FROM "Invoice" WHERE "organizationId" = ${d.organizationId} FOR UPDATE
+    `;
+
+    // Settle the oldest unpaid bills first unless specific ones were chosen
+    const candidates = await tx.invoice.findMany({
+      where: {
+        organizationId: d.organizationId,
+        status: { in: ["APPROVED", "SENT"] },
+        ...(d.invoiceIds?.length ? { id: { in: d.invoiceIds } } : {}),
+      },
+      orderBy: { invoiceDate: "asc" },
+      include: { allocations: { select: { amount: true } } },
+    });
+
     const receipt = await tx.receipt.create({
       data: {
         number: await nextReceiptNumber(tx, receivedOn),
@@ -266,9 +223,87 @@ export async function recordReceipt(input: z.infer<typeof receiptSchema>): Promi
     entityId: row.id,
     after: { number: row.number, amount: row.amount, organizationId: row.organizationId },
   });
+  revalidatePath("/erp/payments");
   revalidatePath("/erp/organizations");
   revalidatePath(`/erp/organizations/${d.organizationId}`);
   return { ok: true, id: row.id, number: row.number };
+}
+
+const voidReceiptSchema = z.object({
+  id: z.string().min(1),
+  reason: z.string().trim().min(3, "Say why it is being voided").max(300),
+});
+
+/**
+ * Takes a payment back off the books, for a bounced cheque or one recorded
+ * against the wrong school.
+ *
+ * The receipt row and its number stay, because a gap in the receipt series
+ * reads as money that went missing. What goes is the money's effect: its
+ * allocations, and the PAID status of any bill that no longer adds up.
+ */
+export async function voidReceipt(input: z.infer<typeof voidReceiptSchema>): Promise<Result> {
+  const denied = await requireCapability("finance.write");
+  if (denied) {
+    return { error: denied === "FORBIDDEN" ? "Only accounts or an owner can void a payment." : "Sign in again." };
+  }
+
+  const parsed = voidReceiptSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { id, reason } = parsed.data;
+
+  const outcome = await db.$transaction(async (tx) => {
+    // Only the first of two people voiding at once gets through; the update
+    // locks the row, so the second waits and then finds it already voided
+    const voided = await tx.receipt.updateMany({
+      where: { id, voidedAt: null },
+      data: { voidedAt: new Date(), voidReason: reason },
+    });
+    if (voided.count === 0) return null;
+
+    const receipt = await tx.receipt.findUniqueOrThrow({
+      where: { id },
+      include: { allocations: { include: { invoice: { select: { number: true } } } } },
+    });
+    await tx.receiptAllocation.deleteMany({ where: { receiptId: id } });
+
+    const touched = await tx.invoice.findMany({
+      where: { id: { in: receipt.allocations.map((a) => a.invoiceId) }, status: "PAID" },
+      include: { allocations: { select: { amount: true } } },
+    });
+    const reopened: { number: string; status: string }[] = [];
+    for (const invoice of touched) {
+      const covered = invoice.allocations.reduce((s, a) => s + a.amount, 0);
+      if (covered >= invoice.total) continue;
+      const status = invoice.sentAt ? "SENT" : "APPROVED";
+      await tx.invoice.update({ where: { id: invoice.id }, data: { status } });
+      reopened.push({ number: invoice.number, status });
+    }
+    return { receipt, reopened };
+  });
+
+  if (!outcome) return { error: "That payment is not on the books, or is already voided." };
+  const { receipt, reopened } = outcome;
+
+  await audit({
+    action: "receipt.void",
+    entityType: "Receipt",
+    entityId: receipt.id,
+    before: {
+      number: receipt.number,
+      amount: receipt.amount,
+      allocations: receipt.allocations.map((a) => ({
+        invoiceId: a.invoiceId,
+        invoice: a.invoice.number,
+        amount: a.amount,
+      })),
+    },
+    after: { voidedAt: receipt.voidedAt, voidReason: receipt.voidReason, reopened },
+  });
+  revalidatePath("/erp/payments");
+  revalidatePath("/erp/invoices");
+  revalidatePath(`/erp/organizations/${receipt.organizationId}`);
+  return { ok: true, id: receipt.id, number: receipt.number };
 }
 
 // ── Targets ──────────────────────────────────────────────────────────────────
@@ -297,7 +332,10 @@ export async function saveTarget(input: z.infer<typeof targetSchema>): Promise<R
   const d = parsed.data;
   if (d.scope === "PERSON" && !d.ownerId) return { error: "Pick whose target this is." };
 
-  const periodStart = new Date(d.periodStart);
+  // Read as a calendar date on the server's clock, the same way the sales
+  // banner works out the start of a month, so the two always meet
+  const [y, m, day] = d.periodStart.split("-").map(Number);
+  const periodStart = new Date(y, (m || 1) - 1, day || 1);
   if (Number.isNaN(periodStart.getTime())) return { error: "That period is not valid." };
 
   // Not an upsert: Postgres does not treat two NULL owners as the same row, so

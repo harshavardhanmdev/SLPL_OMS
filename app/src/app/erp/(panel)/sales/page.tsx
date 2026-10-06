@@ -11,6 +11,9 @@ import {
   Package,
   Plus,
   Receipt,
+  Tags,
+  Target,
+  Truck,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +30,7 @@ const dateIN = (d: Date) =>
 
 /**
  * Where Harish and Uday start their day: how far off target, what is overdue,
- * and five large buttons for the things they actually do.
+ * and large buttons for the things they actually do.
  */
 export default async function SalesHome() {
   const staff = await getStaff();
@@ -58,13 +61,16 @@ export default async function SalesHome() {
   ]);
 
   const actions = [
-    { href: "/erp/visits/new", label: "Log a visit", icon: CalendarClock },
-    { href: "/erp/organizations", label: "Schools", icon: Building2 },
-    { href: "/erp/quotations/new", label: "Quotation", icon: FileSignature },
-    { href: "/erp/invoices/new", label: "Invoice", icon: Receipt },
-    { href: "/erp/samples", label: "Samples", icon: Package },
-    { href: "/erp/gifts", label: "Gifts", icon: Gift },
-  ];
+    { href: "/erp/visits/new", label: "Log a visit", icon: CalendarClock, show: true },
+    { href: "/erp/organizations", label: "Schools", icon: Building2, show: true },
+    { href: "/erp/quotations/new", label: "Quotation", icon: FileSignature, show: roleCan(staff.role, "quotes.write") },
+    { href: "/erp/invoices/new", label: "Invoice", icon: Receipt, show: roleCan(staff.role, "invoices.write") },
+    { href: "/erp/samples", label: "Samples", icon: Package, show: true },
+    { href: "/erp/gifts", label: "Gifts", icon: Gift, show: true },
+    { href: "/erp/targets", label: "Targets", icon: Target, show: true },
+    { href: "/erp/prices", label: "Price list", icon: Tags, show: roleCan(staff.role, "quotes.read") },
+    { href: "/erp/challans", label: "Challans", icon: Truck, show: roleCan(staff.role, "challan.write") },
+  ].filter((a) => a.show);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -78,16 +84,12 @@ export default async function SalesHome() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {banner.mine ? (
-          <>
-            <TargetBanner pace={banner.mine.month} title="My target this month" />
-            <TargetBanner pace={banner.mine.year} title="My target this year" />
-          </>
-        ) : (
-          <TargetBanner pace={banner.company.month} title="Company this month" />
-        )}
-      </div>
+      {banner.mine && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TargetBanner pace={banner.mine.month} title="My target this month" />
+          <TargetBanner pace={banner.mine.year} title="My target this year" />
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <TargetBanner
@@ -99,17 +101,17 @@ export default async function SalesHome() {
       </div>
 
       {/* Big obvious buttons, because this is used between school visits */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="erp-stagger grid grid-cols-3 gap-3">
         {actions.map((a) => (
           <Link
             key={a.href}
             href={a.href}
-            className="flex flex-col items-center gap-2 rounded-2xl border bg-card p-5 text-center transition hover:border-saffron hover:shadow-md"
+            className="erp-lift flex flex-col items-center gap-2 rounded-2xl border bg-card p-4 text-center hover:border-saffron sm:p-5"
           >
-            <span className="flex size-12 items-center justify-center rounded-xl bg-accent text-saffron-deep">
+            <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-saffron-deep sm:size-12">
               <a.icon className="size-6" />
             </span>
-            <span className="font-medium">{a.label}</span>
+            <span className="text-sm font-medium sm:text-base">{a.label}</span>
           </Link>
         ))}
       </div>

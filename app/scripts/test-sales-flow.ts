@@ -10,7 +10,7 @@
 import "dotenv/config";
 
 import { db } from "../src/lib/db";
-import { allocateSerial, nextInvoiceNumber } from "../src/lib/number-series";
+import { allocateSerial, nextInvoiceNumber, nextQuotationNumber } from "../src/lib/number-series";
 import { documentKindFor, documentTotals, rupeesInWords } from "../src/lib/quotation-math";
 import { accountPosition } from "../src/lib/ledger";
 
@@ -22,9 +22,12 @@ function check(what: string, ok: boolean, detail = "") {
 }
 
 async function cleanup() {
+  // Invoices outlive their school (the relation sets null), so remove them by number
+  await db.invoice.deleteMany({ where: { number: { contains: `/${CODE}` } } });
   const org = await db.organization.findUnique({ where: { code: CODE } });
   if (org) await db.organization.delete({ where: { id: org.id } });
   await db.numberSeries.deleteMany({ where: { key: { contains: CODE } } });
+  await db.numberSeries.deleteMany({ where: { key: "quotation:2031-32" } });
 }
 
 async function main() {
@@ -64,6 +67,57 @@ async function main() {
     inState.igst === 0 && inState.cgst + inState.sgst === Math.round(25_000_00 * 0.18),
     `${(inState.cgst + inState.sgst) / 100}`,
   );
+
+  console.log("\nThe School Radio quotation, a discount given as money");
+  const included = Array.from({ length: 11 }, (_, i) => ({
+    description: `Included ${i}`,
+    quantity: 1,
+    unitPrice: 0,
+    gstRate: 1800,
+  }));
+  const radio = documentTotals(
+    [
+      { description: "School radio", quantity: 1, unitPrice: 1_75_000_00, discountAmount: 15_000_00, gstRate: 1800 },
+      ...included,
+    ],
+    "Telangana",
+    0,
+  );
+  check("taxable 1,60,000", radio.taxable === 1_60_000_00, String(radio.taxable / 100));
+  check("CGST @9% is 14,400", radio.cgst === 14_400_00, String(radio.cgst / 100));
+  check("SGST @9% is 14,400", radio.sgst === 14_400_00, String(radio.sgst / 100));
+  check("total 1,88,800", radio.total === 1_88_800_00, String(radio.total / 100));
+  check(
+    "words match the sample",
+    rupeesInWords(radio.total) === "One Lakh Eighty Eight Thousand Eight Hundred Rupees Only",
+    rupeesInWords(radio.total),
+  );
+
+  console.log("\nMixed rates, odd paise: the per-rate rows add up to the totals");
+  const odd = documentTotals(
+    [
+      { description: "E-book", quantity: 3, unitPrice: 333, gstRate: 500 },
+      { description: "Workshop", quantity: 1, unitPrice: 101, gstRate: 1800 },
+    ],
+    "Telangana",
+    0,
+  );
+  const rowsCgst = odd.byRate.reduce((s, r) => s + r.cgst, 0);
+  const rowsSgst = odd.byRate.reduce((s, r) => s + r.sgst, 0);
+  check("CGST rows sum to CGST", rowsCgst === odd.cgst, `${rowsCgst} vs ${odd.cgst}`);
+  check("SGST rows sum to SGST", rowsSgst === odd.sgst, `${rowsSgst} vs ${odd.sgst}`);
+  check(
+    "and the halves still add back to the tax",
+    odd.cgst + odd.sgst === odd.byRate.reduce((s, r) => s + r.tax, 0),
+  );
+
+  console.log("\nQuotation numbers under contention");
+  const qOn = new Date(2031, 5, 1);
+  const qNumbers = await Promise.all(
+    Array.from({ length: 15 }, () => db.$transaction((tx) => nextQuotationNumber(tx, qOn))),
+  );
+  check("fifteen saves gave fifteen numbers", new Set(qNumbers).size === 15);
+  check("in the financial year series", qNumbers.every((n) => n.startsWith("SLPL/Q/2031-32/")), qNumbers[0]);
 
   console.log("\nNumbering under contention");
   const org = await db.organization.create({

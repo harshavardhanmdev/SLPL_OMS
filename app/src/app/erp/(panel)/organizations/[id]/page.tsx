@@ -11,6 +11,8 @@ import {
   Package,
   Pencil,
   Receipt as ReceiptIcon,
+  Truck,
+  Wallet,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { accountPosition } from "@/lib/ledger";
 import { formatINR } from "@/lib/money";
+import { PAYMENT_MODE_LABEL } from "@/lib/payment-modes";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Organisation", robots: { index: false } };
@@ -46,6 +49,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
   if (!staff || !roleCan(staff.role, "crm.read")) redirect("/erp");
   const canManage = roleCan(staff.role, "crm.manage");
   const canWrite = roleCan(staff.role, "crm.write");
+  const canTakeMoney = roleCan(staff.role, "finance.write");
 
   const org = await db.organization.findUnique({
     where: { id },
@@ -57,6 +61,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
       receipts: { where: { voidedAt: null }, orderBy: { receivedOn: "desc" } },
       samples: { orderBy: { issuedOn: "desc" } },
       gifts: { orderBy: { givenOn: "desc" } },
+      challans: { orderBy: { dispatchedOn: "desc" }, include: { items: { select: { quantity: true } } } },
     },
   });
   if (!org) notFound();
@@ -91,11 +96,18 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
       at: r.receivedOn,
       icon: ReceiptIcon,
       title: `Received ${formatINR(r.amount)}`,
-      detail: `${r.number} · ${r.mode.toLowerCase().replace("_", " ")}${r.reference ? ` · ${r.reference}` : ""}`,
+      detail: `${r.number} · ${PAYMENT_MODE_LABEL[r.mode] ?? r.mode}${r.reference ? ` · ${r.reference}` : ""}`,
       badge: { text: "Payment", tone: "border-green-300 bg-green-100 text-green-800" },
     })),
+    ...org.challans.map((c) => ({
+      at: c.dispatchedOn,
+      icon: Truck,
+      title: `Delivery challan ${c.number}`,
+      detail: `${c.items.reduce((s, i) => s + i.quantity, 0)} items to ${c.toName}${c.vehicleNumber ? ` · ${c.vehicleNumber}` : ""}`,
+      href: `/erp/challans/${c.id}`,
+    })),
     ...org.samples.map((s) => ({
-      at: s.issuedOn,
+      at: s.givenOn ?? s.issuedOn,
       icon: Package,
       title: `Sample: ${s.description}`,
       detail: `${s.quantity} left with them · ${s.status.toLowerCase().replace("_", " ")}`,
@@ -147,6 +159,13 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
               </Link>
             </Button>
           )}
+          {canTakeMoney && (
+            <Button size="sm" variant="outline" className="gap-1.5" asChild>
+              <Link href={`/erp/payments/new?org=${org.id}`}>
+                <Wallet className="size-3.5" /> Record a payment
+              </Link>
+            </Button>
+          )}
           {canManage && (
             <Button size="sm" variant="outline" className="gap-1.5" asChild>
               <Link href={`/erp/organizations/${org.id}/edit`}>
@@ -182,7 +201,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
         <div className="border-b p-4">
           <h2 className="font-heading font-semibold">Everything that has happened</h2>
           <p className="text-sm text-muted-foreground">
-            Visits, quotations, bills, payments, samples and gifts, newest first.
+            Visits, quotations, bills, payments, challans, samples and gifts, newest first.
           </p>
         </div>
         {timeline.length === 0 ? (

@@ -78,15 +78,17 @@ export function InvoiceDecisions({
           </Link>
         </Button>
       )}
-      {canApprove && status === "PENDING_APPROVAL" && (
+      {canApprove && ["PENDING_APPROVAL", "DRAFT"].includes(status) && (
         <>
           <Button disabled={busy} onClick={() => run("APPROVED")}>
             {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             Approve
           </Button>
-          <Button variant="outline" onClick={() => setAsking(true)}>
-            Send back
-          </Button>
+          {status === "PENDING_APPROVAL" && (
+            <Button variant="outline" onClick={() => setAsking(true)}>
+              Send back
+            </Button>
+          )}
         </>
       )}
       {canWrite && status === "APPROVED" && (
@@ -94,6 +96,11 @@ export function InvoiceDecisions({
           {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
           Mark as sent
         </Button>
+      )}
+      {status === "DRAFT" && !canApprove && (
+        <span className="rounded-md border px-3 py-1.5 text-sm text-muted-foreground">
+          Sent back. Edit and save to send it to your manager again.
+        </span>
       )}
       {status === "PENDING_APPROVAL" && !canApprove && (
         <span className="rounded-md border border-saffron/40 bg-saffron/10 px-3 py-1.5 text-sm text-saffron-deep">

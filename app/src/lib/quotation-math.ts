@@ -19,6 +19,8 @@ export type QuoteLine = {
   unitPrice: number;
   /** Basis points off this line. */
   discountBp?: number;
+  /** Paise off the whole line. Wins over the percentage when set. */
+  discountAmount?: number;
   /** Basis points of GST: 0 for a printed book, 500 for an e-book, 1800 for a service. */
   gstRate: number;
 };
@@ -33,7 +35,12 @@ export type QuoteLineTotals = {
 
 export function lineTotals(line: QuoteLine): QuoteLineTotals {
   const gross = Math.max(0, Math.round(line.unitPrice * Math.max(0, line.quantity)));
-  const discount = Math.round((gross * Math.max(0, line.discountBp ?? 0)) / 10000);
+  // An amount is taken as given, because Rs 15,000 off Rs 1,75,000 is 8.5714%
+  // and no whole number of basis points lands back on Rs 15,000
+  const discount =
+    (line.discountAmount ?? 0) > 0
+      ? Math.min(gross, Math.round(line.discountAmount ?? 0))
+      : Math.round((gross * Math.max(0, line.discountBp ?? 0)) / 10000);
   const taxable = gross - discount;
   const tax = Math.round((taxable * Math.max(0, line.gstRate)) / 10000);
   return { gross, discount, taxable, tax, total: taxable + tax };
@@ -48,7 +55,7 @@ export type QuoteTotals = {
   igst: number;
   total: number;
   /** Tax split by rate, which is what a GST-registered buyer wants to see. */
-  byRate: { rate: number; taxable: number; tax: number }[];
+  byRate: { rate: number; taxable: number; tax: number; cgst: number; sgst: number }[];
   interState: boolean;
 };
 
@@ -100,9 +107,16 @@ export function documentTotals(
     rates.set(line.gstRate, bucket);
   }
 
-  // Split once on the total rather than per line, so the halves always add back
-  const cgst = interState ? 0 : Math.round(tax / 2);
-  const sgst = interState ? 0 : tax - cgst;
+  // Halve each rate's tax on its own, so the "CGST @9%" and "CGST @2.5%" rows
+  // printed on a document add up to the CGST total exactly
+  const byRate = [...rates.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([rate, v]) => {
+      const half = interState ? 0 : Math.round(v.tax / 2);
+      return { rate, ...v, cgst: half, sgst: interState ? 0 : v.tax - half };
+    });
+  const cgst = byRate.reduce((sum, r) => sum + r.cgst, 0);
+  const sgst = byRate.reduce((sum, r) => sum + r.sgst, 0);
   const igst = interState ? tax : 0;
 
   return {
@@ -113,9 +127,7 @@ export function documentTotals(
     sgst,
     igst,
     total: taxable + tax,
-    byRate: [...rates.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([rate, v]) => ({ rate, ...v })),
+    byRate,
     interState,
   };
 }

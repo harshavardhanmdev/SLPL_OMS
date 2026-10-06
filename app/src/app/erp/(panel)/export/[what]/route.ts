@@ -155,9 +155,11 @@ export async function GET(
       return csvResponse(
         `samples-${stamp}.csv`,
         toCsv(
-          ["Date", "School", "Code", "What", "Quantity", "Status", "Returned", "By", "Notes"],
-          rows.map((s) => [day(s.issuedOn), s.organization.name, s.organization.code,
-            s.description, s.quantity, s.status, day(s.returnedOn), s.issuedBy?.name, s.notes]),
+          ["Taken", "Held by", "What", "Quantity", "Status", "School", "Code", "Given",
+           "Returned", "Notes"],
+          rows.map((s) => [day(s.issuedOn), s.issuedBy?.name ?? s.issuedEmail, s.description,
+            s.quantity, s.status, s.organization?.name, s.organization?.code, day(s.givenOn),
+            day(s.returnedOn), s.notes]),
         ),
       );
     }
@@ -176,6 +178,28 @@ export async function GET(
           ["Date", "School", "Code", "What", "To", "Value", "By", "Notes"],
           rows.map((g) => [day(g.givenOn), g.organization.name, g.organization.code,
             g.description, g.givenToName, rupees(g.value), g.givenBy?.name, g.notes]),
+        ),
+      );
+    }
+
+    case "challans": {
+      const rows = await db.deliveryChallan.findMany({
+        orderBy: { dispatchedOn: "desc" },
+        include: {
+          organization: { select: { name: true } },
+          invoice: { select: { number: true } },
+          items: { orderBy: { sortOrder: "asc" } },
+        },
+      });
+      return csvResponse(
+        `challans-${stamp}.csv`,
+        toCsv(
+          ["Number", "Date", "School", "To", "Transporter", "Vehicle", "Invoice",
+           "Total quantity", "Items"],
+          rows.map((c) => [c.number, day(c.dispatchedOn), c.organization?.name, c.toName,
+            c.transporter, c.vehicleNumber, c.invoice?.number,
+            c.items.reduce((s, i) => s + i.quantity, 0),
+            c.items.map((i) => `${i.description} x ${i.quantity} ${i.unit}`).join("; ")]),
         ),
       );
     }

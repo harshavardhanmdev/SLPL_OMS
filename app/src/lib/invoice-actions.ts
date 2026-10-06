@@ -7,6 +7,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { nextInvoiceNumber } from "@/lib/number-series";
 import { documentKindFor, documentTotals, type QuoteLine } from "@/lib/quotation-math";
+import { storeProductId } from "@/lib/quoting";
 import { getStaff, requireCapability } from "@/lib/staff-auth";
 
 /**
@@ -49,6 +50,8 @@ const schema = z.object({
   terms: z.string().trim().max(2000).optional().or(z.literal("")),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
   quotationId: z.string().optional().nullable(),
+  /** The visit that won this order, marked converted when the bill is saved. */
+  visitId: z.string().optional().nullable(),
   lines: z.array(lineSchema).min(1, "Add at least one line").max(60),
 });
 
@@ -117,7 +120,7 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
     const line = lines[i];
     const t = documentTotals([line], d.placeOfSupply, billDiscountBp);
     return {
-      productId: l.productId || null,
+      productId: storeProductId(l.productId),
       description: line.description,
       hsnCode: line.hsnCode,
       unit: line.unit ?? "Nos",
@@ -131,47 +134,69 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
     };
   });
 
+  // Anything an approver raises is approved already; an executive waits
+  const canApprove = (await requireCapability("invoices.approve")) === null;
+  const approval = {
+    status: canApprove ? ("APPROVED" as const) : ("PENDING_APPROVAL" as const),
+    approvedById: canApprove && !staff.breakGlass ? staff.id : null,
+    approvedAt: canApprove ? new Date() : null,
+  };
+
+  // A visit to another school cannot claim this bill
+  const visit = d.visitId
+    ? await db.visit.findFirst({
+        where: { id: d.visitId, organizationId: org.id },
+        select: { id: true },
+      })
+    : null;
+  if (d.visitId && !visit) return { error: "That visit is not one of this school's." };
+
   if (d.id) {
     const before = await db.invoice.findUnique({ where: { id: d.id } });
     if (!before) return { error: "That invoice no longer exists." };
     if (!["DRAFT", "PENDING_APPROVAL"].includes(before.status)) {
       return { error: "This invoice has been approved. Raise a credit note or a fresh one." };
     }
+    // Saving an edit is also resubmitting it: a bill sent back to draft used
+    // to have no way back to the manager
     const row = await db.$transaction(async (tx) => {
       await tx.invoiceItem.deleteMany({ where: { invoiceId: d.id! } });
-      return tx.invoice.update({
+      const updated = await tx.invoice.update({
         where: { id: d.id! },
-        data: { ...header, items: { create: itemRows } },
+        data: { ...header, ...approval, rejectedReason: null, items: { create: itemRows } },
       });
+      if (visit) {
+        await tx.visit.update({ where: { id: visit.id }, data: { converted: true, invoiceId: updated.id } });
+      }
+      return updated;
     });
     await audit({
       action: "invoice.update",
       entityType: "Invoice",
       entityId: row.id,
-      after: { number: row.number, total: row.total, customer: row.customerName },
+      before: { status: before.status, total: before.total },
+      after: { number: row.number, status: row.status, total: row.total, customer: row.customerName },
     });
     revalidatePath("/erp/invoices");
     return { ok: true, id: row.id, number: row.number };
   }
 
-  // Anything an approver raises is approved already; an executive waits
-  const canApprove = await requireCapability("invoices.approve");
-  const status = canApprove === null ? "APPROVED" : "PENDING_APPROVAL";
-
   const row = await db.$transaction(async (tx) => {
     const number = await nextInvoiceNumber(tx, invoiceDate, d.productLine, org.code);
-    return tx.invoice.create({
+    const created = await tx.invoice.create({
       data: {
         ...header,
+        ...approval,
         number,
-        status,
-        approvedById: canApprove === null && !staff.breakGlass ? staff.id : null,
-        approvedAt: canApprove === null ? new Date() : null,
         createdById: staff.breakGlass ? null : staff.id,
         createdEmail: staff.email,
         items: { create: itemRows },
       },
     });
+    if (visit) {
+      await tx.visit.update({ where: { id: visit.id }, data: { converted: true, invoiceId: created.id } });
+    }
+    return created;
   });
 
   await audit({
@@ -217,6 +242,9 @@ export async function decideInvoice(input: z.infer<typeof decideSchema>): Promis
 
   if (decision === "REJECTED" && !reason) {
     return { error: "Say why it is being sent back, so it can be fixed." };
+  }
+  if (decision === "APPROVED" && !["DRAFT", "PENDING_APPROVAL"].includes(before.status)) {
+    return { error: "Only a bill waiting for approval can be approved." };
   }
   if (decision === "SENT" && before.status !== "APPROVED") {
     return { error: "It has to be approved before it can go out." };

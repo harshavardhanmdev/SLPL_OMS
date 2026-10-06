@@ -1,48 +1,71 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
+import QRCode from "qrcode";
 
 import { PrintButton } from "@/components/store/print-button";
 import { QuotationStatusControls } from "@/components/erp/quotation-status";
-import { getSetting } from "@/lib/catalog";
+import {
+  BankBlock,
+  DOC_BLUE,
+  DOC_MUTED,
+  DOC_NAVY,
+  DOC_RULE,
+  Letterhead,
+  SignatureBlock,
+} from "@/components/erp/letterhead";
+import { getCompany, upiPayload } from "@/lib/company";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { lineTotals, quoteTotals, ratePercent, rupeesInWords } from "@/lib/quotation-math";
-import { site } from "@/lib/site";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Quotation", robots: { index: false } };
 
-const NAVY = "#1E2A5A";
-const SAFFRON = "#F5A623";
-const MUTED = "#5a6478";
-
 const dateIN = (d: Date) =>
-  d.toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+  d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+/** 1,75,000 in the table, as the samples print it, with paise only when there are some. */
+const num = (paise: number) =>
+  new Intl.NumberFormat("en-IN", { maximumFractionDigits: paise % 100 === 0 ? 0 : 2 }).format(paise / 100);
+
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Sent back to draft",
+  PENDING_APPROVAL: "Waiting for approval",
+  APPROVED: "Approved, not yet sent",
+  SENT: "Sent to the school",
+  ACCEPTED: "Accepted by the school",
+  REJECTED: "Not taken up",
+  EXPIRED: "Expired",
+};
 
 /**
- * The quotation as the school receives it, on letterhead.
+ * The quotation as the school receives it, laid out like the owner's School
+ * Radio sample: BILL TO and SHIP TO, expiry date, a discount and a tax column
+ * that each show the percentage underneath, and a subtotal row that totals
+ * every column.
  *
- * Colours are literal hex rather than theme tokens, because this is printed
- * and must not follow the reader's dark mode.
+ * The discount and tax columns appear only when a line uses them, so a plain
+ * books quotation still reads like the simpler Cambridge sample.
  */
 export default async function QuotationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [quotation, gstin, staff] = await Promise.all([
-    db.quotation.findUnique({
-      where: { id },
-      include: { items: { orderBy: { sortOrder: "asc" } }, createdBy: { select: { name: true } } },
-    }),
-    getSetting<string>("company_gstin", ""),
-    getStaff(),
-  ]);
-  if (!quotation) notFound();
+  const staff = await getStaff();
+  if (!staff || !roleCan(staff.role, "quotes.read")) redirect("/erp");
 
-  const canWrite = staff ? roleCan(staff.role, "quotes.write") : false;
+  const quotation = await db.quotation.findUnique({
+    where: { id },
+    include: {
+      items: { orderBy: { sortOrder: "asc" } },
+      createdBy: { select: { name: true } },
+    },
+  });
+  if (!quotation) notFound();
+  const company = await getCompany();
+
   const lines = quotation.items.map((i) => ({
     description: i.description,
     hsnCode: i.hsnCode,
@@ -50,231 +73,262 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
     quantity: i.quantity,
     unitPrice: i.unitPrice,
     discountBp: i.discountBp,
+    discountAmount: i.discountAmount,
     gstRate: i.gstRate,
   }));
+  const perLine = lines.map(lineTotals);
   const totals = quoteTotals(lines, quotation.placeOfSupply);
+  const qty = lines.reduce((s, l) => s + l.quantity, 0);
+  const showDisc = perLine.some((t) => t.discount > 0);
+  const showTax = perLine.some((t) => t.tax > 0);
   const lapsed = quotation.validUntil < new Date() && quotation.status === "SENT";
 
-  const th = "px-2 py-2 text-right font-semibold";
-  const td = "px-2 py-2 text-right tabular-nums";
+  const qr =
+    company.upiId && totals.total > 0
+      ? await QRCode.toString(upiPayload(company, totals.total, quotation.number), {
+          type: "svg",
+          margin: 0,
+          errorCorrectionLevel: "M",
+        })
+      : null;
+
+  const th = "px-2 py-2.5 text-right font-semibold";
+  const td = "px-2 py-2.5 text-right align-top tabular-nums";
+  const sub = "block text-[10px] font-normal";
 
   return (
     <div className="mx-auto max-w-4xl">
-      <style>{"@media print { @page { size: A4; margin: 12mm; } }"}</style>
+      <style>{"@media print { @page { size: A4; margin: 10mm; } }"}</style>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link
-          href="/erp/quotations"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-4" /> Back to quotations
-        </Link>
+        <div>
+          <Link
+            href="/erp/quotations"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="size-4" /> Back to quotations
+          </Link>
+          <p className="mt-1 text-sm">
+            <span className="font-medium">{STATUS_LABEL[quotation.status] ?? quotation.status}</span>
+            {quotation.createdBy ? (
+              <span className="text-muted-foreground"> · raised by {quotation.createdBy.name}</span>
+            ) : null}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canWrite && (
-            <QuotationStatusControls
-              id={quotation.id}
-              number={quotation.number}
-              status={quotation.status}
-            />
-          )}
+          <QuotationStatusControls
+            id={quotation.id}
+            number={quotation.number}
+            status={quotation.status}
+            canApprove={roleCan(staff.role, "invoices.approve")}
+            canWrite={roleCan(staff.role, "quotes.write")}
+            canInvoice={roleCan(staff.role, "invoices.write")}
+          />
           <PrintButton label="Print the quotation" />
         </div>
       </div>
 
+      {quotation.rejectedReason && (
+        <p className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive print:hidden">
+          Sent back by the manager: {quotation.rejectedReason}
+        </p>
+      )}
       {lapsed && (
         <p className="mb-4 rounded-xl border border-saffron/40 bg-saffron/10 p-3 text-sm text-saffron-deep print:hidden">
           This was valid to {dateIN(quotation.validUntil)} and has passed. Raise a fresh one rather
           than letting a school hold an old price.
         </p>
       )}
-
-      <div className="bg-white p-8 text-black" style={{ color: NAVY }}>
-        <header className="flex items-start gap-4 border-b-2 pb-4" style={{ borderColor: SAFFRON }}>
-          <Image
-            src="/brand/sl-logo.png"
-            alt=""
-            width={60}
-            height={60}
-            className="size-15 object-contain"
-          />
-          <div className="flex-1">
-            <p className="font-heading text-xl font-bold">{site.company}</p>
-            <p className="text-sm">{site.contact.address}</p>
-            <p className="text-xs" style={{ color: MUTED }}>
-              {site.contact.phone} · {site.contact.email} · theslpl.in
-              {gstin ? ` · GSTIN ${gstin}` : ""}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="font-heading text-lg font-bold">QUOTATION</p>
-            <p className="font-mono text-sm">{quotation.number}</p>
-            <p className="text-xs" style={{ color: MUTED }}>
-              {dateIN(quotation.quotedOn)}
-            </p>
-          </div>
-        </header>
-
-        <section className="mt-5 flex flex-wrap justify-between gap-6 text-sm">
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase" style={{ color: MUTED }}>
-              Quotation for
-            </p>
-            <p className="font-semibold">{quotation.customerName}</p>
-            {quotation.contactPerson && <p>Kind attention: {quotation.contactPerson}</p>}
-            {quotation.addressLine && <p>{quotation.addressLine}</p>}
-            {(quotation.city || quotation.pincode) && (
-              <p>
-                {[quotation.city, quotation.state].filter(Boolean).join(", ")}
-                {quotation.pincode ? ` - ${quotation.pincode}` : ""}
-              </p>
-            )}
-            {quotation.phone && <p>{quotation.phone}</p>}
-            {quotation.email && <p>{quotation.email}</p>}
-            {quotation.gstin && <p className="mt-1">GSTIN {quotation.gstin}</p>}
-          </div>
-          <div className="text-right text-sm">
-            <p>
-              <span style={{ color: MUTED }}>Place of supply: </span>
-              {quotation.placeOfSupply}
-            </p>
-            <p>
-              <span style={{ color: MUTED }}>Valid until: </span>
-              {dateIN(quotation.validUntil)}
-            </p>
-            {quotation.createdBy && (
-              <p>
-                <span style={{ color: MUTED }}>Raised by: </span>
-                {quotation.createdBy.name}
-              </p>
-            )}
-          </div>
-        </section>
-
-        <table className="mt-5 w-full border-collapse text-sm">
-          <thead>
-            <tr style={{ backgroundColor: NAVY, color: "#ffffff" }}>
-              <th className="px-2 py-2 text-left font-semibold">#</th>
-              <th className="px-2 py-2 text-left font-semibold">Particulars</th>
-              <th className={th}>HSN</th>
-              <th className={th}>Qty</th>
-              <th className={th}>Rate</th>
-              <th className={th}>Taxable</th>
-              <th className={th}>GST</th>
-              <th className={th}>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotation.items.map((item, i) => {
-              const t = lineTotals(lines[i]);
-              return (
-                <tr key={item.id} className="border-b" style={{ borderColor: "#e3e8f2" }}>
-                  <td className="px-2 py-2">{i + 1}</td>
-                  <td className="px-2 py-2">
-                    {item.description}
-                    {item.discountBp > 0 && (
-                      <span className="block text-xs" style={{ color: MUTED }}>
-                        less {ratePercent(item.discountBp)} discount
-                      </span>
-                    )}
-                  </td>
-                  <td className={td}>{item.hsnCode ?? "-"}</td>
-                  <td className={td}>
-                    {item.quantity} {item.unit}
-                  </td>
-                  <td className={td}>{formatINR(item.unitPrice)}</td>
-                  <td className={td}>{formatINR(t.taxable)}</td>
-                  <td className={td}>
-                    {item.gstRate === 0 ? "Nil" : `${ratePercent(item.gstRate)} ${formatINR(t.tax)}`}
-                  </td>
-                  <td className={`${td} font-semibold`}>{formatINR(t.total)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <div className="mt-4 flex flex-wrap justify-end">
-          <dl className="w-full max-w-xs space-y-1 text-sm">
-            <div className="flex justify-between">
-              <dt style={{ color: MUTED }}>Taxable value</dt>
-              <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>
-            </div>
-            {totals.discount > 0 && (
-              <div className="flex justify-between">
-                <dt style={{ color: MUTED }}>Discount allowed</dt>
-                <dd className="tabular-nums">{formatINR(totals.discount)}</dd>
-              </div>
-            )}
-            {!totals.interState && totals.cgst > 0 && (
-              <>
-                <div className="flex justify-between">
-                  <dt style={{ color: MUTED }}>CGST</dt>
-                  <dd className="tabular-nums">{formatINR(totals.cgst)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt style={{ color: MUTED }}>SGST</dt>
-                  <dd className="tabular-nums">{formatINR(totals.sgst)}</dd>
-                </div>
-              </>
-            )}
-            {totals.interState && totals.igst > 0 && (
-              <div className="flex justify-between">
-                <dt style={{ color: MUTED }}>IGST</dt>
-                <dd className="tabular-nums">{formatINR(totals.igst)}</dd>
-              </div>
-            )}
-            <div
-              className="flex justify-between border-t-2 pt-2 font-heading text-base font-bold"
-              style={{ borderColor: NAVY }}
-            >
-              <dt>Total</dt>
-              <dd className="tabular-nums">{formatINR(totals.total)}</dd>
-            </div>
-          </dl>
-        </div>
-
-        <p className="mt-2 text-right text-xs" style={{ color: MUTED }}>
-          {rupeesInWords(totals.total)}
+      {quotation.status === "PENDING_APPROVAL" && (
+        <p className="mb-4 rounded-xl border border-saffron/40 bg-saffron/10 p-3 text-sm text-saffron-deep print:hidden">
+          Not approved yet, so it should not go to the school in this state.
         </p>
+      )}
 
-        {totals.byRate.some((r) => r.rate === 0) && (
-          <p className="mt-3 text-xs" style={{ color: MUTED }}>
-            Printed books are nil rated under HSN 4901.
-          </p>
-        )}
+      <div className="overflow-x-auto rounded-xl shadow-sm print:overflow-visible print:shadow-none">
+        <div className="min-w-[640px] bg-white p-7 text-black" style={{ color: DOC_NAVY }}>
+          <Letterhead company={company} docLabel="QUOTATION" />
 
-        {quotation.terms && (
-          <section className="mt-5 border-t pt-3" style={{ borderColor: "#e3e8f2" }}>
-            <p className="mb-1 text-xs font-semibold uppercase" style={{ color: MUTED }}>
-              Terms
-            </p>
-            <ul className="list-inside list-disc text-xs leading-relaxed">
-              {quotation.terms
-                .split("\n")
-                .map((t) => t.trim())
-                .filter(Boolean)
-                .map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-            </ul>
-          </section>
-        )}
+          <div
+            className="mt-3 flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-xs"
+            style={{ backgroundColor: "#ececec" }}
+          >
+            <span>
+              <b>Quotation No.:</b> {quotation.number}
+            </span>
+            <span>
+              <b>Quotation Date:</b> {dateIN(quotation.quotedOn)}
+            </span>
+            <span>
+              <b>Expiry Date:</b> {dateIN(quotation.validUntil)}
+            </span>
+          </div>
 
-        <footer
-          className="mt-8 flex items-end justify-between border-t pt-4 text-xs"
-          style={{ borderColor: "#e3e8f2", color: MUTED }}
-        >
-          <p>
-            This is a quotation and not a demand for payment.
-            <br />
-            Please quote {quotation.number} when placing an order.
-          </p>
-          <p className="text-right">
-            For {site.company}
-            <br />
-            <span className="mt-6 block">Authorised signatory</span>
-          </p>
-        </footer>
+          <div className="mt-3 grid grid-cols-2 gap-6 text-[11px]">
+            <div>
+              <p className="font-bold uppercase">Bill To</p>
+              <p className="mt-1 text-sm font-bold uppercase">{quotation.customerName}</p>
+              {quotation.contactPerson && <p>Kind attention: {quotation.contactPerson}</p>}
+              {quotation.addressLine && <p>{quotation.addressLine}</p>}
+              {(quotation.city || quotation.pincode) && (
+                <p>
+                  {[quotation.city, quotation.state].filter(Boolean).join(", ")}
+                  {quotation.pincode ? ` ${quotation.pincode}` : ""}
+                </p>
+              )}
+              {quotation.gstin && <p>GSTIN: {quotation.gstin}</p>}
+              <p className="mt-1">Place of Supply: {quotation.placeOfSupply}</p>
+            </div>
+            <div>
+              <p className="font-bold uppercase">Ship To</p>
+              <p className="mt-1 text-sm font-bold uppercase">
+                {quotation.shipToName || quotation.customerName}
+              </p>
+              {quotation.shipToAddress ? (
+                <p>{quotation.shipToAddress}</p>
+              ) : (
+                quotation.addressLine && <p>{quotation.addressLine}</p>
+              )}
+            </div>
+          </div>
+
+          <table className="mt-4 w-full border-collapse text-[11px]">
+            <thead>
+              <tr style={{ borderTop: `2px solid ${DOC_BLUE}`, borderBottom: `2px solid ${DOC_BLUE}` }}>
+                <th className="px-2 py-2.5 text-left font-semibold uppercase">
+                  {showTax || showDisc ? "Items/Services" : "Items"}
+                </th>
+                <th className={th}>QTY.</th>
+                <th className={th}>RATE</th>
+                {showDisc && <th className={th}>DISC.</th>}
+                {showTax && <th className={th}>TAX</th>}
+                <th className={th}>AMOUNT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quotation.items.map((item, i) => {
+                const t = perLine[i];
+                const discPct = t.gross > 0 ? Math.round((t.discount / t.gross) * 10000) : 0;
+                return (
+                  <tr key={item.id} style={{ borderBottom: `1px solid ${DOC_RULE}` }}>
+                    <td className="px-2 py-2.5 align-top uppercase">
+                      {item.description}
+                      {item.hsnCode && showTax && (
+                        <span className={sub} style={{ color: DOC_MUTED }}>
+                          {item.gstRate > 0 ? "SAC" : "HSN"} {item.hsnCode}
+                        </span>
+                      )}
+                    </td>
+                    <td className={`${td} whitespace-nowrap`}>
+                      {item.quantity} {item.unit.toUpperCase()}
+                    </td>
+                    <td className={td}>{num(item.unitPrice)}</td>
+                    {showDisc && (
+                      <td className={td}>
+                        {num(t.discount)}
+                        <span className={sub} style={{ color: DOC_MUTED }}>
+                          ({ratePercent(discPct)})
+                        </span>
+                      </td>
+                    )}
+                    {showTax && (
+                      <td className={td}>
+                        {num(t.tax)}
+                        <span className={sub} style={{ color: DOC_MUTED }}>
+                          ({ratePercent(t.taxable > 0 ? item.gstRate : 0)})
+                        </span>
+                      </td>
+                    )}
+                    <td className={td}>{num(t.total)}</td>
+                  </tr>
+                );
+              })}
+              <tr style={{ borderTop: `2px solid ${DOC_BLUE}`, borderBottom: `2px solid ${DOC_BLUE}` }}>
+                <td className="px-2 py-2.5 font-bold uppercase">Subtotal</td>
+                <td className={`${td} font-bold`}>{qty}</td>
+                <td className={td} />
+                {showDisc && <td className={`${td} font-bold`}>{formatINR(totals.discount)}</td>}
+                {showTax && (
+                  <td className={`${td} font-bold`}>
+                    {formatINR(totals.cgst + totals.sgst + totals.igst)}
+                  </td>
+                )}
+                <td className={`${td} font-bold`}>{formatINR(totals.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="mt-4 grid grid-cols-2 gap-6">
+            <BankBlock company={company} qrSvg={qr} />
+
+            <div className="text-[11px]">
+              <dl className="ml-auto max-w-xs space-y-1">
+                {showTax && (
+                  <div className="flex justify-between">
+                    <dt>Taxable Amount</dt>
+                    <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>
+                  </div>
+                )}
+                {totals.byRate
+                  .filter((r) => r.rate > 0)
+                  .map((r) =>
+                    totals.interState ? (
+                      <div key={r.rate} className="flex justify-between">
+                        <dt>IGST @{ratePercent(r.rate)}</dt>
+                        <dd className="tabular-nums">{formatINR(r.tax)}</dd>
+                      </div>
+                    ) : (
+                      <div key={r.rate} className="space-y-1">
+                        <div className="flex justify-between">
+                          <dt>CGST @{ratePercent(r.rate / 2)}</dt>
+                          <dd className="tabular-nums">{formatINR(r.cgst)}</dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt>SGST @{ratePercent(r.rate / 2)}</dt>
+                          <dd className="tabular-nums">{formatINR(r.sgst)}</dd>
+                        </div>
+                      </div>
+                    ),
+                  )}
+                <div
+                  className="flex justify-between border-y py-1.5 text-sm font-bold"
+                  style={{ borderColor: DOC_RULE }}
+                >
+                  <dt>Total Amount</dt>
+                  <dd className="tabular-nums">{formatINR(totals.total)}</dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-right">
+                <span className="block font-bold">Total Amount (in words)</span>
+                {rupeesInWords(totals.total).replace(/ Only$/, "")}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 items-end gap-6">
+            <div className="text-[11px]">
+              {quotation.terms && (
+                <>
+                  <p className="mb-1 font-bold uppercase">Terms and Conditions</p>
+                  <ol className="list-inside list-decimal leading-relaxed">
+                    {quotation.terms
+                      .split("\n")
+                      .map((t) => t.trim())
+                      .filter(Boolean)
+                      .map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                  </ol>
+                </>
+              )}
+              <p className="mt-2" style={{ color: DOC_MUTED }}>
+                This is a quotation, not a demand for payment. Please quote {quotation.number} when
+                placing the order.
+              </p>
+            </div>
+            <SignatureBlock company={company} />
+          </div>
+        </div>
       </div>
     </div>
   );

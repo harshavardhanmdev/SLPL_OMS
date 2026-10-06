@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveExpense } from "@/lib/expense-actions";
 import { EXPENSE_CATEGORIES, PAID_FROM } from "@/lib/expense-constants";
+import { todayLocalIso } from "@/lib/utils";
 
 const selectClass =
   "flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayLocalIso();
 
 const blank = {
   spentAt: today(),

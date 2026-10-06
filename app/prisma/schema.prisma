@@ -1025,6 +1025,9 @@ model StockMovement {
 
 enum QuotationStatus {
   DRAFT
+  /// Raised by an executive, waiting for the sales manager
+  PENDING_APPROVAL
+  APPROVED
   SENT
   ACCEPTED
   REJECTED
@@ -1051,6 +1054,11 @@ model Quotation {
   gstin         String?
   /// Decides CGST plus SGST against IGST. Our own state is Telangana.
   placeOfSupply String  @default("Telangana")
+
+  /// Where the goods go, when that is not the billing address. Blank means
+  /// the same as BILL TO.
+  shipToName    String?
+  shipToAddress String?
 
   /// All money in paise, like everything else
   subtotal Int @default(0)
@@ -1092,27 +1100,57 @@ model Quotation {
 }
 
 model QuotationItem {
-  id          String    @id @default(cuid())
-  quotationId String
-  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid())
+  quotationId    String
+  quotation      Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   /// Snapshotted, so a later price change cannot rewrite a quotation
-  productId   String?
-  description String
+  productId      String?
+  description    String
   /// 4901 for books, 9992 for services
-  hsnCode     String?
-  unit        String    @default("Nos")
-  quantity    Int       @default(1)
+  hsnCode        String?
+  unit           String    @default("Nos")
+  quantity       Int       @default(1)
   /// Printed price before discount. The rate is MRP less the discount.
-  mrp         Int?
-  unitPrice   Int
+  mrp            Int?
+  unitPrice      Int
   /// Percent in basis points, so 12.5% is 1250
-  discountBp  Int       @default(0)
+  discountBp     Int       @default(0)
+  /// A discount given as money for the whole line, in paise. Used instead of
+  /// the percentage when set, because Rs 15,000 off Rs 1,75,000 is 8.5714%
+  /// and no whole number of basis points lands on it exactly.
+  discountAmount Int       @default(0)
   /// Basis points: nil for books, 500 for an e-book, 1800 for a service
-  gstRate     Int       @default(0)
-  lineTotal   Int       @default(0)
-  sortOrder   Int       @default(0)
+  gstRate        Int       @default(0)
+  lineTotal      Int       @default(0)
+  sortOrder      Int       @default(0)
 
   @@index([quotationId])
+}
+
+/// What sales quote, kept apart from store prices on purpose: the owner was
+/// explicit that changing one must never move the other. Many entries are not
+/// store products at all, such as a UPSC full set for a grade.
+model PriceListItem {
+  id          String  @id @default(cuid())
+  /// Groups the picker and the price list screen, e.g. "Little Leaps Grade 3"
+  group       String
+  description String
+  hsnCode     String? @default("4901")
+  unit        String  @default("PCS")
+  /// Printed price, paise. Shown as MRP on an invoice.
+  mrp         Int?
+  /// What we quote, paise
+  rate        Int
+  /// Basis points: nil for books, 1800 for a service
+  gstRate     Int     @default(0)
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
+  updatedEmail String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([group, sortOrder])
 }
 
 // ─── Document numbering ───────────────────────────────────────────────────────
@@ -1478,27 +1516,36 @@ model ChallanItem {
 // ─── Samples and gifts ────────────────────────────────────────────────────────
 
 enum SampleStatus {
+  /// Taken from the office, still in the salesperson's bag
+  IN_HAND
   WITH_SCHOOL
   RETURNED
   CONVERTED
   WRITTEN_OFF
 }
 
+/// Specimen copies a salesperson carries. They are stock in someone's hands
+/// first and only sometimes end up at a school, so the school is optional and
+/// is named when the copies are actually handed over.
 model SampleIssue {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   productId   String?
   description String
   quantity    Int     @default(1)
 
+  /// Who has them: the salesperson who took them from the office
   issuedById  String?
   issuedBy    AdminUser? @relation(fields: [issuedById], references: [id], onDelete: SetNull)
   issuedEmail String
+  /// When they left the office
   issuedOn    DateTime
 
-  status     SampleStatus @default(WITH_SCHOOL)
+  status     SampleStatus @default(IN_HAND)
+  /// When they were handed to the school
+  givenOn    DateTime?
   returnedOn DateTime?
   notes      String?
 
@@ -1506,6 +1553,7 @@ model SampleIssue {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
+  @@index([issuedById, status])
   @@index([status])
 }
 

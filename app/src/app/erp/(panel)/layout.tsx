@@ -3,13 +3,17 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import {
   Boxes,
+  Building2,
   FileSignature,
+  Landmark,
   LayoutDashboard,
   LogOut,
   Monitor,
   Newspaper,
+  ReceiptText,
   ScrollText,
   Store,
+  TrendingUp,
   UsersRound,
   Wallet,
 } from "lucide-react";
@@ -26,13 +30,17 @@ import { canEnterErp, getStaff, roleCan, type Capability } from "@/lib/staff-aut
  */
 const nav: { href: string; label: string; icon: typeof Wallet; needs: Capability | "erp.enter" }[] = [
   { href: "/erp", label: "Overview", icon: LayoutDashboard, needs: "erp.enter" },
+  { href: "/erp/sales", label: "Sales", icon: TrendingUp, needs: "crm.read" },
+  { href: "/erp/organizations", label: "Schools", icon: Building2, needs: "crm.read" },
   { href: "/erp/quotations", label: "Quotations", icon: FileSignature, needs: "quotes.read" },
+  { href: "/erp/invoices", label: "Invoices", icon: ReceiptText, needs: "crm.read" },
   { href: "/erp/expenses", label: "Expenses", icon: Wallet, needs: "finance.read" },
   { href: "/erp/stock", label: "Stock", icon: Boxes, needs: "finance.read" },
   { href: "/erp/subscriptions", label: "Subs", icon: Newspaper, needs: "finance.read" },
   { href: "/erp/digital", label: "Digital", icon: Monitor, needs: "finance.read" },
   { href: "/erp/audit", label: "Audit", icon: ScrollText, needs: "staff.manage" },
   { href: "/erp/staff", label: "Staff", icon: UsersRound, needs: "staff.manage" },
+  { href: "/erp/company", label: "Company", icon: Landmark, needs: "staff.manage" },
 ];
 
 export const metadata = {

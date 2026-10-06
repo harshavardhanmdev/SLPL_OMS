@@ -340,6 +340,21 @@ const TEXT_SETTINGS = new Set([
   "grievance_officer_name",
   "grievance_officer_email",
   "grievance_officer_phone",
+  // The company profile that every printed document reads. company_gstin was
+  // read by five print pages and editable by nothing, so it could only be set
+  // by writing to the database by hand.
+  "company_gstin",
+  "company_pan",
+  "company_cin",
+  "company_tagline",
+  "company_address",
+  "company_alt_phone",
+  "bank_name",
+  "bank_account_no",
+  "bank_ifsc",
+  "bank_branch",
+  "upi_id",
+  "signature_image",
 ]);
 
 export async function saveSettings(values: Record<string, string>): Promise<Result> {

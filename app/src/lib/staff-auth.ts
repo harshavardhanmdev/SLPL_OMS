@@ -51,6 +51,13 @@ export type Capability =
   | "finance.write"
   | "quotes.read"
   | "quotes.write"
+  // The sales module: organisations, visits, samples, gifts, targets
+  | "crm.read"
+  | "crm.write"
+  | "crm.manage"
+  | "invoices.write"
+  | "invoices.approve"
+  | "challan.write"
   | "staff.manage";
 
 const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
@@ -63,6 +70,12 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "finance.write",
     "quotes.read",
     "quotes.write",
+    "crm.read",
+    "crm.write",
+    "crm.manage",
+    "invoices.write",
+    "invoices.approve",
+    "challan.write",
     "staff.manage",
   ],
   MANAGER: [
@@ -74,11 +87,42 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "finance.write",
     "quotes.read",
     "quotes.write",
+    "crm.read",
+    "crm.write",
+    "crm.manage",
+    "invoices.write",
+    "invoices.approve",
+    "challan.write",
   ],
-  ACCOUNTS: ["orders.manage", "finance.read", "finance.write", "quotes.read"],
-  // The sales manager raises quotations; the executive under him reads them
-  SALES_MANAGER: ["orders.manage", "grievances.manage", "quotes.read", "quotes.write"],
-  SALES: ["orders.manage", "grievances.manage", "quotes.read"],
+  ACCOUNTS: [
+    "orders.manage",
+    "finance.read",
+    "finance.write",
+    "quotes.read",
+    "crm.read",
+    "invoices.write",
+  ],
+  // The manager raises and approves; the executive raises and waits
+  SALES_MANAGER: [
+    "orders.manage",
+    "grievances.manage",
+    "quotes.read",
+    "quotes.write",
+    "crm.read",
+    "crm.write",
+    "crm.manage",
+    "invoices.write",
+    "invoices.approve",
+  ],
+  SALES: [
+    "orders.manage",
+    "grievances.manage",
+    "quotes.read",
+    "quotes.write",
+    "crm.read",
+    "crm.write",
+    "invoices.write",
+  ],
   WAREHOUSE: ["orders.manage", "shipments.manage"],
   SUPPORT: ["grievances.manage"],
   CA_READONLY: ["finance.read"],
@@ -96,7 +140,7 @@ export function roleCan(role: AdminRole, capability: Capability): boolean {
  * they can see money.
  */
 export function canEnterErp(role: AdminRole): boolean {
-  return ["finance.read", "quotes.read", "staff.manage"].some((c) =>
+  return ["finance.read", "quotes.read", "crm.read", "staff.manage"].some((c) =>
     roleCan(role, c as Capability),
   );
 }

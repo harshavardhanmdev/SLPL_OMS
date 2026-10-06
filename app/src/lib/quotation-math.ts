@@ -58,7 +58,26 @@ export type QuoteTotals = {
  * common mistake on an Indian quotation.
  */
 export function quoteTotals(lines: QuoteLine[], placeOfSupply: string): QuoteTotals {
+  return documentTotals(lines, placeOfSupply, 0);
+}
+
+/**
+ * The same arithmetic with a flat percentage taken off the whole bill, which
+ * is how the owner's sample invoice works: five lines at list price, then 30%
+ * off the lot.
+ *
+ * The bill discount is spread across the rate buckets in proportion to their
+ * taxable value, so a mixed bill of nil-rated books and an 18% workshop taxes
+ * each at the right rate on its own discounted share. Taking it off the total
+ * instead would quietly overcharge or undercharge the tax.
+ */
+export function documentTotals(
+  lines: QuoteLine[],
+  placeOfSupply: string,
+  billDiscountBp: number,
+): QuoteTotals {
   const interState = placeOfSupply.trim().toLowerCase() !== OUR_STATE.toLowerCase();
+  const keep = 1 - Math.min(10000, Math.max(0, billDiscountBp)) / 10000;
 
   let subtotal = 0;
   let discount = 0;
@@ -68,13 +87,16 @@ export function quoteTotals(lines: QuoteLine[], placeOfSupply: string): QuoteTot
 
   for (const line of lines) {
     const t = lineTotals(line);
+    const net = Math.round(t.taxable * keep);
+    const lineTax = Math.round((net * Math.max(0, line.gstRate)) / 10000);
+
     subtotal += t.gross;
-    discount += t.discount;
-    taxable += t.taxable;
-    tax += t.tax;
+    discount += t.discount + (t.taxable - net);
+    taxable += net;
+    tax += lineTax;
     const bucket = rates.get(line.gstRate) ?? { taxable: 0, tax: 0 };
-    bucket.taxable += t.taxable;
-    bucket.tax += t.tax;
+    bucket.taxable += net;
+    bucket.tax += lineTax;
     rates.set(line.gstRate, bucket);
   }
 
@@ -96,6 +118,15 @@ export function quoteTotals(lines: QuoteLine[], placeOfSupply: string): QuoteTot
       .map(([rate, v]) => ({ rate, ...v })),
     interState,
   };
+}
+
+/**
+ * Nil rated throughout is a Bill of Supply. One taxed line makes it a Tax
+ * Invoice. Decided from the lines rather than offered as a dropdown, because
+ * picking the wrong one is the error that surfaces in an audit years later.
+ */
+export function documentKindFor(lines: { gstRate: number }[]) {
+  return lines.some((l) => l.gstRate > 0) ? ("TAX_INVOICE" as const) : ("BILL_OF_SUPPLY" as const);
 }
 
 /** "18%" from 1800, and "12.5%" from 1250, without trailing zeros. */

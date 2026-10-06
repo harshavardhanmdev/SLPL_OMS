@@ -438,6 +438,11 @@ model ServicePage {
   externalUrl String?
   sortOrder   Int     @default(0)
   isVisible   Boolean @default(true)
+  /// Paise, so a workshop can be quoted without retyping its price
+  price       Int?
+  /// Basis points. Services are SAC 9992 at 18%, so 1800.
+  gstRate     Int     @default(1800)
+  hsnCode     String? @default("9992")
 }
 
 model EmailLog {
@@ -756,6 +761,12 @@ model AdminUser {
   auditLogs      AdminAuditLog[]
   stockMovements StockMovement[]
   quotations     Quotation[]
+  organizations  Organization[]
+  visits         Visit[]
+  invoices       Invoice[]
+  targets        SalesTarget[]
+  samplesIssued  SampleIssue[]
+  giftsGiven     Gift[]
 
   @@index([isActive])
   @@index([reportsToId])
@@ -1058,6 +1069,17 @@ model Quotation {
   /// Kept alongside the relation so the trail survives a staff row going away
   createdEmail String
 
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  /// A quotation raised by an executive waits for the sales manager
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+
+  /// Flat percentage off the whole bill, in basis points, as the samples do
+  billDiscountBp Int @default(0)
+
   sentAt    DateTime?
   decidedAt DateTime?
   createdAt DateTime  @default(now())
@@ -1080,6 +1102,8 @@ model QuotationItem {
   hsnCode     String?
   unit        String    @default("Nos")
   quantity    Int       @default(1)
+  /// Printed price before discount. The rate is MRP less the discount.
+  mrp         Int?
   unitPrice   Int
   /// Percent in basis points, so 12.5% is 1250
   discountBp  Int       @default(0)
@@ -1089,4 +1113,419 @@ model QuotationItem {
   sortOrder   Int       @default(0)
 
   @@index([quotationId])
+}
+
+// ─── Document numbering ───────────────────────────────────────────────────────
+
+/// One row per series. Allocation takes SELECT ... FOR UPDATE inside the
+/// caller's transaction, so a duplicate or a skipped statutory number is
+/// structurally impossible however many people press save at once.
+model NumberSeries {
+  key       String   @id
+  next      Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Sales and CRM ────────────────────────────────────────────────────────────
+// One organisation, one record. The owner was explicit that a new enquiry must
+// never create a second, so everything hangs off this: visits, quotations,
+// invoices, payments, samples and gifts.
+
+enum OrganizationKind {
+  SCHOOL
+  COLLEGE
+  DISTRIBUTOR
+  INSTITUTION
+  INDIVIDUAL
+}
+
+enum OrganizationStatus {
+  LEAD
+  ACTIVE
+  DORMANT
+  LOST
+}
+
+model Organization {
+  id   String           @id @default(cuid())
+  /// Three letters from the name, used in the invoice number. Cambridge -> CAM
+  code String           @unique
+  name String
+  kind OrganizationKind @default(SCHOOL)
+
+  contactPerson String?
+  designation   String?
+  phone         String?
+  email         String?
+  addressLine   String?
+  city          String?
+  state         String? @default("Telangana")
+  pincode       String?
+  gstin         String?
+
+  /// Whoever is responsible for this school
+  ownerId String?
+  owner   AdminUser? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  source String?
+  status OrganizationStatus @default(LEAD)
+  notes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visits     Visit[]
+  quotations Quotation[]
+  invoices   Invoice[]
+  receipts   Receipt[]
+  samples    SampleIssue[]
+  gifts      Gift[]
+  challans   DeliveryChallan[]
+
+  @@index([status])
+  @@index([ownerId])
+  @@index([name])
+}
+
+enum VisitKind {
+  VISIT
+  CALL
+  MEETING
+  DEMO
+  SAMPLE_DROP
+  FOLLOW_UP
+  PAYMENT_CHASE
+  NOTE
+}
+
+/// What a salesperson did, and what they will do next. The next action is not
+/// optional: the owner's rule is that nothing sits in the system saying only
+/// "Called".
+model Visit {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  byId    String?
+  by      AdminUser? @relation(fields: [byId], references: [id], onDelete: SetNull)
+  /// Kept so the trail survives a staff row going away
+  byEmail String
+
+  visitedOn DateTime
+  kind      VisitKind @default(VISIT)
+  metWith   String?
+  summary   String
+  outcome   String?
+
+  nextAction   String
+  nextActionOn DateTime
+
+  /// Set when this visit turned into money, with the invoice that proves it
+  converted Boolean  @default(false)
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, visitedOn])
+  @@index([byId, visitedOn])
+  @@index([nextActionOn])
+}
+
+enum TargetScope {
+  COMPANY
+  PERSON
+}
+
+enum TargetPeriod {
+  MONTH
+  YEAR
+}
+
+model SalesTarget {
+  id     String       @id @default(cuid())
+  scope  TargetScope
+  period TargetPeriod
+
+  /// First day of the month or of the financial year this target covers
+  periodStart DateTime
+
+  ownerId String?
+  owner   AdminUser? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  /// Paise
+  revenueTarget      Int @default(0)
+  visitTarget        Int @default(0)
+  organizationTarget Int @default(0)
+
+  setByEmail String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([scope, ownerId, period, periodStart])
+  @@index([periodStart])
+}
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
+// A bill of supply when every line is nil rated, a tax invoice the moment any
+// line carries GST. The system decides, because that is the kind of choice that
+// gets made wrong under time pressure and shows up in an audit.
+
+enum InvoiceKind {
+  BILL_OF_SUPPLY
+  TAX_INVOICE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  PAID
+  CANCELLED
+}
+
+enum ProductLine {
+  MAG
+  BOOK
+  SVC
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  /// MAG/SLPL/09-26/CAM01
+  number      String        @unique
+  kind        InvoiceKind   @default(BILL_OF_SUPPLY)
+  productLine ProductLine   @default(BOOK)
+  status      InvoiceStatus @default(DRAFT)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  /// Snapshotted, so editing a school later cannot rewrite a bill already sent
+  customerName  String
+  contactPerson String?
+  phone         String?
+  email         String?
+  addressLine   String?
+  city          String?
+  state         String?
+  pincode       String?
+  gstin         String?
+  placeOfSupply String  @default("Telangana")
+
+  invoiceDate DateTime @default(now())
+  dueDate     DateTime
+
+  subtotal       Int @default(0)
+  /// Flat percentage off the whole bill, in basis points, as the sample does
+  billDiscountBp Int @default(0)
+  discount       Int @default(0)
+  taxable        Int @default(0)
+  cgst           Int @default(0)
+  sgst           Int @default(0)
+  igst           Int @default(0)
+  total          Int @default(0)
+
+  terms String?
+  notes String?
+
+  quotationId String?
+
+  createdById  String?
+  createdBy    AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdEmail String
+
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+
+  sentAt      DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items       InvoiceItem[]
+  allocations ReceiptAllocation[]
+  visits      Visit[]
+  challans    DeliveryChallan[]
+
+  @@index([status, invoiceDate])
+  @@index([organizationId])
+}
+
+model InvoiceItem {
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  productId   String?
+  description String
+  hsnCode     String?
+  unit        String  @default("Nos")
+  quantity    Int     @default(1)
+  /// Printed price before discount. The rate is MRP less the discount.
+  mrp         Int?
+  unitPrice   Int
+  discountBp  Int     @default(0)
+  gstRate     Int     @default(0)
+  lineTotal   Int     @default(0)
+  sortOrder   Int     @default(0)
+
+  @@index([invoiceId])
+}
+
+// ─── Money in ─────────────────────────────────────────────────────────────────
+
+enum PaymentMode {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  UPI
+  CARD
+  RAZORPAY
+  OTHER
+}
+
+/// What a school actually paid. Previous and current balance on an invoice are
+/// computed from these, never typed, so they cannot drift from reality.
+model Receipt {
+  id     String @id @default(cuid())
+  /// SLPL/R/26-27/0001
+  number String @unique
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  receivedOn DateTime
+  amount     Int
+  mode       PaymentMode @default(BANK_TRANSFER)
+  reference  String?
+  notes      String?
+
+  recordedEmail String
+  createdAt     DateTime @default(now())
+
+  /// Voided, never deleted, so a receipt number is never missing
+  voidedAt   DateTime?
+  voidReason String?
+
+  allocations ReceiptAllocation[]
+
+  @@index([organizationId, receivedOn])
+}
+
+model ReceiptAllocation {
+  id        String  @id @default(cuid())
+  receiptId String
+  receipt   Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Int
+
+  @@unique([receiptId, invoiceId])
+  @@index([invoiceId])
+}
+
+// ─── Dispatch ─────────────────────────────────────────────────────────────────
+
+/// What travels with the goods. Deliberately NOT an e-way bill: that is issued
+/// by the NIC portal and nothing we print is one, which the document says in
+/// its own footer so nobody in the warehouse mistakes it.
+model DeliveryChallan {
+  id     String @id @default(cuid())
+  /// SLPL/DC/26-27/0001
+  number String @unique
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  invoiceId      String?
+  invoice        Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  dispatchedOn DateTime
+
+  fromAddress String
+  toName      String
+  toAddress   String
+
+  /// Blank at raise time, because the vehicle is not known until it arrives
+  transporter   String?
+  vehicleNumber String?
+
+  notes String?
+
+  recordedEmail String
+  createdAt     DateTime @default(now())
+
+  items ChallanItem[]
+
+  @@index([dispatchedOn])
+}
+
+model ChallanItem {
+  id          String          @id @default(cuid())
+  challanId   String
+  challan     DeliveryChallan @relation(fields: [challanId], references: [id], onDelete: Cascade)
+  description String
+  unit        String          @default("Nos")
+  quantity    Int             @default(1)
+  sortOrder   Int             @default(0)
+
+  @@index([challanId])
+}
+
+// ─── Samples and gifts ────────────────────────────────────────────────────────
+
+enum SampleStatus {
+  WITH_SCHOOL
+  RETURNED
+  CONVERTED
+  WRITTEN_OFF
+}
+
+model SampleIssue {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId   String?
+  description String
+  quantity    Int     @default(1)
+
+  issuedById  String?
+  issuedBy    AdminUser? @relation(fields: [issuedById], references: [id], onDelete: SetNull)
+  issuedEmail String
+  issuedOn    DateTime
+
+  status     SampleStatus @default(WITH_SCHOOL)
+  returnedOn DateTime?
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+model Gift {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  description String
+  /// Paise, so the spend can be totalled against a school
+  value       Int?
+  givenToName String?
+
+  givenById  String?
+  givenBy    AdminUser? @relation(fields: [givenById], references: [id], onDelete: SetNull)
+  givenEmail String
+  givenOn    DateTime
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
 }

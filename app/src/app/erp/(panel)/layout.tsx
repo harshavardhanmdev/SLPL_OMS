@@ -3,6 +3,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import {
   Boxes,
+  FileSignature,
   LayoutDashboard,
   LogOut,
   Monitor,
@@ -16,15 +17,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
 import { staffSignOut } from "@/lib/staff-actions";
-import { getStaff, roleCan, type Capability } from "@/lib/staff-auth";
+import { canEnterErp, getStaff, roleCan, type Capability } from "@/lib/staff-auth";
 
 /**
  * The back office, gated per person and per capability. A screen asks what it
  * needs rather than naming roles, so adding a role later does not mean hunting
  * through pages.
  */
-const nav: { href: string; label: string; icon: typeof Wallet; needs: Capability }[] = [
-  { href: "/erp", label: "Overview", icon: LayoutDashboard, needs: "finance.read" },
+const nav: { href: string; label: string; icon: typeof Wallet; needs: Capability | "erp.enter" }[] = [
+  { href: "/erp", label: "Overview", icon: LayoutDashboard, needs: "erp.enter" },
+  { href: "/erp/quotations", label: "Quotations", icon: FileSignature, needs: "quotes.read" },
   { href: "/erp/expenses", label: "Expenses", icon: Wallet, needs: "finance.read" },
   { href: "/erp/stock", label: "Stock", icon: Boxes, needs: "finance.read" },
   { href: "/erp/subscriptions", label: "Subs", icon: Newspaper, needs: "finance.read" },
@@ -45,16 +47,16 @@ export default async function ErpLayout({ children }: Readonly<{ children: React
     const quick = (await isRememberedDevice()) && (await hasPin());
     redirect(quick ? "/erp/unlock?next=/erp/expenses" : "/erp/signin?next=/erp");
   }
-  // The back office is the money side, so a role without finance access is told
-  // so plainly rather than bounced to a login it cannot pass.
-  if (!roleCan(staff.role, "finance.read")) {
+  // Sales live here too now, so the gate asks whether they have any business in
+  // the back office at all rather than whether they can see money.
+  if (!canEnterErp(staff.role)) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="max-w-sm rounded-2xl border bg-card p-6 text-center">
           <h1 className="font-heading text-lg font-bold">No access to the back office</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            You are signed in as {staff.name}, {staff.role.toLowerCase().replace("_", " ")}. This
-            area is for finance. Ask an owner if you need it.
+            You are signed in as {staff.name}, {staff.role.toLowerCase().replace("_", " ")}. Ask an
+            owner if you need this.
           </p>
           <form action={staffSignOut} className="mt-4">
             <Button variant="outline" className="w-full gap-2">
@@ -66,7 +68,7 @@ export default async function ErpLayout({ children }: Readonly<{ children: React
     );
   }
 
-  const visible = nav.filter((item) => roleCan(staff.role, item.needs));
+  const visible = nav.filter((item) => item.needs === "erp.enter" || roleCan(staff.role, item.needs));
 
   return (
     <div className="min-h-screen bg-background">

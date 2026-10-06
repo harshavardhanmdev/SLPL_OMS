@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 import { audit } from "@/lib/audit";
-import { clientIp, isLockedOut, recordLoginResult } from "@/lib/admin-auth";
+import { clientIp, destroyAdminSession, isLockedOut, recordLoginResult } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { getStaff, requireCapability, signIn, signOut, type AdminRole } from "@/lib/staff-auth";
 
@@ -29,11 +30,17 @@ export async function staffSignIn(
 export async function staffSignOut(): Promise<void> {
   await audit({ action: "staff.signout" });
   await signOut();
+  // A break-glass session is held by the shared admin cookie, not the staff
+  // one, so clearing only the staff cookie left the owner signed in and the
+  // button looking broken.
+  await destroyAdminSession();
+  redirect("/erp/signin");
 }
 
 const ROLES: AdminRole[] = [
   "OWNER",
   "MANAGER",
+  "SALES_MANAGER",
   "SALES",
   "WAREHOUSE",
   "ACCOUNTS",
@@ -46,6 +53,9 @@ const staffSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
   name: z.string().trim().min(2, "Enter their name").max(80),
   role: z.string().min(1),
+  phone: z.string().trim().max(20).optional().or(z.literal("")),
+  /** Who they report to, so a sales team has a shape the screens can follow. */
+  reportsToId: z.string().optional().nullable(),
   password: z.string().min(8, "Password must be at least 8 characters").optional().or(z.literal("")),
   isActive: z.boolean(),
 });
@@ -69,10 +79,15 @@ export async function saveStaff(input: StaffInput): Promise<Result> {
   if (!d.id && !d.password) return { error: "Set a password for the new account." };
 
   const before = d.id ? await db.adminUser.findUnique({ where: { id: d.id } }) : null;
+  // Nobody reports to themselves, which would make the tree a loop
+  const reportsToId = d.reportsToId && d.reportsToId !== d.id ? d.reportsToId : null;
+
   const data = {
     email: d.email,
     name: d.name,
     role: d.role as never,
+    phone: d.phone || null,
+    reportsToId,
     isActive: d.isActive,
     ...(d.password ? { passwordHash: bcrypt.hashSync(d.password, 10) } : {}),
   };

@@ -725,7 +725,8 @@ model Expense {
 enum AdminRole {
   OWNER // everything, including staff management
   MANAGER // everything except staff management
-  SALES // orders, customers, catalog (read)
+  SALES_MANAGER // runs the sales team, raises and approves quotations
+  SALES // orders, customers, quotations (read)
   WAREHOUSE // shipments and stock
   ACCOUNTS // finance, plus read access to what it bills
   CA_READONLY // external auditor: reads finance, changes nothing
@@ -745,11 +746,19 @@ model AdminUser {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  phone       String?
+  /// Who they report to, so a sales team has a shape the screens can follow
+  reportsToId String?
+  reportsTo   AdminUser?  @relation("reports", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports     AdminUser[] @relation("reports")
+
   sessions       AdminSession[]
   auditLogs      AdminAuditLog[]
   stockMovements StockMovement[]
+  quotations     Quotation[]
 
   @@index([isActive])
+  @@index([reportsToId])
 }
 
 model AdminSession {
@@ -996,4 +1005,88 @@ model StockMovement {
 
   @@index([movedAt])
   @@index([label, movedAt])
+}
+
+// ─── Quotations ───────────────────────────────────────────────────────────────
+// What sales sends a school before an order exists. Everything about the buyer
+// is snapshotted, because a quotation already in someone's inbox must not
+// change when the customer record is later edited.
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model Quotation {
+  id     String          @id @default(cuid())
+  /// SLPL/Q/26-27/0001, continuous within a financial year
+  number String          @unique
+  status QuotationStatus @default(DRAFT)
+
+  quotedOn   DateTime @default(now())
+  validUntil DateTime
+
+  customerName  String
+  contactPerson String?
+  phone         String?
+  email         String?
+  addressLine   String?
+  city          String?
+  state         String?
+  pincode       String?
+  gstin         String?
+  /// Decides CGST plus SGST against IGST. Our own state is Telangana.
+  placeOfSupply String  @default("Telangana")
+
+  /// All money in paise, like everything else
+  subtotal Int @default(0)
+  discount Int @default(0)
+  taxable  Int @default(0)
+  cgst     Int @default(0)
+  sgst     Int @default(0)
+  igst     Int @default(0)
+  total    Int @default(0)
+
+  terms String?
+  notes String?
+
+  createdById  String?
+  createdBy    AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  /// Kept alongside the relation so the trail survives a staff row going away
+  createdEmail String
+
+  sentAt    DateTime?
+  decidedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  items QuotationItem[]
+
+  @@index([status, quotedOn])
+  @@index([customerName])
+}
+
+model QuotationItem {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  /// Snapshotted, so a later price change cannot rewrite a quotation
+  productId   String?
+  description String
+  /// 4901 for books, 9992 for services
+  hsnCode     String?
+  unit        String    @default("Nos")
+  quantity    Int       @default(1)
+  unitPrice   Int
+  /// Percent in basis points, so 12.5% is 1250
+  discountBp  Int       @default(0)
+  /// Basis points: nil for books, 500 for an e-book, 1800 for a service
+  gstRate     Int       @default(0)
+  lineTotal   Int       @default(0)
+  sortOrder   Int       @default(0)
+
+  @@index([quotationId])
 }

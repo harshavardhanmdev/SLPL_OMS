@@ -19,6 +19,7 @@ import { isAdmin } from "@/lib/admin-auth";
 export type AdminRole =
   | "OWNER"
   | "MANAGER"
+  | "SALES_MANAGER"
   | "SALES"
   | "WAREHOUSE"
   | "ACCOUNTS"
@@ -48,6 +49,8 @@ export type Capability =
   | "grievances.manage"
   | "finance.read"
   | "finance.write"
+  | "quotes.read"
+  | "quotes.write"
   | "staff.manage";
 
 const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
@@ -58,6 +61,8 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "grievances.manage",
     "finance.read",
     "finance.write",
+    "quotes.read",
+    "quotes.write",
     "staff.manage",
   ],
   MANAGER: [
@@ -67,9 +72,13 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "grievances.manage",
     "finance.read",
     "finance.write",
+    "quotes.read",
+    "quotes.write",
   ],
-  ACCOUNTS: ["orders.manage", "finance.read", "finance.write"],
-  SALES: ["orders.manage", "grievances.manage"],
+  ACCOUNTS: ["orders.manage", "finance.read", "finance.write", "quotes.read"],
+  // The sales manager raises quotations; the executive under him reads them
+  SALES_MANAGER: ["orders.manage", "grievances.manage", "quotes.read", "quotes.write"],
+  SALES: ["orders.manage", "grievances.manage", "quotes.read"],
   WAREHOUSE: ["orders.manage", "shipments.manage"],
   SUPPORT: ["grievances.manage"],
   CA_READONLY: ["finance.read"],
@@ -77,6 +86,19 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
 
 export function roleCan(role: AdminRole, capability: Capability): boolean {
   return ROLE_CAPABILITIES[role]?.includes(capability) ?? false;
+}
+
+/**
+ * Whether this role has any business in the back office at all.
+ *
+ * It used to ask for finance.read, which kept sales out entirely. Sales work
+ * here now, so the question is whether there is a screen for them, not whether
+ * they can see money.
+ */
+export function canEnterErp(role: AdminRole): boolean {
+  return ["finance.read", "quotes.read", "staff.manage"].some((c) =>
+    roleCan(role, c as Capability),
+  );
 }
 
 // ── Sessions ─────────────────────────────────────────────────────────────────

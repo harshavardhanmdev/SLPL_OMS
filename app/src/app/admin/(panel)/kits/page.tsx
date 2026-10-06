@@ -9,6 +9,7 @@ import { KitPurchaseActions } from "@/components/admin/kit-purchase-actions";
 import { db } from "@/lib/db";
 import { KIT_STATUS_META, currentAcademicYear } from "@/lib/kits";
 import { formatINR } from "@/lib/money";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 const badgeTone: Record<string, string> = {
   amber: "bg-saffron/20 text-saffron-deep border-saffron/40",
@@ -26,6 +27,9 @@ export default async function AdminKitsPage({
 }: {
   searchParams: Promise<{ school?: string }>;
 }) {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const { school: schoolFilter } = await searchParams;
   const year = currentAcademicYear();
 

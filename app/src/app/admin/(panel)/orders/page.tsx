@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { OrderStatus } from "@/generated/prisma/enums";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Orders", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -22,6 +23,9 @@ const filters = [
 type Props = { searchParams: Promise<{ f?: string }> };
 
 export default async function AdminOrdersPage({ searchParams }: Props) {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("orders.manage");
   const { f = "action" } = await searchParams;
 
   const where =

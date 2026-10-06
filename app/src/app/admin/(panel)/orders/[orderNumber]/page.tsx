@@ -13,6 +13,7 @@ import { DEFAULT_TRACKING_URL } from "@/lib/site";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { isShiprocketConfigured } from "@/lib/shipping/shiprocket";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Order", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -20,6 +21,9 @@ export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ orderNumber: string }> };
 
 export default async function AdminOrderDetailPage({ params }: Props) {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("orders.manage");
   const { orderNumber } = await params;
   const order = await db.order.findUnique({
     where: { orderNumber },

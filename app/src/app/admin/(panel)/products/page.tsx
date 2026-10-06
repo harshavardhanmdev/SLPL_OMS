@@ -9,11 +9,15 @@ import { VisibilityToggle } from "@/components/admin/visibility-toggle";
 import { ProductRowActions } from "@/components/admin/product-row-actions";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Products", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AdminProductsPage() {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const products = await db.product.findMany({
     orderBy: [{ category: { sortOrder: "asc" } }, { gradeLabel: "asc" }, { title: "asc" }],
     include: { category: { select: { name: true } } },

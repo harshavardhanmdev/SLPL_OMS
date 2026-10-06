@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 
 import { ServiceEditor, type ServiceRow } from "@/components/admin/service-editor";
 import { db } from "@/lib/db";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Services", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AdminServicesPage() {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const services = await db.servicePage.findMany({ orderBy: { sortOrder: "asc" } });
 
   const rows: ServiceRow[] = services.map((s) => ({

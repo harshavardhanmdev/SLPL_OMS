@@ -16,6 +16,7 @@ import {
   toneClass,
 } from "@/lib/grievances";
 import { formatINR } from "@/lib/money";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Grievance", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -26,6 +27,9 @@ const dateIN = (d: Date) =>
   d.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 
 export default async function AdminGrievanceDetailPage({ params }: Props) {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("grievances.manage");
   const { ticketNumber } = await params;
 
   const g = await db.grievance.findUnique({

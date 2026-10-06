@@ -3,17 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { isAdmin } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { hashPin } from "@/lib/kit-staff-auth";
 import { currentAcademicYear } from "@/lib/kits";
+import { requireCapability } from "@/lib/staff-auth";
 
 /** Admin side of school kits: schools, kit configuration, rosters, handover. */
 
 type Result = { ok?: boolean; error?: string; id?: string };
 
+// School kits are store setup, so they sit with whoever runs the store
 async function ensureAdmin(): Promise<string | null> {
-  return (await isAdmin()) ? null : "UNAUTHORIZED";
+  return requireCapability("store.manage");
 }
 
 // ── Schools ──────────────────────────────────────────────────────────────────

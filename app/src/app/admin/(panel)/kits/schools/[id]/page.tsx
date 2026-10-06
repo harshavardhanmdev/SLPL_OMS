@@ -12,10 +12,14 @@ import { RosterPanel } from "@/components/admin/roster-panel";
 import { db } from "@/lib/db";
 import { currentAcademicYear } from "@/lib/kits";
 import { formatINR } from "@/lib/money";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function AdminSchoolPage({ params }: Props) {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const { id } = await params;
 
   const school = await db.school.findUnique({

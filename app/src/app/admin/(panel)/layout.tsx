@@ -15,30 +15,40 @@ import {
   Ticket,
   Truck,
   UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 
-import { isAdmin } from "@/lib/admin-auth";
+import { getStaff } from "@/lib/staff-auth";
+import { ADMIN_SECTIONS, adminSectionsFor } from "@/lib/admin-gate";
 import { adminLogout } from "@/lib/admin-actions";
 import { Button } from "@/components/ui/button";
 
-const nav = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/orders", label: "Orders", icon: Package },
-  { href: "/admin/shipments", label: "Shipments", icon: Truck },
-  { href: "/admin/grievances", label: "Grievances", icon: MessageSquareWarning },
-  { href: "/admin/kits", label: "School kits", icon: Backpack },
-  { href: "/admin/products", label: "Products", icon: Boxes },
-  { href: "/admin/users", label: "Customers", icon: UsersRound },
-  { href: "/admin/coupons", label: "Coupons", icon: Ticket },
-  { href: "/admin/sales", label: "Festival sales", icon: BadgePercent },
-  { href: "/admin/services", label: "Services", icon: Radio },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
-] as const;
+const icons: Record<(typeof ADMIN_SECTIONS)[number]["href"], LucideIcon> = {
+  "/admin/orders": Package,
+  "/admin/shipments": Truck,
+  "/admin/grievances": MessageSquareWarning,
+  "/admin/kits": Backpack,
+  "/admin/products": Boxes,
+  "/admin/users": UsersRound,
+  "/admin/coupons": Ticket,
+  "/admin/sales": BadgePercent,
+  "/admin/services": Radio,
+  "/admin/settings": Settings,
+};
 
 export default async function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  if (!(await isAdmin())) redirect("/admin/login");
+  const staff = await getStaff();
+  if (!staff) redirect("/admin/login");
+  // Each person sees only the sections their role can work in. Someone with
+  // none at all, a CA say, has no business here.
+  const sections = adminSectionsFor(staff.role);
+  if (sections.length === 0) redirect("/admin/login");
+  const nav = [
+    { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+    ...sections.map((s) => ({ href: s.href, label: s.label, icon: icons[s.href] })),
+  ];
 
   return (
     <div className="flex min-h-screen">

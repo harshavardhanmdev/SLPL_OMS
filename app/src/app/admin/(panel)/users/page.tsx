@@ -3,6 +3,7 @@ import { UsersRound } from "lucide-react";
 
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Customers", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 const PAID = ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"] as const;
 
 export default async function AdminUsersPage() {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const users = await db.user.findMany({
     orderBy: { createdAt: "desc" },
     take: 200,

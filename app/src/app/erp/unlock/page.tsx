@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { PinPad } from "@/components/erp/pin-pad";
 import { isAdmin } from "@/lib/admin-auth";
 import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
+import { safeRelativePath } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Unlock", robots: { index: false } };
 
@@ -15,7 +16,7 @@ export default async function UnlockPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  const safeNext = next && /^\/[^/\\]/.test(next) ? next : "/erp/expenses";
+  const safeNext = safeRelativePath(next, "/erp/expenses");
 
   if (await isAdmin()) redirect(safeNext);
   // No trusted device or no PIN set means the password is the only way in

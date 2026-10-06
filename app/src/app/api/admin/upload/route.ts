@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import sharp from "sharp";
 
-import { isAdmin } from "@/lib/admin-auth";
+import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
 
@@ -19,7 +19,8 @@ const MAX_PDF_BYTES = 30 * 1024 * 1024;
  * /media/[...file].
  */
 export async function POST(request: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const staff = await getStaff();
+  if (!staff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
@@ -27,10 +28,20 @@ export async function POST(request: Request) {
   if (!(file instanceof File) || (kind !== "image" && kind !== "pdf" && kind !== "receipt")) {
     return NextResponse.json({ error: "Send multipart form-data with file + kind" }, { status: 400 });
   }
+  // Anyone on staff may photograph a receipt or a courier slip. Public images
+  // and PDFs end up on the store or on documents, so they need the store or,
+  // for the company signature, the owner.
+  if (
+    kind !== "receipt" &&
+    !roleCan(staff.role, "store.manage") &&
+    !roleCan(staff.role, "staff.manage")
+  ) {
+    return NextResponse.json({ error: "Your role cannot upload this." }, { status: 403 });
+  }
 
   const buffer = Buffer.from(await file.arrayBuffer());
   await mkdir(UPLOADS_DIR, { recursive: true });
-  // "receipt-" prefixed files are served only to admins (courier slips carry addresses)
+  // "receipt-" prefixed files are served only to staff (courier slips carry addresses)
   const stamp = `${kind === "receipt" ? "receipt-" : ""}${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
 
   if (kind === "image" || kind === "receipt") {

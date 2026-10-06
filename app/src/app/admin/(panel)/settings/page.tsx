@@ -3,11 +3,15 @@ import type { Metadata } from "next";
 import { SettingsForm, type SettingsValues } from "@/components/admin/settings-form";
 import { getSetting } from "@/lib/catalog";
 import { DEFAULT_TRACKING_URL, site } from "@/lib/site";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Settings", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const initial: SettingsValues = {
     cod_max_order_value: await getSetting("cod_max_order_value", 150000),
     bulk_otp_threshold: await getSetting("bulk_otp_threshold", 500000),

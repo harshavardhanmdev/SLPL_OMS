@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { SaleEditor, type SaleRow } from "@/components/admin/sale-editor";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Festival sales", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ export const dynamic = "force-dynamic";
 const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
 export default async function AdminSalesPage() {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const [sales, categories] = await Promise.all([
     db.saleEvent.findMany({ orderBy: { startsAt: "desc" } }),
     db.category.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),

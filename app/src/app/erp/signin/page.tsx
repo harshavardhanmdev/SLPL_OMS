@@ -6,6 +6,7 @@ import Image from "next/image";
 
 import { StaffSignInForm } from "@/components/erp/staff-signin-form";
 import { getStaff } from "@/lib/staff-auth";
+import { safeRelativePath } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Staff sign in", robots: { index: false } };
 
@@ -15,7 +16,7 @@ export default async function StaffSignInPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  const safeNext = next && /^\/[^/\\]/.test(next) ? next : "/erp";
+  const safeNext = safeRelativePath(next, "/erp");
   if (await getStaff()) redirect(safeNext);
 
   return (

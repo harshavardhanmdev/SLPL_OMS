@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { isAdmin } from "@/lib/admin-auth";
+import { canEnterAdmin } from "@/lib/admin-gate";
+import { getStaff } from "@/lib/staff-auth";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
+import { safeRelativePath } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin login", robots: { index: false } };
 
@@ -14,8 +18,12 @@ export default async function AdminLoginPage({
 }) {
   const { next } = await searchParams;
   // Relative paths only; a full URL here would be an open redirect
-  const safeNext = next && /^\/[^/\\]/.test(next) ? next : undefined;
+  const safeNext = safeRelativePath(next, "") || undefined;
   if (await isAdmin()) redirect(safeNext ?? "/admin");
+  // Already signed in with their own account. Straight to the dashboard, not
+  // to `next`, which may be a back office page their role cannot open.
+  const staff = await getStaff();
+  if (staff && canEnterAdmin(staff.role)) redirect("/admin");
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-secondary via-background to-accent/40 px-4 dark:from-card dark:via-background dark:to-card">
@@ -32,6 +40,11 @@ export default async function AdminLoginPage({
           <p className="text-sm text-muted-foreground">Enter the store password to continue.</p>
         </div>
         <AdminLoginForm next={safeNext} />
+        <p className="mt-4 text-center text-sm">
+          <Link href="/erp/signin?next=/admin" className="text-muted-foreground hover:underline">
+            Staff? Sign in with your own account
+          </Link>
+        </p>
       </div>
     </div>
   );

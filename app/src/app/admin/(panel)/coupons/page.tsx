@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { CouponEditor, type CouponRow } from "@/components/admin/coupon-editor";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Coupons", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -12,6 +13,9 @@ const toLocal = (d: Date | null) =>
   d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : null;
 
 export default async function AdminCouponsPage() {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const coupons = await db.coupon.findMany({ orderBy: { createdAt: "desc" } });
 
   const rows: CouponRow[] = coupons.map((c) => ({

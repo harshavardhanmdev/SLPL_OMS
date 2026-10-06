@@ -4,7 +4,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 
-import { isAdmin } from "@/lib/admin-auth";
+import { getStaff } from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
 
@@ -33,8 +33,9 @@ export async function GET(
   const type = TYPES[ext];
   if (!type) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Courier receipt photos carry customer addresses - admin eyes only
-  if (name.startsWith("receipt-") && !(await isAdmin())) {
+  // Courier slips carry customer addresses and expense receipts carry money,
+  // so staff eyes only. Any staff session, since whoever uploaded must see it.
+  if (name.startsWith("receipt-") && !(await getStaff())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

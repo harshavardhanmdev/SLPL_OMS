@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { createSession, destroySession, hashPassword, verifyPassword } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { safeRelativePath } from "@/lib/utils";
 
 async function ipKey(scope: string): Promise<string> {
   const h = await headers();
@@ -18,8 +19,7 @@ export type AuthFormState = { error?: string };
 
 /** Only allow same-site relative targets for post-auth redirects. */
 function safeNext(raw: FormDataEntryValue | null, fallback: string): string {
-  const next = typeof raw === "string" ? raw : "";
-  return next.startsWith("/") && !next.startsWith("//") ? next : fallback;
+  return safeRelativePath(raw, fallback);
 }
 
 const signupSchema = z.object({

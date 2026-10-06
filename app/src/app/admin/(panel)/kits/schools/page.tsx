@@ -6,8 +6,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SchoolForm } from "@/components/admin/school-form";
 import { db } from "@/lib/db";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export default async function AdminSchoolsPage() {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const schools = await db.school.findMany({
     orderBy: { name: "asc" },
     select: {

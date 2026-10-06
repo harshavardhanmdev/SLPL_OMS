@@ -9,6 +9,7 @@ import { DEFAULT_TRACKING_URL } from "@/lib/site";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { isShiprocketConfigured } from "@/lib/shipping/shiprocket";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Shipments", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -54,9 +55,17 @@ const STAGES: Stage[] = [
 
 const daysAgo = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86400000);
 
+/** Computed outside render, which the purity rule asks for. */
+function aWeekAgo(): Date {
+  return new Date(Date.now() - 7 * 86400000);
+}
+
 export default async function AdminShipmentsPage() {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("shipments.manage");
   const activeStatuses = STAGES.flatMap((s) => s.statuses);
-  const weekAgo = new Date(Date.now() - 7 * 86400000);
+  const weekAgo = aWeekAgo();
 
   const [active, delivered, trackingUrlDefault] = await Promise.all([
     db.order.findMany({

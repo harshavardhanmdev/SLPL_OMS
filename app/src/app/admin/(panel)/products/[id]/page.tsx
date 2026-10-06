@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { ProductForm, type ProductFormValue } from "@/components/admin/product-form";
 import { db } from "@/lib/db";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Edit product", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -13,6 +14,9 @@ const toLocalInput = (d: Date | null) =>
   d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : null;
 
 export default async function AdminProductEditPage({ params }: Props) {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("store.manage");
   const { id } = await params;
   const [categories, memberOptions] = await Promise.all([
     db.category.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),

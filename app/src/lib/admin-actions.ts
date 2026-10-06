@@ -8,10 +8,10 @@ import {
   clientIp,
   createAdminSession,
   destroyAdminSession,
-  isAdmin,
   isLockedOut,
   recordLoginResult,
 } from "@/lib/admin-auth";
+import { getStaff, roleCan, signOut, type Capability } from "@/lib/staff-auth";
 import { db } from "@/lib/db";
 import { hasCollectedKit, markOrderPaid, restockOrder } from "@/lib/orders";
 import { refreshBundleStock, refreshBundleStockNow } from "@/lib/stock";
@@ -20,6 +20,7 @@ import { createShipmentForOrder, isShiprocketConfigured } from "@/lib/shipping/s
 import { isRazorpayConfigured, refundPayment } from "@/lib/razorpay";
 import { renderEmail, sendEmail } from "@/lib/email";
 import { formatINR } from "@/lib/money";
+import { safeRelativePath } from "@/lib/utils";
 
 // ── Login / logout ───────────────────────────────────────────────────────────
 
@@ -42,16 +43,25 @@ export async function adminLogin(
   // their phone is not dumped on the store dashboard. Relative paths only: a
   // full URL here would be an open redirect.
   const next = String(formData.get("next") ?? "");
-  redirect(/^\/[^/\\]/.test(next) ? next : "/admin");
+  redirect(safeRelativePath(next, "/admin"));
 }
 
 export async function adminLogout(): Promise<void> {
+  // Whichever way they came in, a staff account or the shared password, end it
+  await signOut();
   await destroyAdminSession();
   redirect("/admin/login");
 }
 
-async function ensureAdmin(): Promise<string | null> {
-  return (await isAdmin()) ? null : "UNAUTHORIZED";
+/**
+ * Null when allowed. Any one of the capabilities will do, because packing and
+ * shipping are worked from both the orders page and the shipments board.
+ * Cancelling and marking paid move money, so those stay with orders alone.
+ */
+async function ensureAdmin(...anyOf: Capability[]): Promise<string | null> {
+  const staff = await getStaff();
+  if (!staff) return "UNAUTHORIZED";
+  return anyOf.some((c) => roleCan(staff.role, c)) ? null : "FORBIDDEN";
 }
 
 type Result = { ok?: boolean; error?: string; id?: string };
@@ -100,7 +110,7 @@ const productSchema = z.object({
 export type ProductInput = z.infer<typeof productSchema>;
 
 export async function saveProduct(input: ProductInput): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -177,14 +187,14 @@ export async function saveProduct(input: ProductInput): Promise<Result> {
 }
 
 export async function toggleProductVisible(id: string, visible: boolean): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   await db.product.update({ where: { id }, data: { isVisible: visible } });
   return { ok: true };
 }
 
 export async function deleteProduct(id: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   const inBundles = await db.bundleItem.count({ where: { productId: id } });
   if (inBundles > 0) {
@@ -198,7 +208,7 @@ export async function setBundleItems(
   bundleId: string,
   items: { productId: string; quantity: number }[],
 ): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   const bundle = await db.product.findUnique({ where: { id: bundleId } });
   if (!bundle || bundle.kind !== "BUNDLE") return { error: "Not a bundle." };
@@ -242,7 +252,7 @@ const couponSchema = z.object({
 export type CouponInput = z.infer<typeof couponSchema>;
 
 export async function saveCoupon(input: CouponInput): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   const parsed = couponSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -270,7 +280,7 @@ export async function saveCoupon(input: CouponInput): Promise<Result> {
 }
 
 export async function deleteCoupon(id: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   await db.coupon.delete({ where: { id } });
   return { ok: true };
@@ -293,7 +303,7 @@ const saleSchema = z.object({
 export type SaleInput = z.infer<typeof saleSchema>;
 
 export async function saveSaleEvent(input: SaleInput): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   const parsed = saleSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -316,7 +326,7 @@ export async function saveSaleEvent(input: SaleInput): Promise<Result> {
 }
 
 export async function deleteSaleEvent(id: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   await db.saleEvent.delete({ where: { id } });
   return { ok: true };
@@ -358,7 +368,7 @@ const TEXT_SETTINGS = new Set([
 ]);
 
 export async function saveSettings(values: Record<string, string>): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   for (const [key, raw] of Object.entries(values)) {
     let value: unknown;
@@ -390,7 +400,7 @@ const serviceSchema = z.object({
 export type ServiceInput = z.infer<typeof serviceSchema>;
 
 export async function saveService(input: ServiceInput): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("store.manage");
   if (denied) return { error: denied };
   const parsed = serviceSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -420,7 +430,7 @@ function findOrder(orderNumber: string) {
 }
 
 export async function orderMarkProcessing(orderNumber: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("orders.manage", "shipments.manage");
   if (denied) return { error: denied };
   const order = await findOrder(orderNumber);
   if (!order) return { error: "Order not found." };
@@ -456,7 +466,7 @@ export async function orderShip(
   orderNumber: string,
   input: z.infer<typeof shipSchema>,
 ): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("orders.manage", "shipments.manage");
   if (denied) return { error: denied };
   const parsed = shipSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -509,7 +519,7 @@ export async function orderShip(
 
 /** One click: create the Shiprocket order, get an AWB, schedule pickup, email the customer. */
 export async function orderShipViaShiprocket(orderNumber: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("orders.manage", "shipments.manage");
   if (denied) return { error: denied };
   if (!isShiprocketConfigured()) {
     return { error: "Shiprocket is not configured yet - add the API credentials in .env (see docs/INTEGRATIONS.md)." };
@@ -586,7 +596,7 @@ export async function orderShipViaShiprocket(orderNumber: string): Promise<Resul
 }
 
 export async function orderOutForDelivery(orderNumber: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("orders.manage", "shipments.manage");
   if (denied) return { error: denied };
   const order = await findOrder(orderNumber);
   if (!order) return { error: "Order not found." };
@@ -610,7 +620,7 @@ export async function orderOutForDelivery(orderNumber: string): Promise<Result> 
 }
 
 export async function orderDelivered(orderNumber: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("orders.manage", "shipments.manage");
   if (denied) return { error: denied };
   const order = await findOrder(orderNumber);
   if (!order) return { error: "Order not found." };
@@ -634,7 +644,7 @@ export async function orderDelivered(orderNumber: string): Promise<Result> {
 }
 
 export async function orderCancel(orderNumber: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("orders.manage");
   if (denied) return { error: denied };
   const order = await findOrder(orderNumber);
   if (!order) return { error: "Order not found." };
@@ -680,7 +690,7 @@ export async function orderCancel(orderNumber: string): Promise<Result> {
 }
 
 export async function orderMarkPaidManually(orderNumber: string): Promise<Result> {
-  const denied = await ensureAdmin();
+  const denied = await ensureAdmin("orders.manage");
   if (denied) return { error: denied };
   const order = await findOrder(orderNumber);
   if (!order) return { error: "Order not found." };

@@ -3,8 +3,12 @@ import type { Metadata } from "next";
 import { AlertTriangle, IndianRupee, MessageSquareWarning, Package, Truck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { redirect } from "next/navigation";
+
+import { adminSectionsFor } from "@/lib/admin-gate";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Admin · Dashboard", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -12,6 +16,14 @@ export const dynamic = "force-dynamic";
 const PAID_STATUSES = ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"] as const;
 
 export default async function AdminDashboard() {
+  // Revenue and orders are for people who run the store. Anyone else, such as
+  // support handling complaints, starts on their own section instead.
+  const staff = await getStaff();
+  if (!staff) redirect("/admin/login");
+  if (!roleCan(staff.role, "store.manage") && !roleCan(staff.role, "orders.manage")) {
+    redirect(adminSectionsFor(staff.role)[0]?.href ?? "/admin/login");
+  }
+
   const midnight = new Date();
   midnight.setHours(0, 0, 0, 0);
 

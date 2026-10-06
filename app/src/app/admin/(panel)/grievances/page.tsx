@@ -15,6 +15,7 @@ import { db } from "@/lib/db";
 import { categoryLabel, isAckOverdue, isResolutionOverdue } from "@/lib/grievances";
 import { formatINR } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { requireAdminSection } from "@/lib/admin-gate";
 
 export const metadata: Metadata = { title: "Admin · Grievances", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -75,13 +76,21 @@ const hoursAgo = (d: Date) => Math.floor((Date.now() - d.getTime()) / 3600_000);
 
 type Props = { searchParams: Promise<{ f?: string }> };
 
+/** Computed outside render, which the purity rule asks for. */
+function aWeekAgo(): Date {
+  return new Date(Date.now() - 7 * 86400000);
+}
+
 export default async function AdminGrievancesPage({ searchParams }: Props) {
+  // Checked here as well as in the layout: a layout is skipped on client
+  // navigation, and this page reads data its role may not see.
+  await requireAdminSection("grievances.manage");
   const { f } = await searchParams;
   const filter = f && FILTERS.some((x) => x.key === f) ? f : "all";
   const categoryWhere =
     filter === "all" ? {} : { category: { in: CATEGORY_GROUPS[filter] as never[] } };
 
-  const weekAgo = new Date(Date.now() - 7 * 86400_000);
+  const weekAgo = aWeekAgo();
   const [active, recentlyClosed] = await Promise.all([
     db.grievance.findMany({
       where: {

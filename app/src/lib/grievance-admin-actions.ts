@@ -2,13 +2,13 @@
 
 import { z } from "zod";
 
-import { isAdmin } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
+import { requireCapability } from "@/lib/staff-auth";
 
 type Result = { ok?: boolean; error?: string };
 
 async function ensureAdmin(): Promise<string | null> {
-  return (await isAdmin()) ? null : "UNAUTHORIZED";
+  return requireCapability("grievances.manage");
 }
 
 async function findGrievance(ticketNumber: string) {

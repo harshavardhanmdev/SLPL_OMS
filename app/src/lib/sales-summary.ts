@@ -90,7 +90,7 @@ async function targetFor(
     where: { scope, period, periodStart, ownerId },
     select: { revenueTarget: true },
   });
-  return row?.revenueTarget ?? 0;
+  return Number(row?.revenueTarget ?? 0);
 }
 
 export type SalesBanner = {

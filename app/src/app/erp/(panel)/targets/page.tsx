@@ -118,7 +118,7 @@ export default async function TargetsPage({
   const targetOf = (scope: "COMPANY" | "PERSON", ownerId: string | null): Figures => {
     const t = targets.find((x) => x.scope === scope && x.ownerId === ownerId);
     return {
-      revenue: t?.revenueTarget ?? 0,
+      revenue: Number(t?.revenueTarget ?? 0),
       visits: t?.visitTarget ?? 0,
       organizations: t?.organizationTarget ?? 0,
     };

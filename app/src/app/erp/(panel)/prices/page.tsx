@@ -61,8 +61,12 @@ export default async function PricesPage() {
       ) : (
         <div className="erp-stagger space-y-4">
           {[...groups.entries()].map(([name, rows]) => {
-            const set = rows.find((r) => r.unit === "SET" && /full set/i.test(r.description));
-            const parts = rows.filter((r) => r !== set && r.isActive);
+            // Only a group of one full set and its titles can be checked: a
+            // group of sets for different grades has nothing to add up
+            const isSet = (r: (typeof rows)[number]) => r.unit === "SET" && /full set/i.test(r.description);
+            const sets = rows.filter(isSet);
+            const set = sets.length === 1 ? sets[0] : undefined;
+            const parts = rows.filter((r) => !isSet(r) && r.isActive);
             const partsTotal = parts.reduce((s, r) => s + r.rate, 0);
             const checks = set && parts.length > 1;
             return (

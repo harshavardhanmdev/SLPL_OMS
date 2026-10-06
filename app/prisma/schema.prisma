@@ -1292,8 +1292,9 @@ model SalesTarget {
   ownerId String?
   owner   AdminUser? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  /// Paise
-  revenueTarget      Int @default(0)
+  /// Paise, as a BigInt: the company's Rs 5 crore year is 5,000,000,000 paise,
+  /// more than a plain Int can hold
+  revenueTarget      BigInt @default(0)
   visitTarget        Int @default(0)
   organizationTarget Int @default(0)
 

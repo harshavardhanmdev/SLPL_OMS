@@ -342,7 +342,7 @@ export async function saveTarget(input: z.infer<typeof targetSchema>): Promise<R
   // a company target would never match its own unique index.
   const ownerId = d.scope === "PERSON" ? d.ownerId! : null;
   const figures = {
-    revenueTarget: Math.round(d.revenueTarget * 100),
+    revenueTarget: BigInt(Math.round(d.revenueTarget * 100)),
     visitTarget: d.visitTarget,
     organizationTarget: d.organizationTarget,
     setByEmail: staff.email,
@@ -361,7 +361,7 @@ export async function saveTarget(input: z.infer<typeof targetSchema>): Promise<R
     action: "target.save",
     entityType: "SalesTarget",
     entityId: row.id,
-    after: { scope: row.scope, period: row.period, revenueTarget: row.revenueTarget },
+    after: { scope: row.scope, period: row.period, revenueTarget: Number(row.revenueTarget) },
   });
   revalidatePath("/erp/sales");
   revalidatePath("/erp/targets");

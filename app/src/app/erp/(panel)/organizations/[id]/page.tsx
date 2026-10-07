@@ -6,11 +6,9 @@ import { notFound, redirect } from "next/navigation";
 import {
   CalendarClock,
   ChevronLeft,
-  FileSignature,
   Gift as GiftIcon,
   Package,
   Pencil,
-  Receipt as ReceiptIcon,
   Truck,
   Wallet,
 } from "lucide-react";
@@ -18,7 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
-import { accountPosition } from "@/lib/ledger";
+import { accountPosition, BILLED_STATUSES } from "@/lib/ledger";
 import { formatINR } from "@/lib/money";
 import { PAYMENT_MODE_LABEL } from "@/lib/payment-modes";
 import { getStaff, roleCan } from "@/lib/staff-auth";
@@ -27,6 +25,8 @@ export const metadata: Metadata = { title: "Organisation", robots: { index: fals
 
 const dateIN = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+const statusText = (status: string) => status.toLowerCase().replace(/_/g, " ");
 
 type Entry = {
   at: Date;
@@ -38,7 +38,8 @@ type Entry = {
 };
 
 /**
- * One school, and everything that has ever happened with it in one list.
+ * One school, and everything about it on one screen: what it owes, what we
+ * still owe it, and every quotation, bill and payment in its own section.
  *
  * This is the screen the owner actually asked for: open an organisation and
  * see the whole history rather than hunting through five separate tables.
@@ -50,6 +51,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
   const canManage = roleCan(staff.role, "crm.manage");
   const canWrite = roleCan(staff.role, "crm.write");
   const canTakeMoney = roleCan(staff.role, "finance.write");
+  const canChallan = roleCan(staff.role, "challan.write");
 
   const org = await db.organization.findUnique({
     where: { id },
@@ -57,8 +59,15 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
       owner: { select: { name: true } },
       visits: { orderBy: { visitedOn: "desc" }, include: { by: { select: { name: true } } } },
       quotations: { orderBy: { quotedOn: "desc" } },
-      invoices: { orderBy: { invoiceDate: "desc" } },
-      receipts: { where: { voidedAt: null }, orderBy: { receivedOn: "desc" } },
+      invoices: {
+        orderBy: { invoiceDate: "desc" },
+        include: { allocations: { select: { amount: true } }, challans: { select: { id: true } } },
+      },
+      receipts: {
+        where: { voidedAt: null },
+        orderBy: { receivedOn: "desc" },
+        include: { allocations: { include: { invoice: { select: { id: true, number: true } } } } },
+      },
       samples: { orderBy: { issuedOn: "desc" } },
       gifts: { orderBy: { givenOn: "desc" } },
       challans: { orderBy: { dispatchedOn: "desc" }, include: { items: { select: { quantity: true } } } },
@@ -66,8 +75,15 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
   });
   if (!org) notFound();
 
-  const position = await accountPosition(org.id);
+  const [position, subscriptions] = await Promise.all([
+    accountPosition(org.id),
+    db.subscription.findMany({
+      where: { invoice: { organizationId: org.id } },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
+  // Quotations, bills and payments have sections of their own; this is the rest
   const timeline: Entry[] = [
     ...org.visits.map((v) => ({
       at: v.visitedOn,
@@ -77,28 +93,6 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
       badge: v.converted
         ? { text: "Converted", tone: "border-green-300 bg-green-100 text-green-800" }
         : undefined,
-    })),
-    ...org.quotations.map((q) => ({
-      at: q.quotedOn,
-      icon: FileSignature,
-      title: `Quotation ${q.number}`,
-      detail: `${formatINR(q.total)} · ${q.status.toLowerCase().replace("_", " ")}`,
-      href: `/erp/quotations/${q.id}`,
-    })),
-    ...org.invoices.map((i) => ({
-      at: i.invoiceDate,
-      icon: ReceiptIcon,
-      title: `${i.kind === "TAX_INVOICE" ? "Tax invoice" : "Bill of supply"} ${i.number}`,
-      detail: `${formatINR(i.total)} · ${i.status.toLowerCase().replace("_", " ")}`,
-      href: `/erp/invoices/${i.id}`,
-    })),
-    ...org.receipts.map((r) => ({
-      at: r.receivedOn,
-      icon: ReceiptIcon,
-      title: `Received ${formatINR(r.amount)}`,
-      detail: `${r.number} · ${PAYMENT_MODE_LABEL[r.mode] ?? r.mode}${r.reference ? ` · ${r.reference}` : ""}`,
-      badge: { text: "Payment", tone: "border-green-300 bg-green-100 text-green-800" },
-      href: `/erp/payments/${r.id}`,
     })),
     ...org.challans.map((c) => ({
       at: c.dispatchedOn,
@@ -124,6 +118,34 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
   const samplesOut = org.samples
     .filter((s) => s.status === "WITH_SCHOOL")
     .reduce((sum, s) => sum + s.quantity, 0);
+
+  const billedStatuses: string[] = [...BILLED_STATUSES];
+  const bills = org.invoices.map((i) => {
+    const received = i.allocations.reduce((s, a) => s + a.amount, 0);
+    const counts = billedStatuses.includes(i.status);
+    return { ...i, received, balance: counts ? i.total - received : 0, counts };
+  });
+  const billedFrom = new Map(
+    org.invoices.filter((i) => i.quotationId).map((i) => [i.quotationId!, i]),
+  );
+  const openQuotes = org.quotations.filter(
+    (q) => ["PENDING_APPROVAL", "APPROVED", "SENT", "ACCEPTED"].includes(q.status) && !billedFrom.has(q.id),
+  );
+
+  // What we still owe them: books billed but not yet sent with a challan,
+  // magazine issues still to post, and money paid ahead of any bill
+  const undelivered = bills.filter((b) => b.counts && b.productLine === "BOOK" && b.challans.length === 0);
+  const toPost = subscriptions.filter((s) => s.status === "ACTIVE" && s.issuesSent < s.issuesTotal);
+  const credit = Math.max(0, -position.outstanding);
+  const owed = undelivered.length + toPost.length + (credit > 0 ? 1 : 0);
+
+  const sections = [
+    ["deliver", "Still to give them", owed],
+    ["quotations", "Quotations", org.quotations.length],
+    ["invoices", "Invoices", org.invoices.length],
+    ["payments", "Payments", org.receipts.length],
+    ["history", "History", timeline.length],
+  ] as const;
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
@@ -177,16 +199,21 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
           ["Billed", formatINR(position.billed), `${org.invoices.length} bills`],
           ["Received", formatINR(position.received), `${org.receipts.length} payments`],
+          credit > 0
+            ? ["In credit", formatINR(credit), "paid ahead, held for them"]
+            : [
+                "Balance due",
+                formatINR(Math.max(0, position.outstanding)),
+                position.oldestUnpaidOn ? `oldest ${position.oldestUnpaidDays} days` : "nothing owing",
+              ],
           [
-            "Outstanding",
-            formatINR(Math.max(0, position.outstanding)),
-            position.oldestUnpaidOn
-              ? `oldest ${position.oldestUnpaidDays} days`
-              : "nothing owing",
+            "Open quotations",
+            formatINR(openQuotes.reduce((s, q) => s + q.total, 0)),
+            `${openQuotes.length} not billed yet`,
           ],
           ["Samples out", String(samplesOut), "still with them"],
         ].map(([head, value, hint]) => (
@@ -198,11 +225,190 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
         ))}
       </div>
 
-      <section className="rounded-2xl border bg-card">
+      <nav aria-label="Sections" className="flex flex-wrap gap-2">
+        {sections.map(([anchor, label, count]) => (
+          <a
+            key={anchor}
+            href={`#${anchor}`}
+            className="rounded-full border bg-card px-3 py-1.5 text-sm hover:bg-muted"
+          >
+            {label} <span className="tabular-nums text-muted-foreground">{count}</span>
+          </a>
+        ))}
+      </nav>
+
+      <section id="deliver" className="scroll-mt-20 rounded-2xl border bg-card">
         <div className="border-b p-4">
-          <h2 className="font-heading font-semibold">Everything that has happened</h2>
+          <h2 className="font-heading font-semibold">Still to give them</h2>
           <p className="text-sm text-muted-foreground">
-            Visits, quotations, bills, payments, challans, samples and gifts, newest first.
+            Books billed but not yet sent with a delivery challan, magazine issues still to post,
+            and any money they paid ahead.
+          </p>
+        </div>
+        {owed === 0 ? (
+          <p className="p-6 text-center text-sm text-muted-foreground">Nothing owed to them.</p>
+        ) : (
+          <ul className="divide-y">
+            {undelivered.map((b) => (
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
+                <div>
+                  <Link href={`/erp/invoices/${b.id}`} className="font-medium hover:underline">
+                    {b.number}
+                  </Link>
+                  <p className="text-sm text-muted-foreground">
+                    Billed {dateIN(b.invoiceDate)}, no delivery challan yet
+                  </p>
+                </div>
+                {canChallan && (
+                  <Button size="sm" variant="outline" className="gap-1.5" asChild>
+                    <Link href={`/erp/challans/new?invoiceId=${b.id}`}>
+                      <Truck className="size-3.5" /> Raise the challan
+                    </Link>
+                  </Button>
+                )}
+              </li>
+            ))}
+            {toPost.map((s) => (
+              <li key={s.id} className="p-4">
+                <p className="font-medium">
+                  The GenZ Times, {s.copies} {s.copies === 1 ? "copy" : "copies"} of each issue
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {s.issuesTotal - s.issuesSent} of {s.issuesTotal} issues still to post, from{" "}
+                  {s.startIssue} · {s.code}
+                </p>
+              </li>
+            ))}
+            {credit > 0 && (
+              <li className="p-4">
+                <p className="font-medium">{formatINR(credit)} held on their account</p>
+                <p className="text-sm text-muted-foreground">
+                  Paid ahead of any bill. It settles the next invoice raised for them.
+                </p>
+              </li>
+            )}
+          </ul>
+        )}
+      </section>
+
+      <section id="quotations" className="scroll-mt-20 rounded-2xl border bg-card">
+        <div className="border-b p-4">
+          <h2 className="font-heading font-semibold">Quotations</h2>
+        </div>
+        {org.quotations.length === 0 ? (
+          <p className="p-6 text-center text-sm text-muted-foreground">No quotations yet.</p>
+        ) : (
+          <ul className="divide-y">
+            {org.quotations.map((q) => {
+              const bill = billedFrom.get(q.id);
+              return (
+                <li key={q.id} className="flex flex-wrap items-start justify-between gap-2 p-4">
+                  <div className="min-w-0">
+                    <Link href={`/erp/quotations/${q.id}`} className="font-medium hover:underline">
+                      {q.number}
+                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                      {dateIN(q.quotedOn)} · {statusText(q.status)}
+                      {bill && (
+                        <>
+                          {" · billed as "}
+                          <Link href={`/erp/invoices/${bill.id}`} className="underline">
+                            {bill.number}
+                          </Link>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <span className="font-semibold tabular-nums">{formatINR(q.total)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section id="invoices" className="scroll-mt-20 rounded-2xl border bg-card">
+        <div className="border-b p-4">
+          <h2 className="font-heading font-semibold">Invoices</h2>
+        </div>
+        {bills.length === 0 ? (
+          <p className="p-6 text-center text-sm text-muted-foreground">No invoices yet.</p>
+        ) : (
+          <ul className="divide-y">
+            {bills.map((b) => (
+              <li key={b.id} className="flex flex-wrap items-start justify-between gap-2 p-4">
+                <div className="min-w-0">
+                  <Link href={`/erp/invoices/${b.id}`} className="font-medium hover:underline">
+                    {b.number}
+                  </Link>
+                  <p className="text-sm text-muted-foreground">
+                    {dateIN(b.invoiceDate)} · {statusText(b.status)}
+                    {b.counts && b.balance > 0 ? ` · due ${dateIN(b.dueDate)}` : ""}
+                  </p>
+                </div>
+                <div className="text-right text-sm">
+                  <p className="font-semibold tabular-nums">{formatINR(b.total)}</p>
+                  {b.counts && (
+                    <p className="tabular-nums text-muted-foreground">
+                      {b.balance > 0
+                        ? `${formatINR(b.received)} received, ${formatINR(b.balance)} to collect`
+                        : "paid in full"}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section id="payments" className="scroll-mt-20 rounded-2xl border bg-card">
+        <div className="border-b p-4">
+          <h2 className="font-heading font-semibold">Payments received</h2>
+        </div>
+        {org.receipts.length === 0 ? (
+          <p className="p-6 text-center text-sm text-muted-foreground">No payments yet.</p>
+        ) : (
+          <ul className="divide-y">
+            {org.receipts.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-start justify-between gap-2 p-4">
+                <div className="min-w-0">
+                  <Link href={`/erp/payments/${r.id}`} className="font-medium hover:underline">
+                    {r.number}
+                  </Link>
+                  <p className="text-sm text-muted-foreground">
+                    {dateIN(r.receivedOn)} · {PAYMENT_MODE_LABEL[r.mode] ?? r.mode}
+                    {r.reference ? ` · ${r.reference}` : ""}
+                  </p>
+                  {r.allocations.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Settled{" "}
+                      {r.allocations.map((a, i) => (
+                        <span key={a.id}>
+                          {i > 0 && ", "}
+                          <Link href={`/erp/invoices/${a.invoice.id}`} className="underline">
+                            {a.invoice.number}
+                          </Link>{" "}
+                          {formatINR(a.amount)}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                </div>
+                <span className="font-semibold tabular-nums text-green-700 dark:text-green-400">
+                  {formatINR(r.amount)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section id="history" className="scroll-mt-20 rounded-2xl border bg-card">
+        <div className="border-b p-4">
+          <h2 className="font-heading font-semibold">History</h2>
+          <p className="text-sm text-muted-foreground">
+            Visits, delivery challans, samples and gifts, newest first.
           </p>
         </div>
         {timeline.length === 0 ? (

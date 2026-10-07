@@ -14,9 +14,9 @@ import { formatINR } from "@/lib/money";
 import {
   BOOK_HSN,
   OUR_STATE,
+  documentTotals,
   hsnForRate,
   lineTotals,
-  quoteTotals,
   ratePercent,
 } from "@/lib/quotation-math";
 import { saveQuotation } from "@/lib/quotation-actions";
@@ -65,6 +65,8 @@ export type QuotationDraft = {
   placeOfSupply: string;
   quotedOn: string;
   validDays: string;
+  /** Basis points off the whole quotation, as text. */
+  billDiscountBp?: string;
   terms: string;
   notes: string;
   lines: QuoteRow[];
@@ -169,7 +171,10 @@ export function QuotationForm({
   }
 
   const parsed = v.lines.map(toLine);
-  const totals = quoteTotals(parsed, v.placeOfSupply);
+  const billDiscountBp = Number(v.billDiscountBp) || 0;
+  // Kept as typed, so "12." survives on the way to "12.5"
+  const [discountText, setDiscountText] = React.useState((billDiscountBp / 100).toString());
+  const totals = documentTotals(parsed, v.placeOfSupply, billDiscountBp);
   const qty = parsed.reduce((s, l) => s + l.quantity, 0);
 
   async function submit(e: React.FormEvent) {
@@ -185,6 +190,7 @@ export function QuotationForm({
         placeOfSupply: v.placeOfSupply,
         quotedOn: v.quotedOn,
         validDays: Number(v.validDays) || 30,
+        billDiscountBp,
         terms: v.terms,
         notes: v.notes,
         lines: v.lines.map((r) => {
@@ -513,7 +519,25 @@ export function QuotationForm({
       </section>
 
       <section className="rounded-2xl border bg-card p-4 sm:p-5">
-        <h2 className="mb-3 font-heading font-semibold">Totals</h2>
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <h2 className="font-heading font-semibold">Totals</h2>
+          <div className="space-y-1.5">
+            <Label htmlFor="q-billdisc" className="text-xs">
+              Overall discount, percent
+            </Label>
+            <Input
+              id="q-billdisc"
+              inputMode="decimal"
+              value={discountText}
+              onChange={(e) => {
+                const text = e.target.value.replace(/[^\d.]/g, "");
+                setDiscountText(text);
+                set("billDiscountBp", String(Math.round((Number(text) || 0) * 100)));
+              }}
+              className="h-10 w-28"
+            />
+          </div>
+        </div>
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between">
             <dt className="text-muted-foreground">{qty} items, before discount</dt>
@@ -521,7 +545,9 @@ export function QuotationForm({
           </div>
           {totals.discount > 0 && (
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Discount</dt>
+              <dt className="text-muted-foreground">
+                Discount{billDiscountBp > 0 ? `, including ${ratePercent(billDiscountBp)} overall` : ""}
+              </dt>
               <dd className="tabular-nums">- {formatINR(totals.discount)}</dd>
             </div>
           )}

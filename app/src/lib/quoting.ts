@@ -3,7 +3,7 @@ import "server-only";
 import type { CatalogItem, OrgOption } from "@/components/erp/line-picker";
 import { db } from "@/lib/db";
 import { OUR_STATE } from "@/lib/quotation-math";
-import { PLANS } from "@/lib/subscription-plans";
+import { PLANS, planFromText } from "@/lib/subscription-plans";
 
 /**
  * What a quotation or an invoice line can be picked from, in the order sales
@@ -104,4 +104,12 @@ export async function organizationsForBilling(): Promise<OrgOption[]> {
 export function storeProductId(id: string | null | undefined): string | null {
   if (id?.startsWith("magazine:")) return id;
   return id && !id.includes(":") ? id : null;
+}
+
+/** As above, and a GenZ Times subscription typed by hand is read as its plan. */
+export function lineProductId(id: string | null | undefined, description: string): string | null {
+  const kept = storeProductId(id);
+  if (kept) return kept;
+  const plan = planFromText(description);
+  return plan ? `magazine:${plan.id}` : null;
 }

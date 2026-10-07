@@ -58,10 +58,15 @@ export function monthYearLabel(date: Date): string {
 
 const pad = (n: number, width: number) => String(n).padStart(width, "0");
 
-/** `SLPL/Q/2026-27/0001` */
-export async function nextQuotationNumber(tx: Tx, on: Date): Promise<string> {
+/**
+ * `SLPL/Q/2026-27/GLO/0001`
+ *
+ * The school's code says who it is for at a glance, as on an invoice, while
+ * the serial still runs across every school in the financial year.
+ */
+export async function nextQuotationNumber(tx: Tx, on: Date, customerCode: string): Promise<string> {
   const fy = financialYearLabel(on);
-  return `SLPL/Q/${fy}/${pad(await allocateSerial(tx, `quotation:${fy}`), 4)}`;
+  return `SLPL/Q/${fy}/${customerCode}/${pad(await allocateSerial(tx, `quotation:${fy}`), 4)}`;
 }
 
 /**

@@ -124,3 +124,18 @@ export function isOwed(
   const first = new Date(s.endsAt.getFullYear(), s.endsAt.getMonth() - s.issuesTotal + 1, 1);
   return first <= month;
 }
+
+/**
+ * The plan a hand-typed line means, such as "The Genz Times Annual
+ * Subscription", so a school billed without the picker still gets its
+ * subscription when it pays. Nothing unless the line names both the magazine
+ * and a subscription, and a term that says which plan.
+ */
+export function planFromText(text: string): Plan | undefined {
+  const t = text.toLowerCase();
+  if (!/gen\s*z\s*times/.test(t) || !/subscri/.test(t)) return undefined;
+  if (/half|\b6\s*(months?|issues?)\b|\bsix\b/.test(t)) return planById("half-year");
+  if (/quarter|\b3\s*(months?|issues?)\b|\bthree\b/.test(t)) return planById("quarterly");
+  if (/annual|year|\b12\s*(months?|issues?)\b|twelve/.test(t)) return planById("annual");
+  return undefined;
+}

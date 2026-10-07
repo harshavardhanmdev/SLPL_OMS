@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { nextInvoiceNumber } from "@/lib/number-series";
 import { documentKindFor, documentTotals, type QuoteLine } from "@/lib/quotation-math";
-import { storeProductId } from "@/lib/quoting";
+import { lineProductId } from "@/lib/quoting";
 import { getStaff, requireCapability } from "@/lib/staff-auth";
 
 /**
@@ -123,7 +123,7 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
     const line = lines[i];
     const t = documentTotals([line], d.placeOfSupply, billDiscountBp);
     return {
-      productId: storeProductId(l.productId),
+      productId: lineProductId(l.productId, line.description),
       description: line.description,
       hsnCode: line.hsnCode,
       unit: line.unit ?? "Nos",

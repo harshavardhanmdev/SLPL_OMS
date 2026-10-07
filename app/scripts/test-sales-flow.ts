@@ -11,14 +11,14 @@ import "dotenv/config";
 
 import { db } from "../src/lib/db";
 import { allocateSerial, nextInvoiceNumber, nextQuotationNumber } from "../src/lib/number-series";
-import { documentKindFor, documentTotals, rupeesInWords } from "../src/lib/quotation-math";
+import { discountedLine, documentKindFor, documentTotals, rupeesInWords } from "../src/lib/quotation-math";
 import { accountPosition } from "../src/lib/ledger";
 import {
   remindPosting,
   startInvoiceSubscriptions,
   stopInvoiceSubscriptions,
 } from "../src/lib/subscription-notify";
-import { isOwed } from "../src/lib/subscription-plans";
+import { isOwed, planFromText } from "../src/lib/subscription-plans";
 
 const CODE = "ZZT";
 
@@ -122,10 +122,10 @@ async function main() {
   console.log("\nQuotation numbers under contention");
   const qOn = new Date(2031, 5, 1);
   const qNumbers = await Promise.all(
-    Array.from({ length: 15 }, () => db.$transaction((tx) => nextQuotationNumber(tx, qOn))),
+    Array.from({ length: 15 }, () => db.$transaction((tx) => nextQuotationNumber(tx, qOn, CODE))),
   );
   check("fifteen saves gave fifteen numbers", new Set(qNumbers).size === 15);
-  check("in the financial year series", qNumbers.every((n) => n.startsWith("SLPL/Q/2031-32/")), qNumbers[0]);
+  check("in the financial year series", qNumbers.every((n) => n.startsWith(`SLPL/Q/2031-32/${CODE}/`)), qNumbers[0]);
 
   console.log("\nNumbering under contention");
   const org = await db.organization.create({
@@ -211,6 +211,28 @@ async function main() {
       Math.abs(messy.roundOff) <= 50,
     String(messy.roundOff),
   );
+
+  console.log("\nAn overall discount on a quotation adds up line by line");
+  const quoted = [
+    { description: "Books", quantity: 30, unitPrice: 3294_00, gstRate: 0 },
+    { description: "Workshop", quantity: 1, unitPrice: 25_000_00, discountAmount: 1_000_00, gstRate: 1800 },
+  ];
+  const qt = documentTotals(quoted, "Telangana", 1000);
+  const rows = quoted.map((l) => discountedLine(l, 1000));
+  check("line discounts sum to the total discount", rows.reduce((s, r) => s + r.discount, 0) === qt.discount);
+  check("line tax sums to the tax", rows.reduce((s, r) => s + r.tax, 0) === qt.cgst + qt.sgst + qt.igst);
+  check(
+    "line amounts sum to the exact total",
+    rows.reduce((s, r) => s + r.total, 0) === qt.total - qt.roundOff,
+    `${rows.reduce((s, r) => s + r.total, 0)} vs ${qt.total - qt.roundOff}`,
+  );
+
+  console.log("\nA GenZ Times subscription typed by hand is read as its plan");
+  check("\"The Genz Times Annual Subscription\" is the annual plan", planFromText("The Genz Times Annual Subscription")?.id === "annual");
+  check("the picker's own wording is the annual plan", planFromText("The GenZ Times subscription, 12 months (12 issues)")?.id === "annual");
+  check("six months is the half-year plan", planFromText("GenZ Times 6 months subscription")?.id === "half-year");
+  check("a single issue is not a subscription", planFromText("The GenZ Times October issue") === undefined);
+  check("a subscription with no term is left alone", planFromText("GenZ Times subscription") === undefined);
 
   console.log("\nA school's GenZ Times subscription starts when its bill is paid");
   const magBill = await db.invoice.create({

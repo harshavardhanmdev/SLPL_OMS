@@ -6,8 +6,8 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { nextQuotationNumber } from "@/lib/number-series";
-import { storeProductId } from "@/lib/quoting";
-import { lineTotals, quoteTotals, type QuoteLine } from "@/lib/quotation-math";
+import { lineProductId } from "@/lib/quoting";
+import { documentTotals, lineTotals, type QuoteLine } from "@/lib/quotation-math";
 import { getStaff, requireCapability } from "@/lib/staff-auth";
 
 /**
@@ -53,6 +53,8 @@ const schema = z.object({
   placeOfSupply: z.string().trim().min(2, "Place of supply decides the GST split").max(60),
   quotedOn: z.string().min(1, "Pick the quotation date"),
   validDays: z.number().int().min(1).max(365),
+  /** One percentage off the whole quotation, in basis points. */
+  billDiscountBp: z.number().int().min(0).max(10000).optional(),
   terms: z.string().trim().max(2000).optional().or(z.literal("")),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
   lines: z.array(lineSchema).min(1, "Add at least one line").max(60),
@@ -88,7 +90,8 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
     discountAmount: l.discountAmount ? Math.round(l.discountAmount * 100) : 0,
     gstRate: l.gstRate,
   }));
-  const totals = quoteTotals(lines, d.placeOfSupply);
+  const billDiscountBp = d.billDiscountBp ?? 0;
+  const totals = documentTotals(lines, d.placeOfSupply, billDiscountBp);
 
   // An approver's save stands; anyone else's goes to the manager, including
   // an edit to something already approved, so a figure cannot change unseen
@@ -118,6 +121,7 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
     quotedOn,
     validUntil,
     subtotal: totals.subtotal,
+    billDiscountBp,
     discount: totals.discount,
     taxable: totals.taxable,
     cgst: totals.cgst,
@@ -133,7 +137,7 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
   const itemRows = d.lines.map((l, i) => {
     const line = lines[i];
     return {
-      productId: storeProductId(l.productId),
+      productId: lineProductId(l.productId, line.description),
       description: line.description,
       hsnCode: line.hsnCode,
       unit: line.unit ?? "PCS",
@@ -178,7 +182,7 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
     tx.quotation.create({
       data: {
         ...header,
-        number: await nextQuotationNumber(tx, quotedOn),
+        number: await nextQuotationNumber(tx, quotedOn, org.code),
         createdById: staff.breakGlass ? null : staff.id,
         createdEmail: staff.email,
         items: { create: itemRows },
@@ -293,9 +297,10 @@ export async function deleteQuotation(input: z.infer<typeof deleteSchema>): Prom
   const billed = await db.invoice.findFirst({ where: { quotationId: quotation.id }, select: { number: true } });
   if (billed) return { error: `Invoice ${billed.number} was raised from this quotation, so it stays.` };
 
-  // SLPL/Q/2026-27/0003: the series is the financial year
+  // SLPL/Q/2026-27/GLO/0003, or SLPL/Q/2026-27/0003 before the school's code
+  // was added: the series is the financial year and the serial comes last
   const parts = quotation.number.split("/");
-  const serial = Number(parts[3] ?? 0);
+  const serial = Number(parts[parts.length - 1] ?? 0);
   const key = `quotation:${parts[2] ?? ""}`;
 
   let reused = false;

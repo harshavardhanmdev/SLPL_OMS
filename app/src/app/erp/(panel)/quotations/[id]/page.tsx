@@ -21,15 +21,27 @@ import {
 import { getCompany, upiPayload } from "@/lib/company";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
-import { lineTotals, quoteTotals, ratePercent, rupeesInWords } from "@/lib/quotation-math";
+import {
+  discountedLine,
+  documentTotals,
+  lineTotals,
+  ratePercent,
+  rupeesInWords,
+} from "@/lib/quotation-math";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 /** Named after the document, so "Save as PDF" suggests a sensible file name. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const doc = await db.quotation.findUnique({ where: { id }, select: { number: true } });
+  const doc = await db.quotation.findUnique({
+    where: { id },
+    select: { number: true, customerName: true },
+  });
+  // Save as PDF names the file after this, so the school is in the file name
   return {
-    title: { absolute: doc ? `Quotation ${doc.number.replace(/\//g, "-")}` : "Quotation" },
+    title: {
+      absolute: doc ? `Quotation ${doc.number.replace(/\//g, "-")} ${doc.customerName}` : "Quotation",
+    },
     robots: { index: false },
   };
 }
@@ -88,8 +100,10 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
     discountAmount: i.discountAmount,
     gstRate: i.gstRate,
   }));
-  const perLine = lines.map(lineTotals);
-  const totals = quoteTotals(lines, quotation.placeOfSupply);
+  // Each line carries its share of the overall discount, so the columns add up
+  const perLine = lines.map((l) => discountedLine(l, quotation.billDiscountBp));
+  const totals = documentTotals(lines, quotation.placeOfSupply, quotation.billDiscountBp);
+  const overall = totals.discount - lines.reduce((s, l) => s + lineTotals(l).discount, 0);
   // The stored total is the one quoted; anything past the exact sum is the round off
   const exact = totals.total - totals.roundOff;
   const total = quotation.total;
@@ -285,7 +299,13 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
               <div className="text-[11px]">
                 <dl className="ml-auto max-w-xs space-y-1">
-                  {showTax && (
+                  {overall > 0 && (
+                    <div className="flex justify-between">
+                      <dt>Overall discount ({ratePercent(quotation.billDiscountBp)})</dt>
+                      <dd className="tabular-nums">- {formatINR(overall)}</dd>
+                    </div>
+                  )}
+                  {(showTax || overall > 0) && (
                     <div className="flex justify-between">
                       <dt>Taxable Amount</dt>
                       <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>

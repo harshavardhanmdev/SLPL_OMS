@@ -74,6 +74,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
           placeOfSupply: quotation.placeOfSupply,
           quotedOn: ymd(quotation.quotedOn),
           validDays: String(validDays),
+          billDiscountBp: String(quotation.billDiscountBp),
           terms: quotation.terms ?? "",
           notes: quotation.notes ?? "",
           lines: quotation.items.map((i) => ({

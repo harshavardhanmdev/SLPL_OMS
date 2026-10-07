@@ -43,7 +43,8 @@ async function fromQuotation(id: string): Promise<InvoiceDraft | null> {
     invoiceDate: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()),
     dueDays: "15",
     placeOfSupply: q.placeOfSupply,
-    billDiscountBp: "0",
+    // The quotation's overall discount carries over; line discounts become a lower rate
+    billDiscountBp: String(q.billDiscountBp),
     terms: [
       "Refunds and returns are as per signed MOU.",
       "All disputes are subject to Hyderabad jurisdiction only.",

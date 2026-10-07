@@ -48,6 +48,19 @@ export function lineTotals(line: QuoteLine): QuoteLineTotals {
   return { gross, discount, taxable, tax, total: taxable + tax };
 }
 
+/**
+ * One line once the bill discount has taken its share, so a printed line's
+ * DISC, TAX and AMOUNT columns add up to the totals beneath them.
+ */
+export function discountedLine(line: QuoteLine, billDiscountBp: number): QuoteLineTotals {
+  const t = lineTotals(line);
+  const keep = 1 - Math.min(10000, Math.max(0, billDiscountBp)) / 10000;
+  // A delivery or other charge is billed in full, whatever the discount on the books
+  const net = line.noBillDiscount ? t.taxable : Math.round(t.taxable * keep);
+  const tax = Math.round((net * Math.max(0, line.gstRate)) / 10000);
+  return { gross: t.gross, discount: t.gross - net, taxable: net, tax, total: net + tax };
+}
+
 export type QuoteTotals = {
   subtotal: number;
   discount: number;
@@ -89,7 +102,6 @@ export function documentTotals(
   billDiscountBp: number,
 ): QuoteTotals {
   const interState = placeOfSupply.trim().toLowerCase() !== OUR_STATE.toLowerCase();
-  const keep = 1 - Math.min(10000, Math.max(0, billDiscountBp)) / 10000;
 
   let subtotal = 0;
   let discount = 0;
@@ -98,18 +110,14 @@ export function documentTotals(
   const rates = new Map<number, { taxable: number; tax: number }>();
 
   for (const line of lines) {
-    const t = lineTotals(line);
-    // A delivery or other charge is billed in full, whatever the discount on the books
-    const net = line.noBillDiscount ? t.taxable : Math.round(t.taxable * keep);
-    const lineTax = Math.round((net * Math.max(0, line.gstRate)) / 10000);
-
-    subtotal += t.gross;
-    discount += t.discount + (t.taxable - net);
-    taxable += net;
-    tax += lineTax;
+    const d = discountedLine(line, billDiscountBp);
+    subtotal += d.gross;
+    discount += d.discount;
+    taxable += d.taxable;
+    tax += d.tax;
     const bucket = rates.get(line.gstRate) ?? { taxable: 0, tax: 0 };
-    bucket.taxable += net;
-    bucket.tax += lineTax;
+    bucket.taxable += d.taxable;
+    bucket.tax += d.tax;
     rates.set(line.gstRate, bucket);
   }
 

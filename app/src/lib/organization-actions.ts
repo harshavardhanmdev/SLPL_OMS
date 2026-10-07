@@ -23,20 +23,21 @@ const DENIED: Record<string, string> = {
 };
 
 /**
- * Three letters from the name, which become part of every invoice number.
- * Cambridge Schools -> CAM. Another school starting the same way keeps the
- * letters and takes the next number, CAM2, CAM3, so schools with the same
- * name never share a code and nobody adding one has to think about numbering.
+ * The customer code, which becomes part of every invoice number: three letters
+ * of the name, three of the city, and the month and year the school was added.
+ * Global Model School, Warangal, added October 2026 -> GLOWAR1026. Schools of
+ * the same name in different places, or added at different times, never share
+ * a code. Two that match on all three, which a bulk import can produce, take a
+ * letter, GLOWAR1026B, so nobody adding one has to think about numbering.
  */
-export async function suggestCode(name: string, ignoreId?: string): Promise<string> {
-  const letters = name.toUpperCase().replace(/[^A-Z]/g, "");
-  const base = (letters.slice(0, 3) || "ORG").padEnd(3, "X");
-  for (let i = 1; i < 1000; i++) {
-    const candidate = i === 1 ? base : `${base}${i}`;
-    const clash = await db.organization.findFirst({
-      where: { code: candidate, ...(ignoreId ? { NOT: { id: ignoreId } } : {}) },
-      select: { id: true },
-    });
+export async function suggestCode(name: string, city?: string | null): Promise<string> {
+  const letters = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
+  const now = new Date();
+  const month = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getFullYear()).slice(2)}`;
+  const stem = `${(letters(name).slice(0, 3) || "ORG").padEnd(3, "X")}${letters(city ?? "").slice(0, 3)}${month}`;
+  for (const extra of ["", ..."BCDEFGHJKLMNPQRSTUVWXYZ"]) {
+    const candidate = stem + extra;
+    const clash = await db.organization.findFirst({ where: { code: candidate }, select: { id: true } });
     if (!clash) return candidate;
   }
   throw new Error("Could not allocate a customer code - set one by hand.");
@@ -45,7 +46,7 @@ export async function suggestCode(name: string, ignoreId?: string): Promise<stri
 const schema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(2, "Enter the organisation name").max(120),
-  code: z.string().trim().max(6).optional().or(z.literal("")),
+  code: z.string().trim().max(12).optional().or(z.literal("")),
   kind: z.enum(["SCHOOL", "COLLEGE", "DISTRIBUTOR", "INSTITUTION", "INDIVIDUAL"]),
   contactPerson: z.string().trim().max(80).optional().or(z.literal("")),
   designation: z.string().trim().max(60).optional().or(z.literal("")),
@@ -76,7 +77,7 @@ export async function saveOrganization(input: OrganizationInput): Promise<Result
   // A salesperson who adds a school looks after it
   if (!manager) d.ownerId = (await getStaff())?.id ?? null;
 
-  const code = (d.code || "").toUpperCase() || (await suggestCode(d.name, d.id));
+  const code = (d.code || "").toUpperCase() || (await suggestCode(d.name, d.city));
   const clash = await db.organization.findFirst({
     where: { code, ...(d.id ? { NOT: { id: d.id } } : {}) },
     select: { name: true },
@@ -221,7 +222,7 @@ export async function importOrganizations(input: { rows: ImportRow[]; ownerId?: 
     }
     await db.organization.create({
       data: {
-        code: await suggestCode(r.name),
+        code: await suggestCode(r.name, r.city),
         name: r.name,
         kind: "SCHOOL",
         contactPerson: r.contactPerson || null,

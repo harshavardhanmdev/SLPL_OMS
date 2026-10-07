@@ -121,7 +121,7 @@ export function OrganizationForm({
             />
           </div>
           {text("code", "Customer code", {
-            hint: "Leave blank and we take three letters from the name. It appears in every invoice number.",
+            hint: "Leave blank and it is made from the name, the city and the month added, like GLOWAR1026. It appears in every invoice number.",
           })}
           <div className="space-y-1.5">
             <Label htmlFor="og-kind">Type</Label>

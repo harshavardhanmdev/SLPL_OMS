@@ -172,7 +172,8 @@ export async function signIn(
   const cookieJar = await cookies();
   cookieJar.set(COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // The training demo is served over plain http on the office network
+    secure: process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "1",
     sameSite: "lax",
     path: "/",
     maxAge: HOURS * 60 * 60,

@@ -9,6 +9,7 @@ import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
 import { roleLabel } from "@/lib/roles";
 import { staffSignOut } from "@/lib/staff-actions";
 import { canEnterErp, getStaff, roleCan, type Capability } from "@/lib/staff-auth";
+import { DemoBar } from "@/components/erp/demo-bar";
 
 /**
  * The back office, gated per person and per capability. A screen asks what it
@@ -145,7 +146,9 @@ export default async function ErpLayout({ children }: Readonly<{ children: React
       role={staff.breakGlass ? "shared password" : roleLabel(staff.role)}
       signOut={staffSignOut}
       banner={
-        staff.breakGlass ? (
+        process.env.DEMO_MODE === "1" ? (
+          <DemoBar />
+        ) : staff.breakGlass ? (
           <p className="bg-saffron/20 px-4 py-2 text-center text-sm text-saffron-deep print:hidden">
             Signed in with the shared owner password. Use a personal account so the audit trail
             names you.

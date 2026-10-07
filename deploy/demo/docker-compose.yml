@@ -1,0 +1,75 @@
+# The training copy of the back office, on port 4310: its own database, mail
+# catcher and app, apart from the live store. It runs the images the live site
+# was last built from, holds made-up schools and people, and has no payment,
+# courier, Google or mail keys, so nothing done here reaches anyone.
+#
+#   First time: create demo/.env (see reset.sh), then ./reset.sh
+#   Start again from clean training data: ./reset.sh
+name: oms-demo
+
+x-db: &db postgresql://oms:${DEMO_DB_PASSWORD:?set in demo/.env}@oms-demo-db:5432/oms
+
+services:
+  demo-db:
+    image: postgres:16-alpine
+    container_name: oms-demo-db
+    restart: always
+    environment:
+      POSTGRES_USER: oms
+      POSTGRES_PASSWORD: ${DEMO_DB_PASSWORD:?set in demo/.env}
+      POSTGRES_DB: oms
+    volumes:
+      - oms-demo-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oms -d oms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Every email the demo "sends" lands here instead
+  demo-mail:
+    image: axllent/mailpit:latest
+    container_name: oms-demo-mail
+    restart: always
+    ports:
+      - "127.0.0.1:8027:8025"
+
+  demo-migrate:
+    image: deploy-oms-migrate
+    container_name: oms-demo-migrate
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: *db
+    depends_on:
+      demo-db:
+        condition: service_healthy
+    restart: "no"
+
+  demo-web:
+    image: deploy-oms-web
+    container_name: oms-demo-web
+    restart: always
+    ports:
+      - "4310:3000"
+    environment:
+      DATABASE_URL: *db
+      SESSION_SECRET: ${DEMO_SESSION_SECRET:?set in demo/.env}
+      DEMO_MODE: "1"
+      APP_URL: http://192.168.1.150:4310
+      SMTP_HOST: oms-demo-mail
+      SMTP_PORT: "1025"
+      SMTP_FROM: "SLPL Demo <demo@saaradaa.com>"
+      OWNER_NOTIFY_EMAIL: demo@saaradaa.com
+      UPLOADS_DIR: /app/uploads
+      TZ: Asia/Kolkata
+    volumes:
+      - oms-demo-uploads:/app/uploads
+    depends_on:
+      demo-db:
+        condition: service_healthy
+      demo-migrate:
+        condition: service_completed_successfully
+
+volumes:
+  oms-demo-db:
+  oms-demo-uploads:

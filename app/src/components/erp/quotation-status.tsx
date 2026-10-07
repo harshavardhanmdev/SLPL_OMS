@@ -3,12 +3,12 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Pencil, ReceiptText } from "lucide-react";
+import { Loader2, Pencil, ReceiptText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { decideQuotation } from "@/lib/quotation-actions";
+import { decideQuotation, deleteQuotation } from "@/lib/quotation-actions";
 
 type Decision = "APPROVED" | "REJECTED_BACK" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED";
 
@@ -23,6 +23,7 @@ export function QuotationStatusControls({
   canApprove,
   canWrite,
   canInvoice,
+  canDelete = false,
 }: {
   id: string;
   number: string;
@@ -30,6 +31,8 @@ export function QuotationStatusControls({
   canApprove: boolean;
   canWrite: boolean;
   canInvoice: boolean;
+  /** Owners. A quotation already billed is refused by the action, with the reason. */
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
@@ -73,8 +76,27 @@ export function QuotationStatusControls({
 
   const spinner = busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null;
 
+  function remove() {
+    if (!window.confirm(`Delete ${number}? This cannot be undone. Use it only for a quotation raised by mistake.`)) return;
+    setBusy(true);
+    void deleteQuotation({ id })
+      .then((res) => {
+        if (res.error) toast.error(res.error);
+        else {
+          toast.success(`${number} deleted.`);
+          router.push("/erp/quotations");
+        }
+      })
+      .finally(() => setBusy(false));
+  }
+
   return (
     <>
+      {canDelete && (
+        <Button variant="ghost" className="gap-2 text-destructive" disabled={busy} onClick={remove}>
+          <Trash2 className="size-4" /> Delete
+        </Button>
+      )}
       {canWrite && ["DRAFT", "PENDING_APPROVAL", "APPROVED"].includes(status) && (
         <Button variant="outline" className="gap-2" asChild>
           <Link href={`/erp/quotations/${id}/edit`}>

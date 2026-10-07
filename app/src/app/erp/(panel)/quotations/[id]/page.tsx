@@ -134,6 +134,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             canApprove={roleCan(staff.role, "invoices.approve")}
             canWrite={roleCan(staff.role, "quotes.write")}
             canInvoice={roleCan(staff.role, "invoices.write")}
+            canDelete={roleCan(staff.role, "staff.manage")}
           />
           <PrintButton label="Print the quotation" />
         </div>

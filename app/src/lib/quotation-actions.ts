@@ -272,3 +272,58 @@ export async function decideQuotation(input: z.infer<typeof decideSchema>): Prom
   if (row.organizationId) revalidatePath(`/erp/organizations/${row.organizationId}`);
   return { ok: true, id: row.id, number: row.number };
 }
+
+const deleteSchema = z.object({ id: z.string().min(1) });
+
+/**
+ * Removing a quotation raised by mistake. Owners only, and not once an invoice
+ * has been raised from it, so a bill never points at a quotation that is gone.
+ * The newest number in the year's series is reused, as with invoices.
+ */
+export async function deleteQuotation(input: z.infer<typeof deleteSchema>): Promise<Result> {
+  const denied = await requireCapability("staff.manage");
+  if (denied) {
+    return { error: denied === "FORBIDDEN" ? "Only an owner can delete a quotation." : "Sign in again." };
+  }
+  const parsed = deleteSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const quotation = await db.quotation.findUnique({ where: { id: parsed.data.id }, include: { items: true } });
+  if (!quotation) return { error: "That quotation no longer exists." };
+  const billed = await db.invoice.findFirst({ where: { quotationId: quotation.id }, select: { number: true } });
+  if (billed) return { error: `Invoice ${billed.number} was raised from this quotation, so it stays.` };
+
+  // SLPL/Q/2026-27/0003: the series is the financial year
+  const parts = quotation.number.split("/");
+  const serial = Number(parts[3] ?? 0);
+  const key = `quotation:${parts[2] ?? ""}`;
+
+  let reused = false;
+  await db.$transaction(async (tx) => {
+    await tx.quotation.delete({ where: { id: quotation.id } });
+    const locked = await tx.$queryRaw<{ next: number }[]>`
+      SELECT "next" FROM "NumberSeries" WHERE "key" = ${key} FOR UPDATE
+    `;
+    if (serial > 0 && locked[0]?.next === serial + 1) {
+      await tx.$executeRaw`UPDATE "NumberSeries" SET "next" = ${serial}, "updatedAt" = NOW() WHERE "key" = ${key}`;
+      reused = true;
+    }
+  });
+
+  await audit({
+    action: "quotation.delete",
+    entityType: "Quotation",
+    entityId: quotation.id,
+    before: {
+      number: quotation.number,
+      status: quotation.status,
+      total: quotation.total,
+      customer: quotation.customerName,
+      lines: quotation.items.map((i) => `${i.quantity} x ${i.description}`),
+    },
+    after: { numberReused: reused },
+  });
+  revalidatePath("/erp/quotations");
+  if (quotation.organizationId) revalidatePath(`/erp/organizations/${quotation.organizationId}`);
+  return { ok: true, number: quotation.number };
+}

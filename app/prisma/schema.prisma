@@ -1409,6 +1409,9 @@ model InvoiceItem {
   unitPrice   Int
   discountBp  Int     @default(0)
   gstRate     Int     @default(0)
+  /// A charge outside the bill discount, such as delivery: the discount on the
+  /// books must not quietly discount the courier too
+  noBillDiscount Boolean @default(false)
   lineTotal   Int     @default(0)
   sortOrder   Int     @default(0)
 

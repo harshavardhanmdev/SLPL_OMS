@@ -24,7 +24,15 @@ import { formatINR } from "@/lib/money";
 import { lineTotals, quoteTotals, ratePercent, rupeesInWords } from "@/lib/quotation-math";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
-export const metadata: Metadata = { title: "Quotation", robots: { index: false } };
+/** Named after the document, so "Save as PDF" suggests a sensible file name. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const doc = await db.quotation.findUnique({ where: { id }, select: { number: true } });
+  return {
+    title: { absolute: doc ? `Quotation ${doc.number.replace(/\//g, "-")}` : "Quotation" },
+    robots: { index: false },
+  };
+}
 
 const dateIN = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -99,7 +107,9 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="mx-auto max-w-4xl">
-      <style>{"@media print { @page { size: A4; margin: 8mm; } }"}</style>
+      {/* No page margin, so the browser has nowhere to print its own title and
+          web address; the document carries its own 8mm margin instead */}
+      <style>{"@media print { @page { size: A4; margin: 0; } }"}</style>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
@@ -147,7 +157,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
       )}
 
       <div className="overflow-x-auto rounded-xl shadow-sm print:overflow-visible print:shadow-none">
-        <div className="min-w-[640px] bg-white p-7 text-black print:p-0 print:leading-snug" style={{ color: DOC_NAVY }}>
+        <div className="min-w-[640px] bg-white p-7 text-black print:p-[8mm] print:leading-snug" style={{ color: DOC_NAVY }}>
           <Letterhead company={company} docLabel="QUOTATION" />
 
           <div

@@ -91,8 +91,9 @@ export function PaymentForm({
       });
       if (res.error) toast.error(res.error);
       else {
-        toast.success(`Recorded as ${res.number}.`);
-        router.push(`/erp/organizations/${v.organizationId}`);
+        toast.success(`Recorded as ${res.number}. Here is the receipt.`);
+        // Straight to the receipt, so it can be printed or sent while the school is waiting
+        router.push(res.id ? `/erp/payments/${res.id}` : `/erp/organizations/${v.organizationId}`);
       }
     } finally {
       setBusy(false);

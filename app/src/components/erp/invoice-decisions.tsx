@@ -3,12 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { decideInvoice } from "@/lib/invoice-actions";
+import { decideInvoice, deleteInvoice } from "@/lib/invoice-actions";
 
 /**
  * Approve, send back, or send out.
@@ -22,12 +22,15 @@ export function InvoiceDecisions({
   status,
   canApprove,
   canWrite,
+  canDelete = false,
 }: {
   id: string;
   number: string;
   status: string;
   canApprove: boolean;
   canWrite: boolean;
+  /** Owners, and only while no payment is recorded against the bill. */
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
@@ -69,8 +72,27 @@ export function InvoiceDecisions({
     );
   }
 
+  function remove() {
+    if (!window.confirm(`Delete ${number}? This cannot be undone. Use it only for a bill raised by mistake.`)) return;
+    setBusy(true);
+    void deleteInvoice({ id })
+      .then((res) => {
+        if (res.error) toast.error(res.error);
+        else {
+          toast.success(`${number} deleted.`);
+          router.push("/erp/invoices");
+        }
+      })
+      .finally(() => setBusy(false));
+  }
+
   return (
     <>
+      {canDelete && (
+        <Button variant="ghost" className="gap-2 text-destructive" disabled={busy} onClick={remove}>
+          <Trash2 className="size-4" /> Delete
+        </Button>
+      )}
       {canWrite && ["DRAFT", "PENDING_APPROVAL"].includes(status) && (
         <Button variant="outline" className="gap-2" asChild>
           <Link href={`/erp/invoices/${id}/edit`}>

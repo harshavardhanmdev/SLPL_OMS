@@ -54,6 +54,7 @@ async function fromQuotation(id: string): Promise<InvoiceDraft | null> {
         unitPrice: String(Math.round(rate) / 100),
         discountBp: "0",
         gstRate: String(i.gstRate),
+        noBillDiscount: false,
       };
     }),
   };

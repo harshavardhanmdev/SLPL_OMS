@@ -98,6 +98,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
       title: `Received ${formatINR(r.amount)}`,
       detail: `${r.number} · ${PAYMENT_MODE_LABEL[r.mode] ?? r.mode}${r.reference ? ` · ${r.reference}` : ""}`,
       badge: { text: "Payment", tone: "border-green-300 bg-green-100 text-green-800" },
+      href: `/erp/payments/${r.id}`,
     })),
     ...org.challans.map((c) => ({
       at: c.dispatchedOn,

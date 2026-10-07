@@ -32,6 +32,8 @@ type Row = {
   unitPrice: string;
   discountBp: string;
   gstRate: string;
+  /** Delivery or another charge, billed in full whatever the bill discount. */
+  noBillDiscount: boolean;
 };
 
 const blankRow: Row = {
@@ -44,6 +46,16 @@ const blankRow: Row = {
   unitPrice: "",
   discountBp: "0",
   gstRate: "0",
+  noBillDiscount: false,
+};
+
+/** Delivery is billed on top of the books, so the bill discount leaves it alone. */
+const chargeRow: Row = {
+  ...blankRow,
+  description: "Delivery charges",
+  hsnCode: "9965",
+  unit: "OTH",
+  noBillDiscount: true,
 };
 
 export type InvoiceDraft = {
@@ -140,6 +152,7 @@ export function InvoiceForm({
     unitPrice: Math.round((Number(r.unitPrice) || 0) * 100),
     discountBp: Number(r.discountBp) || 0,
     gstRate: Number(r.gstRate) || 0,
+    noBillDiscount: r.noBillDiscount,
   }));
   const billDiscountBp = Number(v.billDiscountBp) || 0;
   const totals = documentTotals(parsed, v.placeOfSupply, billDiscountBp);
@@ -171,6 +184,7 @@ export function InvoiceForm({
           unitPrice: Number(r.unitPrice) || 0,
           discountBp: Number(r.discountBp) || 0,
           gstRate: Number(r.gstRate) || 0,
+          noBillDiscount: r.noBillDiscount,
         })),
       });
       if (res.error) {
@@ -363,6 +377,15 @@ export function InvoiceForm({
                     </select>
                   </div>
                 </div>
+                <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="size-4"
+                    checked={row.noBillDiscount}
+                    onChange={(e) => setRow(i, { noBillDiscount: e.target.checked })}
+                  />
+                  Not discounted: a delivery or other charge added on top
+                </label>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
                   <span className="text-muted-foreground">
                     {formatINR(t.gross)}
@@ -396,6 +419,15 @@ export function InvoiceForm({
           onClick={() => set("lines", [...v.lines, { ...blankRow }])}
         >
           <Plus className="size-4" /> Add a line
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mt-3 ml-2 gap-2"
+          onClick={() => set("lines", [...v.lines, { ...chargeRow }])}
+        >
+          <Plus className="size-4" /> Add delivery or other charge
         </Button>
       </section>
 

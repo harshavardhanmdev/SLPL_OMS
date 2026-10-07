@@ -37,6 +37,8 @@ const lineSchema = z.object({
   unitPrice: z.number().min(0).max(100_000_000),
   discountBp: z.number().int().min(0).max(10000).optional(),
   gstRate: z.number().int().min(0).max(5000),
+  /** A delivery or other charge the bill discount must not touch. */
+  noBillDiscount: z.boolean().optional(),
 });
 
 const schema = z.object({
@@ -83,6 +85,7 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
     unitPrice: Math.round(l.unitPrice * 100),
     discountBp: l.discountBp ?? 0,
     gstRate: l.gstRate,
+    noBillDiscount: l.noBillDiscount ?? false,
   }));
   const billDiscountBp = d.billDiscountBp ?? 0;
   const totals = documentTotals(lines, d.placeOfSupply, billDiscountBp);
@@ -129,6 +132,7 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
       unitPrice: line.unitPrice,
       discountBp: line.discountBp ?? 0,
       gstRate: line.gstRate,
+      noBillDiscount: line.noBillDiscount ?? false,
       lineTotal: t.total,
       sortOrder: i,
     };
@@ -272,4 +276,68 @@ export async function decideInvoice(input: z.infer<typeof decideSchema>): Promis
   });
   revalidatePath("/erp/invoices");
   return { ok: true, id: row.id, number: row.number };
+}
+
+const deleteSchema = z.object({ id: z.string().min(1) });
+
+/**
+ * Removing a bill raised by mistake. Owners only, and never once money has been
+ * recorded against it: void the payment first, so the ledger stays whole.
+ *
+ * GST wants one unbroken series, so when this was the newest number in its
+ * series the counter steps back and the next bill reuses the number. An older
+ * number cannot be reused; the audit trail then records why it is missing.
+ */
+export async function deleteInvoice(input: z.infer<typeof deleteSchema>): Promise<Result> {
+  const denied = await requireCapability("staff.manage");
+  if (denied) {
+    return { error: denied === "FORBIDDEN" ? "Only an owner can delete an invoice." : "Sign in again." };
+  }
+  const parsed = deleteSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const invoice = await db.invoice.findUnique({
+    where: { id: parsed.data.id },
+    include: { items: true, _count: { select: { allocations: true } } },
+  });
+  if (!invoice) return { error: "That invoice no longer exists." };
+  if (invoice._count.allocations > 0) {
+    return { error: "A payment is recorded against this bill. Void the payment first." };
+  }
+
+  // MAG/SLPL/10-26/GLO02: the series is the product line and customer code
+  const tail = invoice.number.split("/").pop() ?? "";
+  const serial = Number(tail.match(/(\d+)$/)?.[1] ?? 0);
+  const code = tail.replace(/\d+$/, "");
+  const key = `invoice:${invoice.productLine}:${code}`;
+
+  let reused = false;
+  await db.$transaction(async (tx) => {
+    await tx.visit.updateMany({ where: { invoiceId: invoice.id }, data: { converted: false, invoiceId: null } });
+    await tx.invoice.delete({ where: { id: invoice.id } });
+    const locked = await tx.$queryRaw<{ next: number }[]>`
+      SELECT "next" FROM "NumberSeries" WHERE "key" = ${key} FOR UPDATE
+    `;
+    if (serial > 0 && locked[0]?.next === serial + 1) {
+      await tx.$executeRaw`UPDATE "NumberSeries" SET "next" = ${serial}, "updatedAt" = NOW() WHERE "key" = ${key}`;
+      reused = true;
+    }
+  });
+
+  await audit({
+    action: "invoice.delete",
+    entityType: "Invoice",
+    entityId: invoice.id,
+    before: {
+      number: invoice.number,
+      status: invoice.status,
+      total: invoice.total,
+      customer: invoice.customerName,
+      lines: invoice.items.map((i) => `${i.quantity} x ${i.description}`),
+    },
+    after: { numberReused: reused },
+  });
+  revalidatePath("/erp/invoices");
+  if (invoice.organizationId) revalidatePath(`/erp/organizations/${invoice.organizationId}`);
+  return { ok: true, number: invoice.number };
 }

@@ -23,6 +23,8 @@ export type QuoteLine = {
   discountAmount?: number;
   /** Basis points of GST: 0 for a printed book, 500 for an e-book, 1800 for a service. */
   gstRate: number;
+  /** Outside the bill discount, such as a delivery charge. */
+  noBillDiscount?: boolean;
 };
 
 export type QuoteLineTotals = {
@@ -94,7 +96,8 @@ export function documentTotals(
 
   for (const line of lines) {
     const t = lineTotals(line);
-    const net = Math.round(t.taxable * keep);
+    // A delivery or other charge is billed in full, whatever the discount on the books
+    const net = line.noBillDiscount ? t.taxable : Math.round(t.taxable * keep);
     const lineTax = Math.round((net * Math.max(0, line.gstRate)) / 10000);
 
     subtotal += t.gross;

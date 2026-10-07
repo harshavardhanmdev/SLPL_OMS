@@ -19,7 +19,15 @@ import { getCompany } from "@/lib/company";
 import { db } from "@/lib/db";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
-export const metadata: Metadata = { title: "Delivery challan", robots: { index: false } };
+/** Named after the document, so "Save as PDF" suggests a sensible file name. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const doc = await db.deliveryChallan.findUnique({ where: { id }, select: { number: true } });
+  return {
+    title: { absolute: doc ? `Delivery challan ${doc.number.replace(/\//g, "-")}` : "Delivery challan" },
+    robots: { index: false },
+  };
+}
 
 const dateIN = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -61,7 +69,9 @@ export default async function ChallanPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="mx-auto max-w-4xl">
-      <style>{"@media print { @page { size: A4; margin: 8mm; } }"}</style>
+      {/* No page margin, so the browser has nowhere to print its own title and
+          web address; the document carries its own 8mm margin instead */}
+      <style>{"@media print { @page { size: A4; margin: 0; } }"}</style>
 
       <div className="mb-4 space-y-3 print:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -85,7 +95,7 @@ export default async function ChallanPage({ params }: { params: Promise<{ id: st
       {/* The document keeps its A4 proportions and scrolls inside this box on a
           phone, rather than widening the page and making the browser zoom out */}
       <div className="overflow-x-auto rounded-xl shadow-sm print:overflow-visible print:shadow-none">
-        <div className="min-w-[640px] bg-white p-7 text-black print:p-0 print:leading-snug" style={{ color: DOC_NAVY }}>
+        <div className="min-w-[640px] bg-white p-7 text-black print:p-[8mm] print:leading-snug" style={{ color: DOC_NAVY }}>
           <Letterhead company={company} docLabel="DELIVERY CHALLAN" />
 
           <div

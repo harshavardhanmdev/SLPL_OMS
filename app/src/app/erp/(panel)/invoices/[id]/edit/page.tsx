@@ -70,6 +70,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
             unitPrice: (i.unitPrice / 100).toString(),
             discountBp: String(i.discountBp),
             gstRate: String(i.gstRate),
+            noBillDiscount: i.noBillDiscount,
           })),
         }}
       />

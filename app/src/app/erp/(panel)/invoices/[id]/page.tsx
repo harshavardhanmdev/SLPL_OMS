@@ -26,7 +26,15 @@ import { formatINR } from "@/lib/money";
 import { documentTotals, lineTotals, ratePercent, rupeesInWords } from "@/lib/quotation-math";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
-export const metadata: Metadata = { title: "Invoice", robots: { index: false } };
+/** Named after the document, so "Save as PDF" suggests a sensible file name. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const doc = await db.invoice.findUnique({ where: { id }, select: { number: true } });
+  return {
+    title: { absolute: doc ? `Invoice ${doc.number.replace(/\//g, "-")}` : "Invoice" },
+    robots: { index: false },
+  };
+}
 
 const dateIN = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -72,6 +80,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     unitPrice: i.unitPrice,
     discountBp: i.discountBp,
     gstRate: i.gstRate,
+    noBillDiscount: i.noBillDiscount,
   }));
   const totals = documentTotals(lines, invoice.placeOfSupply, invoice.billDiscountBp);
   const taxed = invoice.kind === "TAX_INVOICE";
@@ -90,7 +99,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="mx-auto max-w-4xl">
-      <style>{"@media print { @page { size: A4; margin: 8mm; } }"}</style>
+      {/* No page margin, so the browser has nowhere to print its own title and
+          web address; the document carries its own 8mm margin instead */}
+      <style>{"@media print { @page { size: A4; margin: 0; } }"}</style>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Link
@@ -106,6 +117,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             status={invoice.status}
             canApprove={roleCan(staff.role, "invoices.approve")}
             canWrite={roleCan(staff.role, "invoices.write")}
+            canDelete={roleCan(staff.role, "staff.manage") && balances.receivedAmount === 0}
           />
           {roleCan(staff.role, "challan.write") &&
             ["APPROVED", "SENT", "PAID"].includes(invoice.status) && (
@@ -152,7 +164,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </p>
       )}
 
-      <div className="bg-white p-7 text-black print:p-0 print:leading-snug" style={{ color: DOC_NAVY }}>
+      <div className="bg-white p-7 text-black print:p-[8mm] print:leading-snug" style={{ color: DOC_NAVY }}>
         <Letterhead
           company={company}
           docLabel={taxed ? "TAX INVOICE" : "BILL OF SUPPLY"}
@@ -200,7 +212,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               const t = lineTotals(lines[i]);
               return (
                 <tr key={item.id} style={{ borderBottom: `1px solid ${DOC_RULE}` }}>
-                  <td className="px-2 py-2 uppercase print:py-1">{item.description}</td>
+                  <td className="px-2 py-2 uppercase print:py-1">
+                    {item.description}
+                    {item.noBillDiscount && invoice.billDiscountBp > 0 && (
+                      <span className="block text-[10px] normal-case" style={{ color: DOC_MUTED }}>
+                        Not discounted
+                      </span>
+                    )}
+                  </td>
                   {taxed && <td className={td}>{item.hsnCode ?? "-"}</td>}
                   <td className={td}>
                     {item.quantity} {item.unit}

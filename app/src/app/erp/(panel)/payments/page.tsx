@@ -152,7 +152,9 @@ export default async function PaymentsPage({
                         r.organization.name
                       )}
                     </p>
-                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">{r.number}</p>
+                    <Link href={`/erp/payments/${r.id}`} className="mt-0.5 block font-mono text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                      {r.number} · receipt
+                    </Link>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {dateIN(r.receivedOn)} · {PAYMENT_MODE_LABEL[r.mode] ?? r.mode}
                       {r.reference ? ` · Ref ${r.reference}` : ""}

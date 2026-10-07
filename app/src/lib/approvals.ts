@@ -15,13 +15,22 @@ export function approvalFilters(staff: StaffSession): {
   quotation: Prisma.QuotationWhereInput;
   invoice: Prisma.InvoiceWhereInput;
   sample: Prisma.SampleIssueWhereInput;
+  claim: Prisma.ExpenseClaimWhereInput;
 } {
+  // Expense claims go to the owners, never to the claimant; anyone sees their own sent back
+  const claim: Prisma.ExpenseClaimWhereInput = {
+    OR: [
+      ...(roleCan(staff.role, "staff.manage") ? [{ status: "PENDING" as const, NOT: { claimedById: staff.id } }] : []),
+      { claimedById: staff.id, status: "REJECTED" },
+    ],
+  };
   if (roleCan(staff.role, "invoices.approve")) {
     return {
       approver: true,
       quotation: { status: "PENDING_APPROVAL" },
       invoice: { status: "PENDING_APPROVAL" },
       sample: { approvalStatus: "PENDING" },
+      claim,
     };
   }
   return {
@@ -34,16 +43,18 @@ export function approvalFilters(staff: StaffSession): {
       approvalStatus: "REJECTED",
       status: { in: ["IN_HAND", "WITH_SCHOOL"] },
     },
+    claim,
   };
 }
 
 /** The number on the menu badge. */
 export async function approvalCount(staff: StaffSession): Promise<number> {
   const f = approvalFilters(staff);
-  const [q, i, s] = await Promise.all([
+  const [q, i, s, c] = await Promise.all([
     db.quotation.count({ where: f.quotation }),
     db.invoice.count({ where: f.invoice }),
     db.sampleIssue.count({ where: f.sample }),
+    db.expenseClaim.count({ where: f.claim }),
   ]);
-  return q + i + s;
+  return q + i + s + c;
 }

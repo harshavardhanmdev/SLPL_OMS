@@ -13,7 +13,8 @@ cd "$(dirname "$0")"
 . ./.env
 
 docker compose up -d demo-db demo-mail
-until docker exec oms-demo-db pg_isready -U oms -d oms >/dev/null 2>&1; do sleep 1; done
+# The health check, not pg_isready: a new database restarts once while it sets itself up
+until [ "$(docker inspect -f '{{.State.Health.Status}}' oms-demo-db)" = healthy ]; do sleep 2; done
 
 echo "== training data"
 docker exec oms-demo-db psql -q -U oms -d postgres -c "DROP DATABASE IF EXISTS oms WITH (FORCE)" -c "CREATE DATABASE oms"

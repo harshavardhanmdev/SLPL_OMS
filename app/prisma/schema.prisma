@@ -723,6 +723,36 @@ model Expense {
   @@index([category, spentAt])
 }
 
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// What a staff member paid for themselves, such as travel or food, sent to an
+/// owner to approve. Kept apart from Expense, which is the company's own books.
+model ExpenseClaim {
+  id             String          @id @default(cuid())
+  claimedById    String
+  claimedBy      AdminUser       @relation(fields: [claimedById], references: [id], onDelete: Cascade)
+  spentOn        DateTime
+  amount         Int // paise
+  category       ExpenseCategory
+  /// Where and what for, such as "Bus to Uppal and back, Sunrise visit"
+  note           String
+  /// Photo of the bill, served to staff only
+  billImage      String?
+  status         ClaimStatus     @default(PENDING)
+  decidedByName  String?
+  decidedAt      DateTime?
+  rejectedReason String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([status])
+  @@index([claimedById, spentOn])
+}
+
 // ─── Staff accounts ───────────────────────────────────────────────────────────
 // Ported verbatim from the ERP fork so the two systems stay schema compatible
 // and the rest of its finance layer can follow without a rewrite.
@@ -756,6 +786,7 @@ model AdminUser {
   reportsToId String?
   reportsTo   AdminUser?  @relation("reports", fields: [reportsToId], references: [id], onDelete: SetNull)
   reports     AdminUser[] @relation("reports")
+  expenseClaims ExpenseClaim[]
 
   sessions       AdminSession[]
   auditLogs      AdminAuditLog[]

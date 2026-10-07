@@ -21,7 +21,10 @@ type Entry = NavItem & { needs: Capability | "erp.enter" | "admin.enter" };
 const groups: { label: string | null; items: Entry[] }[] = [
   {
     label: null,
-    items: [{ href: "/erp", label: "Overview", icon: "overview", needs: "erp.enter" }],
+    items: [
+      { href: "/erp", label: "Overview", icon: "overview", needs: "erp.enter" },
+      { href: "/erp/claims", label: "My expenses", icon: "expenses", needs: "erp.enter" },
+    ],
   },
   {
     label: "Sales",

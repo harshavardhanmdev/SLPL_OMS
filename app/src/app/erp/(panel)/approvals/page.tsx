@@ -3,9 +3,10 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, ChevronRight, FileSignature, Package, ReceiptText } from "lucide-react";
+import { CheckCircle2, ChevronRight, FileSignature, Package, ReceiptText, Wallet } from "lucide-react";
 
 import { approvalFilters } from "@/lib/approvals";
+import { claimCategoryLabel } from "@/lib/claims";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { getStaff, roleCan } from "@/lib/staff-auth";
@@ -17,7 +18,7 @@ const dateIN = (d: Date) =>
 
 type Item = {
   key: string;
-  kind: "Quotation" | "Invoice" | "Samples";
+  kind: "Quotation" | "Invoice" | "Samples" | "Expense";
   title: string;
   href: string;
   raisedBy: string;
@@ -27,7 +28,7 @@ type Item = {
   reason: string | null;
 };
 
-const icons = { Quotation: FileSignature, Invoice: ReceiptText, Samples: Package };
+const icons = { Quotation: FileSignature, Invoice: ReceiptText, Samples: Package, Expense: Wallet };
 
 /**
  * One inbox for everything that needs a decision. The manager sees what is
@@ -39,7 +40,7 @@ export default async function ApprovalsPage() {
   if (!staff || !roleCan(staff.role, "crm.read")) redirect("/erp");
   const f = approvalFilters(staff);
 
-  const [quotations, invoices, samples] = await Promise.all([
+  const [quotations, invoices, samples, claims] = await Promise.all([
     db.quotation.findMany({
       where: f.quotation,
       orderBy: { updatedAt: "desc" },
@@ -66,6 +67,12 @@ export default async function ApprovalsPage() {
         issuedBy: { select: { name: true } },
         organization: { select: { name: true } },
       },
+    }),
+    db.expenseClaim.findMany({
+      where: f.claim,
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      include: { claimedBy: { select: { name: true } } },
     }),
   ]);
 
@@ -103,6 +110,17 @@ export default async function ApprovalsPage() {
       when: s.updatedAt,
       reason: s.rejectedReason,
     })),
+    ...claims.map((c) => ({
+      key: `c-${c.id}`,
+      kind: "Expense" as const,
+      title: c.note,
+      href: "/erp/claims",
+      raisedBy: c.claimedBy.name,
+      school: claimCategoryLabel(c.category),
+      amount: formatINR(c.amount),
+      when: c.updatedAt,
+      reason: c.rejectedReason,
+    })),
   ].sort((a, b) => b.when.getTime() - a.when.getTime());
 
   return (
@@ -111,7 +129,7 @@ export default async function ApprovalsPage() {
         <h1 className="font-heading text-2xl font-bold">Approvals</h1>
         <p className="text-sm text-muted-foreground">
           {f.approver
-            ? "Quotations, invoices and samples waiting for your decision, newest first."
+            ? "Quotations, invoices, samples and expense claims waiting for your decision, newest first."
             : "What your manager sent back to you, and why. Fix it and save to send it again."}
         </p>
       </div>

@@ -218,6 +218,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                 <th className="px-2 py-2.5 text-left font-semibold uppercase print:py-1">
                   {showTax || showDisc ? "Items/Services" : "Items"}
                 </th>
+                <th className={th}>HSN/SAC</th>
                 <th className={th}>QTY.</th>
                 <th className={th}>RATE</th>
                 {showDisc && <th className={th}>DISC.</th>}
@@ -233,12 +234,8 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                   <tr key={item.id} style={{ borderBottom: `1px solid ${DOC_RULE}` }}>
                     <td className="px-2 py-2.5 align-top uppercase print:py-1">
                       {item.description}
-                      {item.hsnCode && showTax && (
-                        <span className={sub} style={{ color: DOC_MUTED }}>
-                          {item.gstRate > 0 ? "SAC" : "HSN"} {item.hsnCode}
-                        </span>
-                      )}
                     </td>
+                    <td className={td}>{item.hsnCode || "-"}</td>
                     <td className={`${td} whitespace-nowrap`}>
                       {item.quantity} {item.unit.toUpperCase()}
                     </td>
@@ -265,6 +262,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
               })}
               <tr style={{ borderTop: `2px solid ${DOC_BLUE}`, borderBottom: `2px solid ${DOC_BLUE}` }}>
                 <td className="px-2 py-2.5 font-bold uppercase print:py-1">Subtotal</td>
+                <td className={td} />
                 <td className={`${td} font-bold`}>{qty}</td>
                 <td className={td} />
                 {showDisc && <td className={`${td} font-bold`}>{formatINR(totals.discount)}</td>}

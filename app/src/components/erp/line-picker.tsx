@@ -74,9 +74,10 @@ function termOf(title: string): keyof typeof TERM_STYLE | null {
   return null;
 }
 
-// A zero rate on the price list means the book comes inside a set
-const priceText = (item: CatalogItem) =>
-  item.price > 0 ? formatINR(item.price) : "Included in set";
+// A zero rate on a book means it comes inside a set; on a taxed service, such
+// as designing, it means the amount is typed on each quotation
+const zeroText = (item: CatalogItem) => (item.gstRate > 0 ? "Price typed in" : "Included in set");
+const priceText = (item: CatalogItem) => (item.price > 0 ? formatINR(item.price) : zeroText(item));
 
 function groupsOf(items: CatalogItem[]): [string, CatalogItem[]][] {
   const groups: [string, CatalogItem[]][] = [];
@@ -296,7 +297,7 @@ export function LinePicker({
                                 </>
                               ) : (
                                 <span className="text-xs font-medium text-muted-foreground">
-                                  Included in set
+                                  {zeroText(c)}
                                 </span>
                               )}
                             </span>

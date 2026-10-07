@@ -9,7 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatINR } from "@/lib/money";
-import { OUR_STATE, documentTotals, lineTotals, ratePercent } from "@/lib/quotation-math";
+import {
+  BOOK_HSN,
+  OUR_STATE,
+  documentTotals,
+  hsnForRate,
+  lineTotals,
+  ratePercent,
+} from "@/lib/quotation-math";
 import { saveInvoice } from "@/lib/invoice-actions";
 import { LinePicker, type CatalogItem, type OrgOption } from "@/components/erp/line-picker";
 import { todayLocalIso } from "@/lib/utils";
@@ -39,7 +46,7 @@ type Row = {
 const blankRow: Row = {
   productId: null,
   description: "",
-  hsnCode: "",
+  hsnCode: BOOK_HSN,
   unit: "Nos",
   quantity: "1",
   mrp: "",
@@ -314,7 +321,7 @@ export function InvoiceForm({
                       onPick={(item) => pickProduct(i, item)}
                     />
                   </div>
-                  <div className="space-y-1.5 sm:col-span-4">
+                  <div className="space-y-1.5 sm:col-span-12">
                     <Label htmlFor={`in-desc-${i}`} className="text-xs">
                       Description
                     </Label>
@@ -326,7 +333,19 @@ export function InvoiceForm({
                       required
                     />
                   </div>
-                  <div className="space-y-1.5 sm:col-span-1">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor={`in-hsn-${i}`} className="text-xs">
+                      HSN/SAC
+                    </Label>
+                    <Input
+                      id={`in-hsn-${i}`}
+                      inputMode="numeric"
+                      value={row.hsnCode}
+                      onChange={(e) => setRow(i, { hsnCode: e.target.value.replace(/[^\dA-Za-z]/g, "") })}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor={`in-qty-${i}`} className="text-xs">
                       Qty
                     </Label>
@@ -350,7 +369,7 @@ export function InvoiceForm({
                       className="h-10"
                     />
                   </div>
-                  <div className="space-y-1.5 sm:col-span-2">
+                  <div className="space-y-1.5 sm:col-span-3">
                     <Label htmlFor={`in-rate-${i}`} className="text-xs">
                       Rate charged
                     </Label>
@@ -370,7 +389,12 @@ export function InvoiceForm({
                       id={`in-gst-${i}`}
                       className="flex h-10 w-full rounded-md border border-input bg-transparent px-2 text-sm"
                       value={row.gstRate}
-                      onChange={(e) => setRow(i, { gstRate: e.target.value })}
+                      onChange={(e) =>
+                        setRow(i, {
+                          gstRate: e.target.value,
+                          hsnCode: hsnForRate(row.hsnCode, Number(e.target.value)),
+                        })
+                      }
                     >
                       <option value="0">Nil, printed book</option>
                       <option value="500">5%, e-book</option>

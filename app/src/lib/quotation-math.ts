@@ -152,6 +152,20 @@ export function documentKindFor(lines: { gstRate: number }[]) {
   return lines.some((l) => l.gstRate > 0) ? ("TAX_INVOICE" as const) : ("BILL_OF_SUPPLY" as const);
 }
 
+/**
+ * The owner's usual codes: HSN 4901 for a printed book, SAC 9983 for a taxed
+ * service. Changing a line's GST swaps one for the other, so a new line reads
+ * right either way, but a code typed by hand is left alone.
+ */
+export const BOOK_HSN = "4901";
+export const SERVICE_SAC = "9983";
+
+export function hsnForRate(current: string, gstRate: number): string {
+  if (current === BOOK_HSN && gstRate > 0) return SERVICE_SAC;
+  if (current === SERVICE_SAC && gstRate === 0) return BOOK_HSN;
+  return current;
+}
+
 /** "18%" from 1800, and "12.5%" from 1250, without trailing zeros. */
 export function ratePercent(basisPoints: number): string {
   return `${(basisPoints / 100).toFixed(2).replace(/\.?0+$/, "")}%`;

@@ -11,7 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LinePicker, UNITS, type CatalogItem, type OrgOption } from "@/components/erp/line-picker";
 import { formatINR } from "@/lib/money";
-import { OUR_STATE, lineTotals, quoteTotals, ratePercent } from "@/lib/quotation-math";
+import {
+  BOOK_HSN,
+  OUR_STATE,
+  hsnForRate,
+  lineTotals,
+  quoteTotals,
+  ratePercent,
+} from "@/lib/quotation-math";
 import { saveQuotation } from "@/lib/quotation-actions";
 import { cn, todayLocalIso } from "@/lib/utils";
 
@@ -38,7 +45,7 @@ export type QuoteRow = {
 const blankRow: QuoteRow = {
   productId: null,
   description: "",
-  hsnCode: "",
+  hsnCode: BOOK_HSN,
   unit: "PCS",
   quantity: "1",
   mrp: "",
@@ -69,6 +76,14 @@ const DEFAULT_TERMS = [
   "Payment: 50% with the order, balance before dispatch.",
   "Printed books are nil rated under HSN 4901. Services attract GST at 18%.",
 ].join("\n");
+
+/**
+ * The owner's note for design work, added to the terms the first time a line
+ * from the "Designing service" price list group is picked.
+ */
+const DESIGN_GROUP = "Designing service";
+const DESIGN_NOTE =
+  "The designing and printing price is for a standard 64 page magazine and may vary if the number of pages increases or decreases.";
 
 /** What the server and the totals both read a row as. */
 function toLine(r: QuoteRow) {
@@ -144,6 +159,13 @@ export function QuotationForm({
       unitPrice: String(item.price / 100),
       gstRate: String(item.gstRate),
     });
+    if (item.group === DESIGN_GROUP) {
+      setV((old) =>
+        old.terms.includes(DESIGN_NOTE)
+          ? old
+          : { ...old, terms: old.terms.trim() ? `${old.terms.trim()}\n${DESIGN_NOTE}` : DESIGN_NOTE },
+      );
+    }
   }
 
   const parsed = v.lines.map(toLine);
@@ -428,7 +450,12 @@ export function QuotationForm({
                       id={`q-gst-${i}`}
                       className="flex h-10 w-full rounded-md border border-input bg-transparent px-2 text-sm"
                       value={row.gstRate}
-                      onChange={(e) => setRow(i, { gstRate: e.target.value })}
+                      onChange={(e) =>
+                        setRow(i, {
+                          gstRate: e.target.value,
+                          hsnCode: hsnForRate(row.hsnCode, Number(e.target.value)),
+                        })
+                      }
                     >
                       <option value="0">Nil, printed book</option>
                       <option value="500">5%, e-book</option>

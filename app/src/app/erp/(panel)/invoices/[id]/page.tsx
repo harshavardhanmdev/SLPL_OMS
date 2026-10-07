@@ -204,7 +204,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <thead>
             <tr style={{ borderBottom: `2px solid ${DOC_BLUE}` }}>
               <th className="px-2 py-2 text-left font-semibold uppercase print:py-1">Items</th>
-              {taxed && <th className={th}>HSN</th>}
+              <th className={th}>HSN/SAC</th>
               <th className={th}>Qty.</th>
               {invoice.items.some((i) => i.mrp) && <th className={th}>MRP</th>}
               <th className={th}>Rate</th>
@@ -225,7 +225,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                       </span>
                     )}
                   </td>
-                  {taxed && <td className={td}>{item.hsnCode ?? "-"}</td>}
+                  <td className={td}>{item.hsnCode || "-"}</td>
                   <td className={td}>
                     {item.quantity} {item.unit}
                   </td>
@@ -246,7 +246,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             })}
             <tr style={{ borderTop: `2px solid ${DOC_BLUE}`, borderBottom: `2px solid ${DOC_BLUE}` }}>
               <td className="px-2 py-2 font-bold uppercase print:py-1">Subtotal</td>
-              <td className={`${td} font-bold`} colSpan={taxed ? 2 : 1}>
+              <td className={`${td} font-bold`} colSpan={2}>
                 {qty}
               </td>
               <td

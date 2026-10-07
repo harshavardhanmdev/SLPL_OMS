@@ -219,6 +219,11 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
     if (visit) {
       await tx.visit.update({ where: { id: visit.id }, data: { converted: true, invoiceId: created.id } });
     }
+    // A school billed is a school buying from us
+    await tx.organization.updateMany({
+      where: { id: org.id, status: { not: "ACTIVE" } },
+      data: { status: "ACTIVE" },
+    });
     // Billing a quotation is the school accepting it
     if (quotation && ["APPROVED", "SENT"].includes(quotation.status)) {
       await tx.quotation.update({
@@ -332,10 +337,12 @@ export async function deleteInvoice(input: z.infer<typeof deleteSchema>): Promis
     return { error: "A payment is recorded against this bill. Void the payment first." };
   }
 
-  // MAG/SLPL/10-26/GLO02: the series is the product line and customer code
+  // MAG/SLPL/10-26/GLO02, or GLO2-01 for a code ending in a digit: the series
+  // is the product line and customer code
   const tail = invoice.number.split("/").pop() ?? "";
-  const serial = Number(tail.match(/(\d+)$/)?.[1] ?? 0);
-  const code = tail.replace(/\d+$/, "");
+  const parts = tail.includes("-") ? tail.split("-") : [tail.replace(/\d+$/, ""), tail.match(/(\d+)$/)?.[1] ?? "0"];
+  const code = parts[0];
+  const serial = Number(parts[1]);
   const key = `invoice:${invoice.productLine}:${code}`;
 
   let reused = false;

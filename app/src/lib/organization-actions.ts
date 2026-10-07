@@ -24,14 +24,15 @@ const DENIED: Record<string, string> = {
 
 /**
  * Three letters from the name, which become part of every invoice number.
- * Cambridge Schools -> CAM. A clash gets a digit rather than failing, because
- * somebody adding a school should not have to think about numbering.
+ * Cambridge Schools -> CAM. Another school starting the same way keeps the
+ * letters and takes the next number, CAM2, CAM3, so schools with the same
+ * name never share a code and nobody adding one has to think about numbering.
  */
 export async function suggestCode(name: string, ignoreId?: string): Promise<string> {
   const letters = name.toUpperCase().replace(/[^A-Z]/g, "");
   const base = (letters.slice(0, 3) || "ORG").padEnd(3, "X");
-  for (let i = 0; i < 100; i++) {
-    const candidate = i === 0 ? base : `${base.slice(0, 2)}${i}`;
+  for (let i = 1; i < 1000; i++) {
+    const candidate = i === 1 ? base : `${base}${i}`;
     const clash = await db.organization.findFirst({
       where: { code: candidate, ...(ignoreId ? { NOT: { id: ignoreId } } : {}) },
       select: { id: true },
@@ -149,4 +150,102 @@ export async function deleteOrganization(id: string): Promise<Result> {
   });
   revalidatePath("/erp/organizations");
   return { ok: true };
+}
+
+const importRowSchema = z.object({
+  name: z.string().trim().min(2, "No school name").max(120),
+  contactPerson: z.string().trim().max(80).optional(),
+  phone: z.string().trim().max(20).optional(),
+  email: z.string().trim().max(120).optional(),
+  addressLine: z.string().trim().max(200).optional(),
+  city: z.string().trim().max(60).optional(),
+  state: z.string().trim().max(60).optional(),
+  pincode: z.string().trim().max(10).optional(),
+  gstin: z.string().trim().max(20).optional(),
+});
+
+export type ImportRow = z.infer<typeof importRowSchema>;
+
+export type ImportResult = {
+  error?: string;
+  created?: number;
+  skipped?: { name: string; reason: string }[];
+};
+
+/** Same school if the name matches and the city does too, or one of them has no city. */
+const nameKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * A salesperson's list of schools from a spreadsheet. Each new school comes in
+ * as a lead, not yet active, until a quotation or an invoice is raised for it.
+ * A school already on record is skipped, never duplicated.
+ */
+export async function importOrganizations(input: { rows: ImportRow[]; ownerId?: string | null }): Promise<ImportResult> {
+  const denied = await requireCapability("crm.write");
+  if (denied) return { error: DENIED[denied] };
+  const staff = await getStaff();
+  if (!staff) return { error: DENIED.UNAUTHORIZED };
+  if (!Array.isArray(input.rows) || input.rows.length === 0) return { error: "The sheet has no schools in it." };
+  if (input.rows.length > 2000) return { error: "That is over 2,000 rows. Split the sheet and import it in parts." };
+
+  // A manager can hand the list to a salesperson; a salesperson's list is theirs
+  const manager = (await requireCapability("crm.manage")) === null;
+  let ownerId: string | null = staff.breakGlass ? null : staff.id;
+  if (manager) {
+    ownerId = input.ownerId || null;
+    if (ownerId && !(await db.adminUser.findUnique({ where: { id: ownerId }, select: { id: true } }))) {
+      return { error: "Pick who looks after these schools again." };
+    }
+  }
+
+  const known = (await db.organization.findMany({ select: { name: true, city: true } })).map((o) => ({
+    name: nameKey(o.name),
+    city: nameKey(o.city ?? ""),
+  }));
+  const seen = (name: string, city: string) =>
+    known.some((k) => k.name === name && (k.city === city || !k.city || !city));
+
+  const skipped: { name: string; reason: string }[] = [];
+  let created = 0;
+  for (const raw of input.rows) {
+    const parsed = importRowSchema.safeParse(raw);
+    if (!parsed.success) {
+      skipped.push({ name: String(raw?.name ?? "").slice(0, 120) || "(blank)", reason: parsed.error.issues[0].message });
+      continue;
+    }
+    const r = parsed.data;
+    const key = { name: nameKey(r.name), city: nameKey(r.city ?? "") };
+    if (seen(key.name, key.city)) {
+      skipped.push({ name: r.name, reason: "Already on record" });
+      continue;
+    }
+    await db.organization.create({
+      data: {
+        code: await suggestCode(r.name),
+        name: r.name,
+        kind: "SCHOOL",
+        contactPerson: r.contactPerson || null,
+        phone: r.phone || null,
+        email: r.email || null,
+        addressLine: r.addressLine || null,
+        city: r.city || null,
+        ...(r.state ? { state: r.state } : {}),
+        pincode: r.pincode || null,
+        gstin: r.gstin ? r.gstin.toUpperCase() : null,
+        ownerId,
+        source: "Excel import",
+        status: "LEAD",
+      },
+    });
+    known.push(key);
+    created++;
+  }
+
+  await audit({
+    action: "organization.import",
+    entityType: "Organization",
+    after: { created, skipped: skipped.length, ownerId },
+  });
+  revalidatePath("/erp/organizations");
+  return { created, skipped };
 }

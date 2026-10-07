@@ -84,7 +84,9 @@ export async function nextInvoiceNumber(
 ): Promise<string> {
   const my = monthYearLabel(on);
   const serial = await allocateSerial(tx, `invoice:${productLine}:${customerCode}`);
-  return `${productLine}/SLPL/${my}/${customerCode}${pad(serial, 2)}`;
+  // GLO2-01 rather than GLO201, so a code ending in a digit still reads apart from its serial
+  const join = /\d$/.test(customerCode) ? "-" : "";
+  return `${productLine}/SLPL/${my}/${customerCode}${join}${pad(serial, 2)}`;
 }
 
 /** `SLPL/DC/2026-27/0001` */

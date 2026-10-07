@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, Download, Plus } from "lucide-react";
+import { Building2, Download, Plus, Upload } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,13 @@ export default async function OrganizationsPage({
               <Download className="size-4" /> Excel
             </Link>
           </Button>
+          {canAdd && (
+            <Button variant="outline" className="gap-2" asChild>
+              <Link href="/erp/organizations/import">
+                <Upload className="size-4" /> Import from Excel
+              </Link>
+            </Button>
+          )}
           {canAdd && (
             <Button className="gap-2" asChild>
               <Link href="/erp/organizations/new">

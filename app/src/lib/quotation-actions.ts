@@ -180,8 +180,13 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
     return { ok: true, id: row.id, number: row.number };
   }
 
-  const row = await db.$transaction(async (tx) =>
-    tx.quotation.create({
+  const row = await db.$transaction(async (tx) => {
+    // A school being quoted is an active school, however it was first added
+    await tx.organization.updateMany({
+      where: { id: org.id, status: { not: "ACTIVE" } },
+      data: { status: "ACTIVE" },
+    });
+    return tx.quotation.create({
       data: {
         ...header,
         number: await nextQuotationNumber(tx, quotedOn, org.code),
@@ -189,8 +194,8 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
         createdEmail: staff.email,
         items: { create: itemRows },
       },
-    }),
-  );
+    });
+  });
 
   await audit({
     action: "quotation.create",

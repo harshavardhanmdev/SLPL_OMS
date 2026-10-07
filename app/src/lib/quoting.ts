@@ -98,8 +98,10 @@ export async function organizationsForBilling(): Promise<OrgOption[]> {
 
 /**
  * A picked line's product id, or null. Price list and service lines are
- * prefixed so they never pass for a store product id.
+ * prefixed so they never pass for a store product id. A GenZ Times plan is
+ * kept as magazine:<plan>, because a paid bill starts that subscription.
  */
 export function storeProductId(id: string | null | undefined): string | null {
+  if (id?.startsWith("magazine:")) return id;
   return id && !id.includes(":") ? id : null;
 }

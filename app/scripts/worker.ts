@@ -6,6 +6,7 @@
  *    Razorpay payments (heals interrupted payments / missed webhooks)
  *  - every 3 h:    sync Shiprocket tracking → order statuses + emails
  *  - daily 9 am:   email the owner any grievance past its statutory deadline
+ *  - 1st and 15th: email the owner who is still owed this month's GenZ Times
  *
  * Start: npx tsx scripts/worker.ts   (NODE_OPTIONS=--conditions=react-server)
  */
@@ -15,7 +16,7 @@ import cron from "node-cron";
 import { releaseExpiredOrders, reconcilePendingPayments } from "../src/lib/orders";
 import { syncShipmentTracking } from "../src/lib/shipping/tracking-sync";
 import { reportOverdueGrievances } from "../src/lib/grievance-sla";
-import { remindExpiringSubscriptions } from "../src/lib/subscription-notify";
+import { remindExpiringSubscriptions, remindPosting } from "../src/lib/subscription-notify";
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), "[worker]", ...args);
 
@@ -46,6 +47,15 @@ async function subscriptionTick() {
   }
 }
 
+async function postingTick() {
+  try {
+    const owed = await remindPosting();
+    if (owed > 0) log(`${owed} subscriber(s) owed this month's issue - owner reminded`);
+  } catch (err) {
+    console.error("[worker] posting reminder failed", err);
+  }
+}
+
 async function grievanceSlaTick() {
   try {
     const overdue = await reportOverdueGrievances();
@@ -65,6 +75,8 @@ cron.schedule("0 */3 * * *", trackingTick);
 cron.schedule("0 9 * * *", grievanceSlaTick);
 // 10 am, after the grievance digest, so the two never collide
 cron.schedule("0 10 * * *", subscriptionTick);
+// 9:30 am on the 1st, and again on the 15th if the run is still not recorded
+cron.schedule("30 9 1,15 * *", postingTick);
 
 process.on("SIGTERM", () => {
   log("SIGTERM — bye");

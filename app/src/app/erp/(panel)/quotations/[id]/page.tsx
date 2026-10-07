@@ -73,7 +73,10 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
     },
   });
   if (!quotation) notFound();
-  const company = await getCompany();
+  const [company, invoice] = await Promise.all([
+    getCompany(),
+    db.invoice.findFirst({ where: { quotationId: quotation.id }, select: { id: true, number: true } }),
+  ]);
 
   const lines = quotation.items.map((i) => ({
     description: i.description,
@@ -87,13 +90,17 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
   }));
   const perLine = lines.map(lineTotals);
   const totals = quoteTotals(lines, quotation.placeOfSupply);
+  // The stored total is the one quoted; anything past the exact sum is the round off
+  const exact = totals.total - totals.roundOff;
+  const total = quotation.total;
+  const roundOff = total - exact;
   const qty = lines.reduce((s, l) => s + l.quantity, 0);
   const showDisc = perLine.some((t) => t.discount > 0);
   const showTax = perLine.some((t) => t.tax > 0);
   const lapsed = quotation.validUntil < new Date() && quotation.status === "SENT";
 
   const qr =
-    company.upiId && totals.total > 0
+    company.upiId && total > 0
       ? await QRCode.toString(upiPayload(company, quotation.number), {
           type: "svg",
           margin: 0,
@@ -135,6 +142,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             canWrite={roleCan(staff.role, "quotes.write")}
             canInvoice={roleCan(staff.role, "invoices.write")}
             canDelete={roleCan(staff.role, "staff.manage")}
+            invoice={invoice}
           />
           <PrintButton label="Print the quotation" />
         </div>
@@ -265,7 +273,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                     {formatINR(totals.cgst + totals.sgst + totals.igst)}
                   </td>
                 )}
-                <td className={`${td} font-bold`}>{formatINR(totals.total)}</td>
+                <td className={`${td} font-bold`}>{formatINR(exact)}</td>
               </tr>
             </tbody>
           </table>
@@ -275,7 +283,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
               signature always print on the same sheet */}
           <div className="mt-4 break-inside-avoid print:mt-3">
             <div className="grid grid-cols-2 gap-6">
-              <BankBlock company={company} qrSvg={qr} amount={totals.total} amountLabel="Quotation total" />
+              <BankBlock company={company} qrSvg={qr} amount={total} amountLabel="Quotation total" />
 
               <div className="text-[11px]">
                 <dl className="ml-auto max-w-xs space-y-1">
@@ -306,17 +314,26 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                         </div>
                       ),
                     )}
+                  {roundOff !== 0 && (
+                    <div className="flex justify-between">
+                      <dt>Round off</dt>
+                      <dd className="tabular-nums">
+                        {roundOff > 0 ? "+ " : "- "}
+                        {formatINR(Math.abs(roundOff))}
+                      </dd>
+                    </div>
+                  )}
                   <div
                     className="flex justify-between border-y py-1.5 text-sm font-bold"
                     style={{ borderColor: DOC_RULE }}
                   >
                     <dt>Total Amount</dt>
-                    <dd className="tabular-nums">{formatINR(totals.total)}</dd>
+                    <dd className="tabular-nums">{formatINR(total)}</dd>
                   </div>
                 </dl>
                 <p className="mt-3 text-right print:mt-2">
                   <span className="block font-bold">Total Amount (in words)</span>
-                  {rupeesInWords(totals.total).replace(/ Only$/, "")}
+                  {rupeesInWords(total).replace(/ Only$/, "")}
                 </p>
                 <TermsBlock terms={quotation.terms} />
                 <p className="mt-2 text-[10px] leading-snug" style={{ color: DOC_MUTED }}>

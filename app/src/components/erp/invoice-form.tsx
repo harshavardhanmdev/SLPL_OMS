@@ -155,6 +155,8 @@ export function InvoiceForm({
     noBillDiscount: r.noBillDiscount,
   }));
   const billDiscountBp = Number(v.billDiscountBp) || 0;
+  // Kept as typed, so "12." survives on the way to "12.5"
+  const [discountText, setDiscountText] = React.useState((billDiscountBp / 100).toString());
   const totals = documentTotals(parsed, v.placeOfSupply, billDiscountBp);
   const taxed = parsed.some((l) => l.gstRate > 0);
 
@@ -441,10 +443,12 @@ export function InvoiceForm({
             <Input
               id="in-billdisc"
               inputMode="decimal"
-              value={(billDiscountBp / 100).toString()}
-              onChange={(e) =>
-                set("billDiscountBp", String(Math.round((Number(e.target.value) || 0) * 100)))
-              }
+              value={discountText}
+              onChange={(e) => {
+                const text = e.target.value.replace(/[^\d.]/g, "");
+                setDiscountText(text);
+                set("billDiscountBp", String(Math.round((Number(text) || 0) * 100)));
+              }}
               className="h-10 w-28"
             />
           </div>
@@ -482,6 +486,15 @@ export function InvoiceForm({
                   </React.Fragment>
                 ),
               )}
+          {totals.roundOff !== 0 && (
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Round off</dt>
+              <dd className="tabular-nums">
+                {totals.roundOff > 0 ? "+ " : "- "}
+                {formatINR(Math.abs(totals.roundOff))}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between border-t pt-2 font-heading text-lg font-bold">
             <dt>Total</dt>
             <dd className="tabular-nums">{formatINR(totals.total)}</dd>
@@ -529,5 +542,47 @@ export function InvoiceForm({
         {v.id ? "Save changes" : "Raise the invoice"}
       </Button>
     </form>
+  );
+}
+
+/** An approved, sent or accepted quotation that has not been billed yet. */
+export type BillableQuotation = { id: string; label: string };
+
+/**
+ * Picks the quotation a new bill comes from. Choosing one reloads the form
+ * filled from it: the school, every line and the place of supply.
+ */
+export function QuotationStart({
+  quotations,
+  current,
+}: {
+  quotations: BillableQuotation[];
+  current?: string;
+}) {
+  const router = useRouter();
+  if (quotations.length === 0 && !current) return null;
+  return (
+    <section className="rounded-2xl border bg-card p-4 sm:p-5">
+      <Label htmlFor="in-quote">Start from a quotation</Label>
+      <select
+        id="in-quote"
+        className={`${selectClass} mt-1.5`}
+        value={current ?? ""}
+        onChange={(e) =>
+          router.push(e.target.value ? `/erp/invoices/new?quotation=${e.target.value}` : "/erp/invoices/new")
+        }
+      >
+        <option value="">No, a blank invoice</option>
+        {quotations.map((q) => (
+          <option key={q.id} value={q.id}>
+            {q.label}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        Fills in the school and every line, ready to change. The quotation is marked accepted when
+        this invoice is saved.
+      </p>
+    </section>
   );
 }

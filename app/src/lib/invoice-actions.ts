@@ -133,7 +133,8 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
       discountBp: line.discountBp ?? 0,
       gstRate: line.gstRate,
       noBillDiscount: line.noBillDiscount ?? false,
-      lineTotal: t.total,
+      // The line's own value; only the bill as a whole is rounded to rupees
+      lineTotal: t.total - t.roundOff,
       sortOrder: i,
     };
   });
@@ -154,6 +155,24 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
       })
     : null;
   if (d.visitId && !visit) return { error: "That visit is not one of this school's." };
+
+  // A quotation can be billed once, and only to the school it was made out to
+  const quotation = d.quotationId
+    ? await db.quotation.findUnique({
+        where: { id: d.quotationId },
+        select: { id: true, number: true, status: true, organizationId: true },
+      })
+    : null;
+  if (d.quotationId && !d.id) {
+    if (!quotation || quotation.organizationId !== org.id) {
+      return { error: "That quotation is not one of this school's." };
+    }
+    const billed = await db.invoice.findFirst({
+      where: { quotationId: quotation.id },
+      select: { number: true },
+    });
+    if (billed) return { error: `Quotation ${quotation.number} is already billed as ${billed.number}.` };
+  }
 
   if (d.id) {
     const before = await db.invoice.findUnique({ where: { id: d.id } });
@@ -200,6 +219,13 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
     if (visit) {
       await tx.visit.update({ where: { id: visit.id }, data: { converted: true, invoiceId: created.id } });
     }
+    // Billing a quotation is the school accepting it
+    if (quotation && ["APPROVED", "SENT"].includes(quotation.status)) {
+      await tx.quotation.update({
+        where: { id: quotation.id },
+        data: { status: "ACCEPTED", decidedAt: new Date() },
+      });
+    }
     return created;
   });
 
@@ -216,6 +242,7 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
     },
   });
   revalidatePath("/erp/invoices");
+  if (quotation) revalidatePath("/erp/quotations");
   return { ok: true, id: row.id, number: row.number };
 }
 

@@ -8,7 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { PrintButton } from "@/components/store/print-button";
 import { db } from "@/lib/db";
 import { site } from "@/lib/site";
-import { issueLabelFor } from "@/lib/subscription-plans";
+import { isOwed, issueLabelFor } from "@/lib/subscription-plans";
 
 export const metadata: Metadata = { title: "Posting list", robots: { index: false } };
 
@@ -33,7 +33,8 @@ export default async function PostingListPage({
     where: { status: "ACTIVE", dispatches: { none: { issueLabel: issue } } },
     orderBy: [{ state: "asc" }, { city: "asc" }, { pincode: "asc" }],
   });
-  const owed = due.filter((s) => s.issuesSent < s.issuesTotal);
+  const owed = due.filter((s) => isOwed(s, issue));
+  const copies = owed.reduce((n, s) => n + s.copies, 0);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -65,7 +66,8 @@ export default async function PostingListPage({
             <p className="font-heading text-lg font-bold">{site.company}</p>
             <p className="text-sm">
               The GenZ Times, posting list for {issue} · {owed.length}{" "}
-              {owed.length === 1 ? "envelope" : "envelopes"}
+              {owed.length === 1 ? "envelope" : "envelopes"}, {copies}{" "}
+              {copies === 1 ? "copy" : "copies"}
             </p>
           </div>
         </header>
@@ -82,7 +84,10 @@ export default async function PostingListPage({
                 className="break-inside-avoid rounded border p-3 text-sm"
                 style={{ borderColor: NAVY }}
               >
-                <p className="font-semibold">{s.subscriberName}</p>
+                <p className="font-semibold">
+                  {s.subscriberName}
+                  {s.copies > 1 && <span className="float-right">{s.copies} copies</span>}
+                </p>
                 <p>{s.addressLine1}</p>
                 {s.addressLine2 && <p>{s.addressLine2}</p>}
                 <p>

@@ -13,6 +13,12 @@ import { db } from "../src/lib/db";
 import { allocateSerial, nextInvoiceNumber, nextQuotationNumber } from "../src/lib/number-series";
 import { documentKindFor, documentTotals, rupeesInWords } from "../src/lib/quotation-math";
 import { accountPosition } from "../src/lib/ledger";
+import {
+  remindPosting,
+  startInvoiceSubscriptions,
+  stopInvoiceSubscriptions,
+} from "../src/lib/subscription-notify";
+import { isOwed } from "../src/lib/subscription-plans";
 
 const CODE = "ZZT";
 
@@ -22,6 +28,8 @@ function check(what: string, ok: boolean, detail = "") {
 }
 
 async function cleanup() {
+  // A school's subscription outlives its deleted test invoice, so find it by the note
+  await db.subscription.deleteMany({ where: { notes: { contains: `/${CODE}` } } });
   // Invoices outlive their school (the relation sets null), so remove them by number
   await db.invoice.deleteMany({ where: { number: { contains: `/${CODE}` } } });
   const org = await db.organization.findUnique({ where: { code: CODE } });
@@ -182,6 +190,93 @@ async function main() {
   await db.receipt.update({ where: { id: receipt.id }, data: { voidedAt: new Date() } });
   position = await accountPosition(org.id);
   check("a voided receipt stops counting", position.outstanding === 10_000_00);
+
+  console.log("\nThe bill is rounded to whole rupees");
+  const up = documentTotals([{ description: "x", quantity: 1, unitPrice: 100_50, gstRate: 0 }], "Telangana", 0);
+  check("Rs 100.50 goes up to Rs 101", up.total === 101_00 && up.roundOff === 50, `${up.total} ${up.roundOff}`);
+  const down = documentTotals([{ description: "x", quantity: 1, unitPrice: 100_49, gstRate: 0 }], "Telangana", 0);
+  check("Rs 100.49 goes down to Rs 100", down.total === 100_00 && down.roundOff === -49, `${down.total} ${down.roundOff}`);
+  const messy = documentTotals(
+    [
+      { description: "Books", quantity: 7, unitPrice: 333_33, gstRate: 0 },
+      { description: "Workshop", quantity: 1, unitPrice: 12_345_67, gstRate: 1800 },
+    ],
+    "Telangana",
+    1250,
+  );
+  check("a discounted mixed bill lands on a whole rupee", messy.total % 100 === 0, String(messy.total));
+  check(
+    "and the round off is the whole difference",
+    messy.total - messy.roundOff === messy.taxable + messy.cgst + messy.sgst + messy.igst &&
+      Math.abs(messy.roundOff) <= 50,
+    String(messy.roundOff),
+  );
+
+  console.log("\nA school's GenZ Times subscription starts when its bill is paid");
+  const magBill = await db.invoice.create({
+    data: {
+      number: `MAG/SLPL/10-26/${CODE}98`,
+      productLine: "MAG",
+      status: "APPROVED",
+      organizationId: org.id,
+      customerName: org.name,
+      contactPerson: "The Principal",
+      addressLine: "1 Test Road",
+      city: "Hyderabad",
+      state: "Telangana",
+      pincode: "500068",
+      invoiceDate: new Date(2026, 9, 7),
+      dueDate: new Date(2026, 9, 22),
+      subtotal: 60_470_00,
+      taxable: 60_470_00,
+      total: 60_470_00,
+      createdEmail: "test@theslpl.in",
+      items: {
+        create: [
+          {
+            productId: "magazine:annual",
+            description: "The GenZ Times subscription, 12 months (12 issues)",
+            quantity: 30,
+            unitPrice: 1999_00,
+            lineTotal: 59_970_00,
+          },
+          { description: "Delivery charges", quantity: 1, unitPrice: 500_00, lineTotal: 500_00, sortOrder: 1 },
+        ],
+      },
+    },
+  });
+  const paidOn = new Date(2026, 9, 7);
+  const made = await db.$transaction((tx) => startInvoiceSubscriptions(tx, magBill.id, paidOn));
+  check("one subscription for the one magazine line", made === 1, String(made));
+  const sub = await db.subscription.findFirstOrThrow({ where: { invoiceId: magBill.id } });
+  check("30 copies of each issue", sub.copies === 30, String(sub.copies));
+  check("paid in October, posted from November", sub.startIssue === "November 2026", sub.startIssue);
+  check(
+    "twelve issues, the last in October 2027",
+    sub.issuesTotal === 12 && sub.endsAt?.getMonth() === 9 && sub.endsAt.getFullYear() === 2027,
+    sub.endsAt?.toDateString(),
+  );
+  check("the line's own value is what was paid", sub.amountPaid === 59_970_00, String(sub.amountPaid));
+  check("posted to the school, for the contact", sub.addressLine2 === "Attn: The Principal");
+  check("not owed the October issue", !isOwed(sub, "October 2026"));
+  check("owed the November issue", isOwed(sub, "November 2026"));
+
+  const owed = await remindPosting(new Date(2026, 10, 1));
+  const mail = await db.emailLog.findFirst({
+    where: { template: "subscription-posting-reminder" },
+    orderBy: { createdAt: "desc" },
+  });
+  check(
+    "the reminder on 1 November names the issue and counts the copies",
+    owed >= 1 && !!mail?.subject.includes("November 2026") && /\b\d+ copies\b/.test(mail.subject),
+    mail ? `${mail.subject} [${mail.status}]` : "no email logged",
+  );
+
+  const again = await db.$transaction((tx) => startInvoiceSubscriptions(tx, magBill.id, paidOn));
+  check("a second payment does not make a second subscription", again === 0);
+  const stopped = await db.$transaction((tx) => stopInvoiceSubscriptions(tx, [magBill.id]));
+  const left = await db.subscription.count({ where: { invoiceId: magBill.id } });
+  check("voiding the payment takes it off the posting list", stopped === 1 && left === 0);
 
   await cleanup();
   console.log(

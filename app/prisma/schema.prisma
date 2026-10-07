@@ -868,13 +868,19 @@ enum SubscriptionStatus {
 }
 
 model Subscription {
-  id      String  @id @default(cuid())
+  id        String   @id @default(cuid())
   /// SLPL-S-YYMM-XXXXX, printed on the welcome email and quoted by the reader
-  code    String  @unique
-  orderId String?
-  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  userId  String?
-  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  code      String   @unique
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Set when a school bought it on an invoice rather than at /subscribe. It
+  /// starts once that invoice is paid in full.
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  /// Copies of each issue: a school buys one for every student
+  copies    Int      @default(1)
 
   /// Snapshotted so a later profile edit cannot rewrite where issues were sent
   subscriberName String
@@ -905,6 +911,7 @@ model Subscription {
 
   @@index([status, endsAt])
   @@index([email])
+  @@index([invoiceId])
 }
 
 /// One row per issue posted, so a reader asking "did you send October" has an
@@ -1385,10 +1392,11 @@ model Invoice {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  items       InvoiceItem[]
-  allocations ReceiptAllocation[]
-  visits      Visit[]
-  challans    DeliveryChallan[]
+  items         InvoiceItem[]
+  allocations   ReceiptAllocation[]
+  visits        Visit[]
+  challans      DeliveryChallan[]
+  subscriptions Subscription[]
 
   @@index([status, invoiceDate])
   @@index([organizationId])

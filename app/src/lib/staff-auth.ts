@@ -102,10 +102,9 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "crm.read",
     "invoices.write",
   ],
-  // The manager raises and approves; the executive raises and waits
+  // The manager raises and approves; the executive raises and waits. Neither
+  // has any part of the online store admin: the owner keeps sales in /erp.
   SALES_MANAGER: [
-    "orders.manage",
-    "grievances.manage",
     "quotes.read",
     "quotes.write",
     "crm.read",
@@ -115,8 +114,6 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "invoices.approve",
   ],
   SALES: [
-    "orders.manage",
-    "grievances.manage",
     "quotes.read",
     "quotes.write",
     "crm.read",

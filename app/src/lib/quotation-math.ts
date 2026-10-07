@@ -55,7 +55,10 @@ export type QuoteTotals = {
   cgst: number;
   sgst: number;
   igst: number;
+  /** Taxable plus tax, rounded to whole rupees. */
   total: number;
+  /** What the rounding added or took away, paise. Printed as "Round off". */
+  roundOff: number;
   /** Tax split by rate, which is what a GST-registered buyer wants to see. */
   byRate: { rate: number; taxable: number; tax: number; cgst: number; sgst: number }[];
   interState: boolean;
@@ -122,6 +125,10 @@ export function documentTotals(
   const sgst = byRate.reduce((sum, r) => sum + r.sgst, 0);
   const igst = interState ? tax : 0;
 
+  // A bill is settled in whole rupees: 50 paise and above goes up, below goes down
+  const exact = taxable + tax;
+  const total = Math.round(exact / 100) * 100;
+
   return {
     subtotal,
     discount,
@@ -129,7 +136,8 @@ export function documentTotals(
     cgst,
     sgst,
     igst,
-    total: taxable + tax,
+    total,
+    roundOff: total - exact,
     byRate,
     interState,
   };

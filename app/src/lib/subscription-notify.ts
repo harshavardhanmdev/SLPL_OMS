@@ -1,8 +1,14 @@
 import "server-only";
 
+import { randomBytes } from "node:crypto";
+
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { notifyOwner, renderEmail, sendEmail } from "@/lib/email";
 import { formatINR } from "@/lib/money";
+import { endIssueFor, isOwed, issueLabelFor, planById } from "@/lib/subscription-plans";
+
+type Tx = Prisma.TransactionClient;
 
 /**
  * Activates a paid subscription and sends the welcome email.
@@ -74,8 +80,14 @@ export async function activateSubscriptions(orderId: string): Promise<void> {
  */
 export async function remindExpiringSubscriptions(): Promise<number> {
   const soon = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  // A school's renewal goes through its salesperson and a fresh invoice, not /subscribe
   const due = await db.subscription.findMany({
-    where: { status: "ACTIVE", renewalNoticeAt: null, endsAt: { lte: soon, gte: new Date() } },
+    where: {
+      status: "ACTIVE",
+      invoiceId: null,
+      renewalNoticeAt: null,
+      endsAt: { lte: soon, gte: new Date() },
+    },
   });
 
   for (const sub of due) {
@@ -100,5 +112,130 @@ export async function remindExpiringSubscriptions(): Promise<number> {
       data: { renewalNoticeAt: new Date() },
     });
   }
+  return due.length;
+}
+
+/** SLPL-S-YYMM-XXXXX, the same shape as a subscription bought at /subscribe. */
+async function subscriptionCode(tx: Tx): Promise<string> {
+  const now = new Date();
+  const stamp = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
+  for (let i = 0; i < 5; i++) {
+    const candidate = `SLPL-S-${stamp}-${randomBytes(3).toString("hex").toUpperCase().slice(0, 5)}`;
+    if (!(await tx.subscription.findUnique({ where: { code: candidate } }))) return candidate;
+  }
+  throw new Error("Could not allocate a subscription number - please retry.");
+}
+
+/**
+ * A school that bought The GenZ Times on an invoice joins the posting list
+ * once the bill is paid in full. One subscription per line, with the line's
+ * quantity as the copies of each issue, posted from the month after payment.
+ *
+ * Runs inside the payment's transaction, so money and subscription land
+ * together, and does nothing if the invoice already has its subscriptions.
+ */
+export async function startInvoiceSubscriptions(
+  tx: Tx,
+  invoiceId: string,
+  paidOn: Date,
+): Promise<number> {
+  if (await tx.subscription.findFirst({ where: { invoiceId }, select: { id: true } })) return 0;
+  const invoice = await tx.invoice.findUnique({
+    where: { id: invoiceId },
+    include: { items: { where: { productId: { startsWith: "magazine:" } } } },
+  });
+  if (!invoice) return 0;
+
+  // Delivery starts the month after the money arrives
+  const start = new Date(paidOn.getFullYear(), paidOn.getMonth() + 1, 1);
+  let made = 0;
+  for (const item of invoice.items) {
+    const plan = planById(item.productId!.slice("magazine:".length));
+    if (!plan) continue;
+    await tx.subscription.create({
+      data: {
+        code: await subscriptionCode(tx),
+        invoiceId: invoice.id,
+        copies: item.quantity,
+        subscriberName: invoice.customerName,
+        email: invoice.email ?? "",
+        phone: invoice.phone ?? "",
+        addressLine1: invoice.addressLine ?? "",
+        addressLine2: invoice.contactPerson ? `Attn: ${invoice.contactPerson}` : null,
+        city: invoice.city ?? "",
+        state: invoice.state ?? "",
+        pincode: invoice.pincode ?? "",
+        termMonths: plan.months,
+        issuesTotal: plan.issues,
+        amountPaid: item.lineTotal,
+        status: "ACTIVE",
+        startIssue: issueLabelFor(start),
+        startedAt: paidOn,
+        endsAt: endIssueFor(start, plan.issues).date,
+        notes: `From invoice ${invoice.number}`,
+      },
+    });
+    made++;
+  }
+  return made;
+}
+
+/**
+ * The payment behind an invoice was voided, so its subscriptions come off the
+ * posting list. One that has had an issue posted stays, for the owner to
+ * settle by hand, since copies already went out.
+ */
+export async function stopInvoiceSubscriptions(tx: Tx, invoiceIds: string[]): Promise<number> {
+  if (invoiceIds.length === 0) return 0;
+  const gone = await tx.subscription.deleteMany({
+    where: { invoiceId: { in: invoiceIds }, issuesSent: 0 },
+  });
+  return gone.count;
+}
+
+const esc = (text: string) =>
+  text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+/**
+ * On the 1st and the 15th: tell the owner who is still owed this month's
+ * issue and how many copies that is. Silent once the posting run is recorded.
+ */
+export async function remindPosting(now = new Date()): Promise<number> {
+  const issue = issueLabelFor(now);
+  const due = (
+    await db.subscription.findMany({
+      where: { status: "ACTIVE", dispatches: { none: { issueLabel: issue } } },
+      orderBy: [{ city: "asc" }, { subscriberName: "asc" }],
+    })
+  ).filter((s) => isOwed(s, issue));
+  if (due.length === 0) return 0;
+
+  const copies = due.reduce((n, s) => n + s.copies, 0);
+  const rows = due
+    .map(
+      (s) =>
+        `<tr><td style="padding:4px 0;border-top:1px solid #e3e8f2">${esc(s.subscriberName)}${s.invoiceId ? " (school)" : ""}</td>` +
+        `<td style="padding:4px 8px;border-top:1px solid #e3e8f2;color:#5a6478">${esc(s.city)}</td>` +
+        `<td align="right" style="padding:4px 0;border-top:1px solid #e3e8f2">${s.copies}</td></tr>`,
+    )
+    .join("");
+  const app = process.env.APP_URL ?? "https://store.theslpl.in";
+
+  await notifyOwner(
+    `Post The GenZ Times ${issue}: ${copies} ${copies === 1 ? "copy" : "copies"} to ${due.length} ${due.length === 1 ? "subscriber" : "subscribers"}`,
+    renderEmail(
+      `The ${issue} issue is due`,
+      `<p style="margin:0 0 14px">${due.length} ${due.length === 1 ? "subscriber is" : "subscribers are"} still owed the ${issue} issue, ${copies} ${copies === 1 ? "copy" : "copies"} in all.</p>
+       <table role="presentation" width="100%" style="font-size:13px;border-collapse:collapse">
+         <tr><th align="left" style="padding:4px 0">Subscriber</th><th align="left" style="padding:4px 8px">City</th><th align="right" style="padding:4px 0">Copies</th></tr>
+         ${rows}
+       </table>
+       <p style="margin:16px 0 14px">
+         <a href="${app}/erp/subscriptions/posting" style="display:inline-block;background:#f5a623;color:#16213e;font-weight:bold;padding:11px 20px;border-radius:8px;text-decoration:none">Print the address labels</a>
+       </p>
+       <p style="margin:0;font-size:13px;color:#5a6478">Once they are in the post, record the run under Subscriptions so this reminder stops.</p>`,
+    ),
+    "subscription-posting-reminder",
+  );
   return due.length;
 }

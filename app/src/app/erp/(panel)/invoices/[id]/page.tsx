@@ -83,6 +83,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     noBillDiscount: i.noBillDiscount,
   }));
   const totals = documentTotals(lines, invoice.placeOfSupply, invoice.billDiscountBp);
+  // The stored total is what the ledger counts; anything past the exact sum is the round off
+  const exact = totals.total - totals.roundOff;
+  const roundOff = invoice.total - exact;
   const taxed = invoice.kind === "TAX_INVOICE";
   const qty = invoice.items.reduce((s, i) => s + i.quantity, 0);
 
@@ -306,12 +309,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         </div>
                       ),
                     )}
+                {roundOff !== 0 && (
+                  <div className="flex justify-between">
+                    <dt style={{ color: DOC_MUTED }}>Round off</dt>
+                    <dd className="tabular-nums">
+                      {roundOff > 0 ? "+ " : "- "}
+                      {formatINR(Math.abs(roundOff))}
+                    </dd>
+                  </div>
+                )}
                 <div
                   className="flex justify-between border-y py-1 text-sm font-bold"
                   style={{ borderColor: DOC_RULE }}
                 >
                   <dt>Total Amount</dt>
-                  <dd className="tabular-nums">{formatINR(totals.total)}</dd>
+                  <dd className="tabular-nums">{formatINR(invoice.total)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt style={{ color: DOC_MUTED }}>Received Amount</dt>
@@ -329,7 +341,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <span className="block font-bold" style={{ color: DOC_NAVY }}>
                     Total Amount (in words)
                   </span>
-                  {rupeesInWords(totals.total)}
+                  {rupeesInWords(invoice.total)}
                 </p>
               </dl>
               <TermsBlock terms={invoice.terms} />

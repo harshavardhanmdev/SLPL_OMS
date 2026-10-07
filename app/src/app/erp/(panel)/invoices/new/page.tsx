@@ -5,8 +5,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
-import { InvoiceForm, type InvoiceDraft } from "@/components/erp/invoice-form";
+import {
+  InvoiceForm,
+  QuotationStart,
+  type BillableQuotation,
+  type InvoiceDraft,
+} from "@/components/erp/invoice-form";
 import { db } from "@/lib/db";
+import { formatINR } from "@/lib/money";
 import { openVisits } from "@/lib/open-visits";
 import { catalogForQuoting, organizationsForBilling } from "@/lib/quoting";
 import { getStaff, roleCan } from "@/lib/staff-auth";
@@ -27,7 +33,12 @@ async function fromQuotation(id: string): Promise<InvoiceDraft | null> {
   if (!q?.organizationId) return null;
   return {
     organizationId: q.organizationId,
-    productLine: q.items.every((i) => i.gstRate > 0) ? "SVC" : "BOOK",
+    // A magazine subscription is billed in the MAG series, as picking one on the form does
+    productLine: q.items.some((i) => i.productId?.startsWith("magazine:"))
+      ? "MAG"
+      : q.items.every((i) => i.gstRate > 0)
+        ? "SVC"
+        : "BOOK",
     // The server runs on UTC, so ask for the date in India explicitly
     invoiceDate: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()),
     dueDays: "15",
@@ -60,6 +71,23 @@ async function fromQuotation(id: string): Promise<InvoiceDraft | null> {
   };
 }
 
+/** Quotations ready to bill: approved, sent or accepted, and not billed yet. */
+async function billableQuotations(): Promise<BillableQuotation[]> {
+  const [quotations, billed] = await Promise.all([
+    db.quotation.findMany({
+      where: { status: { in: ["APPROVED", "SENT", "ACCEPTED"] }, organizationId: { not: null } },
+      orderBy: { quotedOn: "desc" },
+      take: 100,
+      select: { id: true, number: true, customerName: true, total: true },
+    }),
+    db.invoice.findMany({ where: { quotationId: { not: null } }, select: { quotationId: true } }),
+  ]);
+  const done = new Set(billed.map((b) => b.quotationId));
+  return quotations
+    .filter((q) => !done.has(q.id))
+    .map((q) => ({ id: q.id, label: `${q.number}, ${q.customerName}, ${formatINR(q.total)}` }));
+}
+
 export default async function NewInvoicePage({
   searchParams,
 }: {
@@ -69,11 +97,12 @@ export default async function NewInvoicePage({
   if (!staff || !roleCan(staff.role, "invoices.write")) redirect("/erp/invoices");
 
   const { quotation } = await searchParams;
-  const [catalog, organizations, visits, initial] = await Promise.all([
+  const [catalog, organizations, visits, initial, quotations] = await Promise.all([
     catalogForQuoting(),
     organizationsForBilling(),
     openVisits(),
     quotation ? fromQuotation(quotation) : null,
+    billableQuotations(),
   ]);
 
   if (organizations.length === 0) {
@@ -105,7 +134,10 @@ export default async function NewInvoicePage({
           anything else carrying GST and it becomes a Tax Invoice by itself.
         </p>
       </div>
+      <QuotationStart quotations={quotations} current={initial ? quotation : undefined} />
       <InvoiceForm
+        // A fresh form for each quotation picked, since the form keeps its own state
+        key={quotation ?? "blank"}
         catalog={catalog}
         organizations={organizations}
         visits={visits}

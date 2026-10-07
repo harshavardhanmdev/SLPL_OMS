@@ -523,6 +523,15 @@ export function QuotationForm({
                 </React.Fragment>
               ),
             )}
+          {totals.roundOff !== 0 && (
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Round off</dt>
+              <dd className="tabular-nums">
+                {totals.roundOff > 0 ? "+ " : "- "}
+                {formatINR(Math.abs(totals.roundOff))}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between border-t pt-2 font-heading text-lg font-bold">
             <dt>Total amount</dt>
             <dd className="tabular-nums">{formatINR(totals.total)}</dd>

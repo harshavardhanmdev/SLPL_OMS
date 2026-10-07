@@ -101,3 +101,26 @@ export function endIssueFor(start: Date, issues: number): { label: string; date:
     date: d,
   };
 }
+
+/** The month an issue label such as "October 2026" names, or null if it names none. */
+function issueMonth(label: string): Date | null {
+  const d = new Date(`1 ${label}`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Whether a running subscription is owed this issue: it has issues left and
+ * its term has begun. The first issue is worked back from the last, so a
+ * school that paid in October and starts with November is not owed October.
+ * Whether the issue was already posted is the caller's check.
+ */
+export function isOwed(
+  s: { issuesSent: number; issuesTotal: number; endsAt: Date | null },
+  issueLabel: string,
+): boolean {
+  if (s.issuesSent >= s.issuesTotal) return false;
+  const month = issueMonth(issueLabel);
+  if (!month || !s.endsAt) return true;
+  const first = new Date(s.endsAt.getFullYear(), s.endsAt.getMonth() - s.issuesTotal + 1, 1);
+  return first <= month;
+}

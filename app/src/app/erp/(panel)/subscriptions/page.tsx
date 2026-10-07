@@ -14,7 +14,7 @@ import {
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { getStaff, roleCan } from "@/lib/staff-auth";
-import { endsWithin, issueLabelFor } from "@/lib/subscription-plans";
+import { endsWithin, isOwed, issueLabelFor } from "@/lib/subscription-plans";
 
 export const metadata: Metadata = { title: "Subscriptions", robots: { index: false } };
 
@@ -45,14 +45,17 @@ export default async function SubscriptionsPage() {
   const issue = issueLabelFor();
 
   const subs = await db.subscription.findMany({
-    include: { dispatches: { orderBy: { sentAt: "desc" } } },
+    include: {
+      dispatches: { orderBy: { sentAt: "desc" } },
+      invoice: { select: { id: true, number: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
   subs.sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
 
   const active = subs.filter((s) => s.status === "ACTIVE");
   const due = active.filter(
-    (s) => s.issuesSent < s.issuesTotal && !s.dispatches.some((d) => d.issueLabel === issue),
+    (s) => isOwed(s, issue) && !s.dispatches.some((d) => d.issueLabel === issue),
   );
   const collected = subs
     .filter((s) => s.status === "ACTIVE" || s.status === "COMPLETED")
@@ -98,7 +101,8 @@ export default async function SubscriptionsPage() {
           <Newspaper className="mx-auto size-8 text-muted-foreground" />
           <p className="mt-3 font-medium">No subscriptions yet.</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            They appear here the moment a reader pays at store.theslpl.in/subscribe.
+            They appear here the moment a reader pays at store.theslpl.in/subscribe, or a school
+            pays an invoice that includes one.
           </p>
         </div>
       ) : (
@@ -112,6 +116,19 @@ export default async function SubscriptionsPage() {
                     <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
                       {s.code}
                     </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.invoice ? (
+                      <>
+                        School, invoice{" "}
+                        <Link href={`/erp/invoices/${s.invoice.id}`} className="underline">
+                          {s.invoice.number}
+                        </Link>
+                      </>
+                    ) : (
+                      "Online store"
+                    )}
+                    {s.copies > 1 && ` · ${s.copies} copies of each issue`}
                   </p>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">

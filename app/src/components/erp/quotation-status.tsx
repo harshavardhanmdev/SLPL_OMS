@@ -24,6 +24,7 @@ export function QuotationStatusControls({
   canWrite,
   canInvoice,
   canDelete = false,
+  invoice = null,
 }: {
   id: string;
   number: string;
@@ -33,6 +34,8 @@ export function QuotationStatusControls({
   canInvoice: boolean;
   /** Owners. A quotation already billed is refused by the action, with the reason. */
   canDelete?: boolean;
+  /** The bill already raised from this quotation, so it is not billed twice. */
+  invoice?: { id: string; number: string } | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
@@ -147,7 +150,15 @@ export function QuotationStatusControls({
           Reopen
         </Button>
       )}
-      {canInvoice && status === "ACCEPTED" && (
+      {invoice && (
+        <Button variant="outline" className="gap-2" asChild>
+          <Link href={`/erp/invoices/${invoice.id}`}>
+            <ReceiptText className="size-4" /> Invoice {invoice.number}
+          </Link>
+        </Button>
+      )}
+      {/* Raising the bill is the school saying yes, so it need not be marked accepted first */}
+      {!invoice && canInvoice && ["APPROVED", "SENT", "ACCEPTED"].includes(status) && (
         <Button className="gap-2" asChild>
           <Link href={`/erp/invoices/new?quotation=${id}`}>
             <ReceiptText className="size-4" /> Raise the invoice

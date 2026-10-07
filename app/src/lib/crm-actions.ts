@@ -6,6 +6,7 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { nextReceiptNumber } from "@/lib/number-series";
+import { startInvoiceSubscriptions, stopInvoiceSubscriptions } from "@/lib/subscription-notify";
 import { getStaff, requireCapability } from "@/lib/staff-auth";
 
 /**
@@ -212,6 +213,8 @@ export async function recordReceipt(input: z.infer<typeof receiptSchema>): Promi
       left -= put;
       if (put === owed) {
         await tx.invoice.update({ where: { id: invoice.id }, data: { status: "PAID" } });
+        // A GenZ Times subscription on the bill joins the posting list now
+        await startInvoiceSubscriptions(tx, invoice.id, receivedOn);
       }
     }
     return receipt;
@@ -226,6 +229,7 @@ export async function recordReceipt(input: z.infer<typeof receiptSchema>): Promi
   revalidatePath("/erp/payments");
   revalidatePath("/erp/organizations");
   revalidatePath(`/erp/organizations/${d.organizationId}`);
+  revalidatePath("/erp/subscriptions");
   return { ok: true, id: row.id, number: row.number };
 }
 
@@ -271,14 +275,16 @@ export async function voidReceipt(input: z.infer<typeof voidReceiptSchema>): Pro
       where: { id: { in: receipt.allocations.map((a) => a.invoiceId) }, status: "PAID" },
       include: { allocations: { select: { amount: true } } },
     });
-    const reopened: { number: string; status: string }[] = [];
+    const reopened: { id: string; number: string; status: string }[] = [];
     for (const invoice of touched) {
       const covered = invoice.allocations.reduce((s, a) => s + a.amount, 0);
       if (covered >= invoice.total) continue;
       const status = invoice.sentAt ? "SENT" : "APPROVED";
       await tx.invoice.update({ where: { id: invoice.id }, data: { status } });
-      reopened.push({ number: invoice.number, status });
+      reopened.push({ id: invoice.id, number: invoice.number, status });
     }
+    // An unpaid bill no longer earns its subscription
+    await stopInvoiceSubscriptions(tx, reopened.map((r) => r.id));
     return { receipt, reopened };
   });
 
@@ -303,6 +309,7 @@ export async function voidReceipt(input: z.infer<typeof voidReceiptSchema>): Pro
   revalidatePath("/erp/payments");
   revalidatePath("/erp/invoices");
   revalidatePath(`/erp/organizations/${receipt.organizationId}`);
+  revalidatePath("/erp/subscriptions");
   return { ok: true, id: receipt.id, number: receipt.number };
 }
 

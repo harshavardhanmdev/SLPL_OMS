@@ -6,6 +6,7 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { requireCapability } from "@/lib/staff-auth";
+import { isOwed } from "@/lib/subscription-plans";
 
 /**
  * Recording that an issue went into the post.
@@ -104,13 +105,14 @@ export async function recordIssueForAll(issue: string): Promise<Result> {
 
   const due = await db.subscription.findMany({
     where: { status: "ACTIVE", dispatches: { none: { issueLabel } } },
-    select: { id: true, issuesSent: true, issuesTotal: true },
+    select: { id: true, issuesSent: true, issuesTotal: true, endsAt: true },
   });
 
   let sent = 0;
   let already = 0;
   for (const sub of due) {
-    if (sub.issuesSent >= sub.issuesTotal) continue;
+    // Out of issues, or a term that starts with a later issue
+    if (!isOwed(sub, issueLabel)) continue;
     if (await post(sub.id, issueLabel, null)) sent++;
     else already++;
   }

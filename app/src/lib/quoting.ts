@@ -3,6 +3,7 @@ import "server-only";
 import type { CatalogItem, OrgOption } from "@/components/erp/line-picker";
 import { db } from "@/lib/db";
 import { OUR_STATE } from "@/lib/quotation-math";
+import { PLANS } from "@/lib/subscription-plans";
 
 /**
  * What a quotation or an invoice line can be picked from, in the order sales
@@ -45,6 +46,19 @@ export async function catalogForQuoting(): Promise<CatalogItem[]> {
       price: p.rate,
       mrp: p.mrp,
       unit: p.unit,
+    })),
+    // The GenZ Times at the prices readers pay on the website, so a school
+    // ordering for its students is billed exactly as the magazine is sold.
+    // Periodicals are HSN 4902 and nil rated.
+    ...PLANS.map((p) => ({
+      id: `magazine:${p.id}`,
+      group: "The GenZ Times",
+      title: `The GenZ Times subscription, ${p.label} (${p.issues} issues)`,
+      hsnCode: "4902",
+      gstRate: 0,
+      price: p.price,
+      mrp: p.listPrice,
+      unit: "NOS",
     })),
     ...services.map((s) => ({
       id: `service:${s.id}`,

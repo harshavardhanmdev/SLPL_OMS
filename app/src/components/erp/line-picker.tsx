@@ -45,6 +45,7 @@ const SERIES_STYLE = {
   "Little Leaps": "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200",
   UPSC: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200",
   Services: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
+  "GenZ Times": "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
   Store: "bg-saffron/20 text-saffron-deep",
 } as const;
 
@@ -58,6 +59,7 @@ const TERM_STYLE = {
 function seriesOf(item: CatalogItem): keyof typeof SERIES_STYLE | null {
   if (item.group === STORE) return "Store";
   if (item.group === "Services") return "Services";
+  if (item.group === "The GenZ Times") return "GenZ Times";
   const text = `${item.group} ${item.title}`.toLowerCase();
   if (text.includes("baby steps")) return "Baby Steps";
   if (text.includes("little leaps")) return "Little Leaps";

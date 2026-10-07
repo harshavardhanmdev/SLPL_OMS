@@ -117,6 +117,8 @@ export function InvoiceForm({
       setRow(i, { productId: null });
       return;
     }
+    // A magazine subscription is billed in the MAG series, as the owner's samples are
+    if (item.id.startsWith("magazine:")) set("productLine", "MAG");
     setRow(i, {
       productId: item.id,
       description: item.title,

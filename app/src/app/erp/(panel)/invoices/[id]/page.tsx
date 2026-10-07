@@ -117,7 +117,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             status={invoice.status}
             canApprove={roleCan(staff.role, "invoices.approve")}
             canWrite={roleCan(staff.role, "invoices.write")}
-            canDelete={roleCan(staff.role, "staff.manage") && balances.receivedAmount === 0}
+            // Shown to owners always: with a payment recorded the action refuses
+            // and says to void the payment first, which a missing button never would
+            canDelete={roleCan(staff.role, "staff.manage")}
           />
           {roleCan(staff.role, "challan.write") &&
             ["APPROVED", "SENT", "PAID"].includes(invoice.status) && (

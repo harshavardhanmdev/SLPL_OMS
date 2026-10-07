@@ -29,7 +29,7 @@ export function InvoiceDecisions({
   status: string;
   canApprove: boolean;
   canWrite: boolean;
-  /** Owners, and only while no payment is recorded against the bill. */
+  /** Owners. A bill with a payment recorded is refused by the action, with the reason. */
   canDelete?: boolean;
 }) {
   const router = useRouter();

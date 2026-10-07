@@ -22,7 +22,8 @@ export async function salesPeople() {
 
 export default async function NewOrganizationPage() {
   const staff = await getStaff();
-  if (!staff || !roleCan(staff.role, "crm.manage")) redirect("/erp/organizations");
+  if (!staff || !roleCan(staff.role, "crm.write")) redirect("/erp/organizations");
+  const canManage = roleCan(staff.role, "crm.manage");
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -38,7 +39,8 @@ export default async function NewOrganizationPage() {
           Search the list first. One school must never end up with two records.
         </p>
       </div>
-      <OrganizationForm people={await salesPeople()} />
+      {/* A salesperson's new school is theirs to look after */}
+      <OrganizationForm people={canManage ? await salesPeople() : [{ id: staff.id, name: staff.name }]} />
     </div>
   );
 }

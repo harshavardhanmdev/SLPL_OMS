@@ -81,7 +81,7 @@ export default async function SamplesPage() {
   const canManage = roleCan(staff.role, "crm.manage");
   const mine = canManage ? {} : { issuedById: staff.id };
 
-  const [samples, organizations, holders, products, manager] = await Promise.all([
+  const [samples, organizations, holders, products, me, manager] = await Promise.all([
     db.sampleIssue.findMany({
       where: mine,
       orderBy: [{ issuedOn: "desc" }, { createdAt: "desc" }],
@@ -104,13 +104,19 @@ export default async function SamplesPage() {
       orderBy: [{ series: "asc" }, { title: "asc" }],
       select: { title: true },
     }),
-    // Named on a waiting row, so the executive knows whose desk it is on
+    // Named on a waiting row, so the executive knows whose desk it is on: the
+    // person they report to, or else the sales manager
+    db.adminUser.findFirst({
+      where: { id: staff.id },
+      select: { reportsTo: { select: { name: true, isActive: true } } },
+    }),
     db.adminUser.findFirst({
       where: { isActive: true, role: "SALES_MANAGER" },
       select: { name: true },
     }),
   ]);
-  const approver = manager?.name.split(" ")[0] || "your manager";
+  const lead = me?.reportsTo?.isActive ? me.reportsTo : manager;
+  const approver = lead?.name.split(" ")[0] || "your manager";
 
   const inHand = samples.filter((s) => s.status === "IN_HAND");
   const atSchools = samples.filter((s) => s.status === "WITH_SCHOOL");

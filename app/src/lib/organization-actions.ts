@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
-import { requireCapability } from "@/lib/staff-auth";
+import { getStaff, requireCapability } from "@/lib/staff-auth";
 
 /**
  * The customer master.
@@ -64,12 +64,16 @@ const schema = z.object({
 export type OrganizationInput = z.infer<typeof schema>;
 
 export async function saveOrganization(input: OrganizationInput): Promise<Result> {
-  const denied = await requireCapability("crm.manage");
-  if (denied) return { error: DENIED[denied] };
-
+  // Anyone in sales adds a school they have found; changing one stays with a
+  // manager, since its code is already in that school's invoice numbers
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const d = parsed.data;
+  const denied = await requireCapability(d.id ? "crm.manage" : "crm.write");
+  if (denied) return { error: DENIED[denied] };
+  const manager = (await requireCapability("crm.manage")) === null;
+  // A salesperson who adds a school looks after it
+  if (!manager) d.ownerId = (await getStaff())?.id ?? null;
 
   const code = (d.code || "").toUpperCase() || (await suggestCode(d.name, d.id));
   const clash = await db.organization.findFirst({

@@ -29,7 +29,7 @@ export default async function OrganizationsPage({
 }) {
   const staff = await getStaff();
   if (!staff || !roleCan(staff.role, "crm.read")) redirect("/erp");
-  const canManage = roleCan(staff.role, "crm.manage");
+  const canAdd = roleCan(staff.role, "crm.write");
 
   const { q, status } = await searchParams;
   const where = {
@@ -75,7 +75,7 @@ export default async function OrganizationsPage({
               <Download className="size-4" /> Excel
             </Link>
           </Button>
-          {canManage && (
+          {canAdd && (
             <Button className="gap-2" asChild>
               <Link href="/erp/organizations/new">
                 <Plus className="size-4" /> Add one
@@ -132,7 +132,7 @@ export default async function OrganizationsPage({
           <Building2 className="mx-auto size-8 text-muted-foreground" />
           <p className="mt-3 font-medium">Nothing here yet.</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {canManage ? "Add the first school." : "Your manager adds schools."}
+            {canAdd ? "Add the first school." : "Sales add schools here."}
           </p>
         </div>
       ) : (

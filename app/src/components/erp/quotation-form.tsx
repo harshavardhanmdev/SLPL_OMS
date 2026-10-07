@@ -80,8 +80,10 @@ const DEFAULT_TERMS = [
 ].join("\n");
 
 /**
- * The owner's note for design work, added to the terms the first time a line
- * from the "Designing service" price list group is picked.
+ * The owner's note for magazine design work, added to the terms the first time
+ * a magazine line from the "Designing service" price list group is picked.
+ * Curriculum design sits in the same group but is priced per page, so it
+ * gets no note.
  */
 const DESIGN_GROUP = "Designing service";
 const DESIGN_NOTE =
@@ -161,7 +163,7 @@ export function QuotationForm({
       unitPrice: String(item.price / 100),
       gstRate: String(item.gstRate),
     });
-    if (item.group === DESIGN_GROUP) {
+    if (item.group === DESIGN_GROUP && /magazine/i.test(item.title)) {
       setV((old) =>
         old.terms.includes(DESIGN_NOTE)
           ? old

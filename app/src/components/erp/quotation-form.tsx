@@ -350,7 +350,7 @@ export function QuotationForm({
             const t = lineTotals(parsed[i]);
             return (
               <div key={i} className="rounded-xl border bg-muted/20 p-3">
-                <div className="grid gap-2 sm:grid-cols-12">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-12">
                   <div className="space-y-1.5 sm:col-span-12">
                     <Label htmlFor={`q-pick-${i}`} className="text-xs">
                       Pick from the price list, or type anything

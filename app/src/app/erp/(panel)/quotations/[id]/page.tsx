@@ -16,6 +16,7 @@ import {
   DOC_RULE,
   Letterhead,
   SignatureBlock,
+  TermsBlock,
 } from "@/components/erp/letterhead";
 import { getCompany, upiPayload } from "@/lib/company";
 import { db } from "@/lib/db";
@@ -85,20 +86,20 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
   const qr =
     company.upiId && totals.total > 0
-      ? await QRCode.toString(upiPayload(company, totals.total, quotation.number), {
+      ? await QRCode.toString(upiPayload(company, quotation.number), {
           type: "svg",
           margin: 0,
           errorCorrectionLevel: "M",
         })
       : null;
 
-  const th = "px-2 py-2.5 text-right font-semibold";
-  const td = "px-2 py-2.5 text-right align-top tabular-nums";
+  const th = "px-2 py-2.5 text-right font-semibold print:py-1";
+  const td = "px-2 py-2.5 text-right align-top tabular-nums print:py-1";
   const sub = "block text-[10px] font-normal";
 
   return (
     <div className="mx-auto max-w-4xl">
-      <style>{"@media print { @page { size: A4; margin: 10mm; } }"}</style>
+      <style>{"@media print { @page { size: A4; margin: 8mm; } }"}</style>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
@@ -146,11 +147,11 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
       )}
 
       <div className="overflow-x-auto rounded-xl shadow-sm print:overflow-visible print:shadow-none">
-        <div className="min-w-[640px] bg-white p-7 text-black" style={{ color: DOC_NAVY }}>
+        <div className="min-w-[640px] bg-white p-7 text-black print:p-0 print:leading-snug" style={{ color: DOC_NAVY }}>
           <Letterhead company={company} docLabel="QUOTATION" />
 
           <div
-            className="mt-3 flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-xs"
+            className="mt-3 flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-xs print:mt-2 print:py-1.5"
             style={{ backgroundColor: "#ececec" }}
           >
             <span>
@@ -164,7 +165,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             </span>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-6 text-[11px]">
+          <div className="mt-3 grid grid-cols-2 gap-6 text-[11px] print:mt-2">
             <div>
               <p className="font-bold uppercase">Bill To</p>
               <p className="mt-1 text-sm font-bold uppercase">{quotation.customerName}</p>
@@ -192,10 +193,10 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             </div>
           </div>
 
-          <table className="mt-4 w-full border-collapse text-[11px]">
+          <table className="mt-4 w-full border-collapse text-[11px] print:mt-3">
             <thead>
               <tr style={{ borderTop: `2px solid ${DOC_BLUE}`, borderBottom: `2px solid ${DOC_BLUE}` }}>
-                <th className="px-2 py-2.5 text-left font-semibold uppercase">
+                <th className="px-2 py-2.5 text-left font-semibold uppercase print:py-1">
                   {showTax || showDisc ? "Items/Services" : "Items"}
                 </th>
                 <th className={th}>QTY.</th>
@@ -211,7 +212,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                 const discPct = t.gross > 0 ? Math.round((t.discount / t.gross) * 10000) : 0;
                 return (
                   <tr key={item.id} style={{ borderBottom: `1px solid ${DOC_RULE}` }}>
-                    <td className="px-2 py-2.5 align-top uppercase">
+                    <td className="px-2 py-2.5 align-top uppercase print:py-1">
                       {item.description}
                       {item.hsnCode && showTax && (
                         <span className={sub} style={{ color: DOC_MUTED }}>
@@ -244,7 +245,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                 );
               })}
               <tr style={{ borderTop: `2px solid ${DOC_BLUE}`, borderBottom: `2px solid ${DOC_BLUE}` }}>
-                <td className="px-2 py-2.5 font-bold uppercase">Subtotal</td>
+                <td className="px-2 py-2.5 font-bold uppercase print:py-1">Subtotal</td>
                 <td className={`${td} font-bold`}>{qty}</td>
                 <td className={td} />
                 {showDisc && <td className={`${td} font-bold`}>{formatINR(totals.discount)}</td>}
@@ -258,74 +259,62 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             </tbody>
           </table>
 
-          <div className="mt-4 grid grid-cols-2 gap-6">
-            <BankBlock company={company} qrSvg={qr} />
+          {/* Bank and QR on the left, the money and the terms on the right, then
+              the signatures. One block that never splits, so the totals and the
+              signature always print on the same sheet */}
+          <div className="mt-4 break-inside-avoid print:mt-3">
+            <div className="grid grid-cols-2 gap-6">
+              <BankBlock company={company} qrSvg={qr} amount={totals.total} amountLabel="Quotation total" />
 
-            <div className="text-[11px]">
-              <dl className="ml-auto max-w-xs space-y-1">
-                {showTax && (
-                  <div className="flex justify-between">
-                    <dt>Taxable Amount</dt>
-                    <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>
-                  </div>
-                )}
-                {totals.byRate
-                  .filter((r) => r.rate > 0)
-                  .map((r) =>
-                    totals.interState ? (
-                      <div key={r.rate} className="flex justify-between">
-                        <dt>IGST @{ratePercent(r.rate)}</dt>
-                        <dd className="tabular-nums">{formatINR(r.tax)}</dd>
-                      </div>
-                    ) : (
-                      <div key={r.rate} className="space-y-1">
-                        <div className="flex justify-between">
-                          <dt>CGST @{ratePercent(r.rate / 2)}</dt>
-                          <dd className="tabular-nums">{formatINR(r.cgst)}</dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt>SGST @{ratePercent(r.rate / 2)}</dt>
-                          <dd className="tabular-nums">{formatINR(r.sgst)}</dd>
-                        </div>
-                      </div>
-                    ),
+              <div className="text-[11px]">
+                <dl className="ml-auto max-w-xs space-y-1">
+                  {showTax && (
+                    <div className="flex justify-between">
+                      <dt>Taxable Amount</dt>
+                      <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>
+                    </div>
                   )}
-                <div
-                  className="flex justify-between border-y py-1.5 text-sm font-bold"
-                  style={{ borderColor: DOC_RULE }}
-                >
-                  <dt>Total Amount</dt>
-                  <dd className="tabular-nums">{formatINR(totals.total)}</dd>
-                </div>
-              </dl>
-              <p className="mt-3 text-right">
-                <span className="block font-bold">Total Amount (in words)</span>
-                {rupeesInWords(totals.total).replace(/ Only$/, "")}
-              </p>
+                  {totals.byRate
+                    .filter((r) => r.rate > 0)
+                    .map((r) =>
+                      totals.interState ? (
+                        <div key={r.rate} className="flex justify-between">
+                          <dt>IGST @{ratePercent(r.rate)}</dt>
+                          <dd className="tabular-nums">{formatINR(r.tax)}</dd>
+                        </div>
+                      ) : (
+                        <div key={r.rate} className="space-y-1">
+                          <div className="flex justify-between">
+                            <dt>CGST @{ratePercent(r.rate / 2)}</dt>
+                            <dd className="tabular-nums">{formatINR(r.cgst)}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt>SGST @{ratePercent(r.rate / 2)}</dt>
+                            <dd className="tabular-nums">{formatINR(r.sgst)}</dd>
+                          </div>
+                        </div>
+                      ),
+                    )}
+                  <div
+                    className="flex justify-between border-y py-1.5 text-sm font-bold"
+                    style={{ borderColor: DOC_RULE }}
+                  >
+                    <dt>Total Amount</dt>
+                    <dd className="tabular-nums">{formatINR(totals.total)}</dd>
+                  </div>
+                </dl>
+                <p className="mt-3 text-right print:mt-2">
+                  <span className="block font-bold">Total Amount (in words)</span>
+                  {rupeesInWords(totals.total).replace(/ Only$/, "")}
+                </p>
+                <TermsBlock terms={quotation.terms} />
+                <p className="mt-2 text-[10px] leading-snug" style={{ color: DOC_MUTED }}>
+                  This is a quotation, not a demand for payment. Please quote {quotation.number} when
+                  placing the order.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-6 grid grid-cols-2 items-end gap-6">
-            <div className="text-[11px]">
-              {quotation.terms && (
-                <>
-                  <p className="mb-1 font-bold uppercase">Terms and Conditions</p>
-                  <ol className="list-inside list-decimal leading-relaxed">
-                    {quotation.terms
-                      .split("\n")
-                      .map((t) => t.trim())
-                      .filter(Boolean)
-                      .map((t, i) => (
-                        <li key={i}>{t}</li>
-                      ))}
-                  </ol>
-                </>
-              )}
-              <p className="mt-2" style={{ color: DOC_MUTED }}>
-                This is a quotation, not a demand for payment. Please quote {quotation.number} when
-                placing the order.
-              </p>
-            </div>
             <SignatureBlock company={company} />
           </div>
         </div>

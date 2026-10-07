@@ -9,20 +9,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
+import { roleLabel } from "@/lib/roles";
 import { revokeSessions, saveStaff } from "@/lib/staff-actions";
 
 const selectClass =
   "flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
+// The name comes from roleLabel, so a renamed role reads the same everywhere
 const ROLES = [
-  { value: "OWNER", label: "Owner, everything including staff" },
-  { value: "MANAGER", label: "Manager, everything except staff" },
-  { value: "ACCOUNTS", label: "Accounts, finance and orders" },
-  { value: "SALES_MANAGER", label: "Sales manager, raises quotations" },
-  { value: "SALES", label: "Sales executive, reads quotations and orders" },
-  { value: "WAREHOUSE", label: "Warehouse, shipments and stock" },
-  { value: "SUPPORT", label: "Support, grievances only" },
-  { value: "CA_READONLY", label: "CA, reads finance and changes nothing" },
+  { value: "OWNER", does: "everything including staff" },
+  { value: "MANAGER", does: "everything except staff" },
+  { value: "ACCOUNTS", does: "finance and orders" },
+  { value: "SALES_MANAGER", does: "raises quotations" },
+  { value: "SALES", does: "reads quotations and orders" },
+  { value: "WAREHOUSE", does: "shipments and stock" },
+  { value: "SUPPORT", does: "grievances only" },
+  { value: "CA_READONLY", does: "reads finance and changes nothing" },
 ];
 
 type Person = {
@@ -162,7 +165,7 @@ export function StaffManager({ people }: { people: Person[] }) {
           >
             {ROLES.map((r) => (
               <option key={r.value} value={r.value}>
-                {r.label}
+                {roleLabel(r.value)}: {r.does}
               </option>
             ))}
           </select>
@@ -180,16 +183,15 @@ export function StaffManager({ people }: { people: Person[] }) {
               .filter((p) => p.id !== v.id)
               .map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.role.toLowerCase().replace("_", " ")})
+                  {p.name} ({roleLabel(p.role)})
                 </option>
               ))}
           </select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="st-password">{v.id ? "New password, to change it" : "Password"}</Label>
-          <Input
+          <PasswordInput
             id="st-password"
-            type="password"
             value={v.password}
             onChange={(e) => set("password", e.target.value)}
             className="h-11"
@@ -229,7 +231,7 @@ export function StaffManager({ people }: { people: Person[] }) {
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 font-medium">
                   {p.name}
-                  <Badge variant="secondary">{p.role.toLowerCase().replace("_", " ")}</Badge>
+                  <Badge variant="secondary">{roleLabel(p.role)}</Badge>
                   {!p.isActive && <Badge variant="outline">inactive</Badge>}
                   {p.activeSessions > 0 && (
                     <Badge className="bg-green-100 text-green-800">

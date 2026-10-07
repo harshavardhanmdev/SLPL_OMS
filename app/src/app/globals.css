@@ -238,3 +238,68 @@
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
 }
+
+/* Behind pace: a slow saffron breath on the figure and the bar, never a strobe.
+   Target met: a steady green glow and a light sweep across the ribbon. */
+@layer utilities {
+  .erp-breathe {
+    animation: erp-breathe 2.4s ease-in-out infinite;
+  }
+  /* The bar grows in first, then starts breathing */
+  .erp-bar-behind {
+    animation: erp-grow 900ms ease-out, erp-breathe 2.4s ease-in-out 900ms infinite;
+  }
+  .erp-glow-behind {
+    animation: erp-glow-behind 2.4s ease-in-out infinite;
+  }
+  .erp-glow-met {
+    box-shadow: 0 0 0 1px rgb(22 163 74 / 0.3), 0 0 26px -8px rgb(22 163 74 / 0.6);
+  }
+  .erp-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .erp-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.55) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: erp-shimmer 3.2s ease-in-out infinite;
+  }
+  .erp-twinkle {
+    animation: erp-twinkle 2.4s ease-in-out infinite;
+  }
+  /* A soft ring ripples out of an overdue badge, in the badge's own colour */
+  .erp-ring {
+    animation: erp-ring 2.4s ease-out infinite;
+  }
+}
+@keyframes erp-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes erp-glow-behind {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(245 166 35 / 0); }
+  50% { box-shadow: 0 0 0 3px rgb(245 166 35 / 0.2), 0 0 24px -6px rgb(245 166 35 / 0.6); }
+}
+/* The sweep takes the first half, then the ribbon rests */
+@keyframes erp-shimmer {
+  0% { transform: translateX(-100%); }
+  45%, 100% { transform: translateX(100%); }
+}
+@keyframes erp-twinkle {
+  0%, 100% { transform: scale(0.85) rotate(0deg); opacity: 0.75; }
+  50% { transform: scale(1.1) rotate(15deg); opacity: 1; }
+}
+@keyframes erp-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 35%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+/* Less motion: keep the colours and a still glow, drop the movement */
+@media (prefers-reduced-motion: reduce) {
+  .erp-breathe, .erp-bar-behind, .erp-twinkle, .erp-ring { animation: none; }
+  .erp-glow-behind { animation: none; box-shadow: 0 0 0 3px rgb(245 166 35 / 0.2); }
+  .erp-shimmer::after { display: none; }
+}

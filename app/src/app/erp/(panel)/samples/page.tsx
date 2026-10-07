@@ -3,11 +3,11 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Backpack, Download, Package, School } from "lucide-react";
+import { Backpack, Download, Package, School, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { SampleActions, SampleTaker } from "@/components/erp/sample-board";
+import { SampleActions, SampleDecision, SampleTaker } from "@/components/erp/sample-board";
 import { db } from "@/lib/db";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
@@ -32,6 +32,42 @@ const label: Record<string, string> = {
 const dateIN = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
+/** Whose bag the copies are in, on the row itself rather than only in a heading. */
+function HolderChip({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border bg-muted/60 px-2 py-0.5 text-xs font-medium">
+      <UserRound className="size-3" /> {name}
+    </span>
+  );
+}
+
+/** Nothing for an approved batch; otherwise who it waits for, or why it came back. */
+function ApprovalNote({
+  status,
+  reason,
+  approver,
+}: {
+  status: string;
+  reason: string | null;
+  approver: string;
+}) {
+  if (status === "PENDING") {
+    return (
+      <span className="rounded-full border border-saffron/40 bg-saffron/10 px-2 py-0.5 text-xs font-medium text-saffron-deep">
+        Waiting for {approver}
+      </span>
+    );
+  }
+  if (status === "REJECTED") {
+    return (
+      <span className="rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+        Sent back{reason ? `: ${reason}` : ""}
+      </span>
+    );
+  }
+  return null;
+}
+
 /**
  * Specimen copies, from the office to a salesperson's bag to a school.
  *
@@ -45,7 +81,7 @@ export default async function SamplesPage() {
   const canManage = roleCan(staff.role, "crm.manage");
   const mine = canManage ? {} : { issuedById: staff.id };
 
-  const [samples, organizations, holders, products] = await Promise.all([
+  const [samples, organizations, holders, products, manager] = await Promise.all([
     db.sampleIssue.findMany({
       where: mine,
       orderBy: [{ issuedOn: "desc" }, { createdAt: "desc" }],
@@ -68,7 +104,13 @@ export default async function SamplesPage() {
       orderBy: [{ series: "asc" }, { title: "asc" }],
       select: { title: true },
     }),
+    // Named on a waiting row, so the executive knows whose desk it is on
+    db.adminUser.findFirst({
+      where: { isActive: true, role: "SALES_MANAGER" },
+      select: { name: true },
+    }),
   ]);
+  const approver = manager?.name.split(" ")[0] || "your manager";
 
   const inHand = samples.filter((s) => s.status === "IN_HAND");
   const atSchools = samples.filter((s) => s.status === "WITH_SCHOOL");
@@ -83,6 +125,17 @@ export default async function SamplesPage() {
     entry.rows.push(s);
     byHolder.set(key, entry);
   }
+
+  // Every holder at a glance: what is still in the bag, and what is at schools
+  const people = new Map<string, { name: string; inHand: number; atSchools: number }>();
+  for (const s of [...inHand, ...atSchools]) {
+    const key = s.issuedBy?.id ?? s.issuedEmail;
+    const entry = people.get(key) ?? { name: s.issuedBy?.name ?? s.issuedEmail, inHand: 0, atSchools: 0 };
+    if (s.status === "IN_HAND") entry.inHand += s.quantity;
+    else entry.atSchools += s.quantity;
+    people.set(key, entry);
+  }
+  const holderName = (s: (typeof samples)[number]) => s.issuedBy?.name ?? s.issuedEmail;
 
   const meId = staff.breakGlass ? null : staff.id;
   const canAct = (holderId: string | null) => canWrite && (canManage || holderId === staff.id);
@@ -132,6 +185,27 @@ export default async function SamplesPage() {
         ))}
       </div>
 
+      {canManage && people.size > 0 && (
+        <section className="rounded-2xl border bg-card">
+          <div className="flex items-center gap-2 border-b p-4">
+            <UserRound className="size-4 text-muted-foreground" />
+            <h2 className="font-heading font-semibold">Who has what</h2>
+          </div>
+          <ul className="divide-y">
+            {[...people.entries()]
+              .sort(([, a], [, b]) => b.inHand + b.atSchools - (a.inHand + a.atSchools))
+              .map(([key, p]) => (
+                <li key={key} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                  <span className="font-medium">{p.name}</span>
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {p.inHand} in hand · {p.atSchools} with schools
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
       {canWrite && (
         <SampleTaker
           organizations={organizations}
@@ -172,15 +246,25 @@ export default async function SamplesPage() {
                         Taken {dateIN(s.issuedOn)}
                         {s.notes ? ` · ${s.notes}` : ""}
                       </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <HolderChip name={holderName(s)} />
+                        <ApprovalNote status={s.approvalStatus} reason={s.rejectedReason} approver={approver} />
+                      </div>
                     </div>
-                    {canAct(s.issuedById) && (
-                      <SampleActions
-                        id={s.id}
-                        status={s.status}
-                        quantity={s.quantity}
-                        organizations={organizations}
-                      />
-                    )}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {canManage && s.approvalStatus === "PENDING" && (
+                        <SampleDecision id={s.id} title={s.description} />
+                      )}
+                      {canAct(s.issuedById) && (
+                        <SampleActions
+                          id={s.id}
+                          status={s.status}
+                          quantity={s.quantity}
+                          organizations={organizations}
+                          approval={s.approvalStatus}
+                        />
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -219,17 +303,26 @@ export default async function SamplesPage() {
                       </Link>
                     )}
                     {s.givenOn ? ` · given ${dateIN(s.givenOn)}` : ""}
-                    {canManage && s.issuedBy ? ` · ${s.issuedBy.name}` : ""}
                   </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <HolderChip name={holderName(s)} />
+                    <ApprovalNote status={s.approvalStatus} reason={s.rejectedReason} approver={approver} />
+                  </div>
                 </div>
-                {canAct(s.issuedById) && (
-                  <SampleActions
-                    id={s.id}
-                    status={s.status}
-                    quantity={s.quantity}
-                    organizations={organizations}
-                  />
-                )}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {canManage && s.approvalStatus === "PENDING" && (
+                    <SampleDecision id={s.id} title={s.description} />
+                  )}
+                  {canAct(s.issuedById) && (
+                    <SampleActions
+                      id={s.id}
+                      status={s.status}
+                      quantity={s.quantity}
+                      organizations={organizations}
+                      approval={s.approvalStatus}
+                    />
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -255,17 +348,25 @@ export default async function SamplesPage() {
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {s.organization ? `${s.organization.name} · ` : ""}
-                    {s.issuedBy?.name ?? s.issuedEmail} · taken {dateIN(s.issuedOn)}
+                    taken {dateIN(s.issuedOn)}
                   </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <HolderChip name={holderName(s)} />
+                    <ApprovalNote status={s.approvalStatus} reason={s.rejectedReason} approver={approver} />
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className={tone[s.status]}>{label[s.status] ?? s.status}</Badge>
+                  {canManage && s.approvalStatus === "PENDING" && (
+                    <SampleDecision id={s.id} title={s.description} />
+                  )}
                   {canAct(s.issuedById) && (
                     <SampleActions
                       id={s.id}
                       status={s.status}
                       quantity={s.quantity}
                       organizations={organizations}
+                      approval={s.approvalStatus}
                     />
                   )}
                 </div>

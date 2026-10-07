@@ -155,11 +155,11 @@ export async function GET(
       return csvResponse(
         `samples-${stamp}.csv`,
         toCsv(
-          ["Taken", "Held by", "What", "Quantity", "Status", "School", "Code", "Given",
-           "Returned", "Notes"],
+          ["Taken", "Held by", "What", "Quantity", "Status", "Approval", "Sent back because",
+           "School", "Code", "Given", "Returned", "Notes"],
           rows.map((s) => [day(s.issuedOn), s.issuedBy?.name ?? s.issuedEmail, s.description,
-            s.quantity, s.status, s.organization?.name, s.organization?.code, day(s.givenOn),
-            day(s.returnedOn), s.notes]),
+            s.quantity, s.status, s.approvalStatus, s.rejectedReason, s.organization?.name,
+            s.organization?.code, day(s.givenOn), day(s.returnedOn), s.notes]),
         ),
       );
     }

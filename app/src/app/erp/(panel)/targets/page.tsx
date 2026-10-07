@@ -3,12 +3,14 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronLeft, ChevronRight, Target } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles, Target } from "lucide-react";
 
+import { CountUp } from "@/components/erp/count-up";
 import { TargetEditor } from "@/components/erp/target-editor";
 import { db } from "@/lib/db";
 import { BILLED_STATUSES } from "@/lib/ledger";
 import { formatINR } from "@/lib/money";
+import { roleLabel } from "@/lib/roles";
 import { financialYearWindow } from "@/lib/sales-summary";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 import { cn } from "@/lib/utils";
@@ -49,19 +51,32 @@ async function achieved(start: Date, end: Date, personId: string | null): Promis
   return { revenue: billed._sum.total ?? 0, visits, organizations };
 }
 
-function Meter({ done, target, money }: { done: number; target: number; money?: boolean }) {
+function Meter({
+  done,
+  target,
+  money,
+  behind,
+}: {
+  done: number;
+  target: number;
+  money?: boolean;
+  behind?: boolean;
+}) {
   const pct = target > 0 ? Math.min(1, done / target) : 0;
   const show = (n: number) => (money ? formatINR(n) : String(n));
   return (
     <div className="min-w-0">
       <p className="text-sm tabular-nums">
-        <span className="font-semibold">{show(done)}</span>
+        <span className={cn("font-semibold", behind && "erp-breathe text-saffron-deep")}>
+          {money ? <CountUp paise={done} /> : done}
+        </span>
         <span className="text-muted-foreground"> / {target > 0 ? show(target) : "not set"}</span>
       </p>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
         <div
           className={cn(
-            "h-full origin-left rounded-full motion-safe:animate-[erp-grow_800ms_ease-out]",
+            "h-full origin-left rounded-full",
+            behind ? "erp-bar-behind" : "motion-safe:animate-[erp-grow_800ms_ease-out]",
             pct >= 1 ? "bg-green-600" : "bg-saffron",
           )}
           style={{ width: `${pct * 100}%` }}
@@ -98,6 +113,11 @@ export default async function TargetsPage({
   const start = year ? fy.start : monthStart;
   const end = year ? fy.end : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
   const period = year ? "YEAR" : "MONTH";
+  // How far through the period the calendar is, to tell who is behind on revenue
+  const elapsed = Math.min(
+    1,
+    Math.max(0, (now.getTime() - start.getTime()) / (end.getTime() - start.getTime())),
+  );
   const title = year
     ? fy.label
     : monthStart.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
@@ -138,7 +158,7 @@ export default async function TargetsPage({
       visible.map(async (p) => ({
         key: p.id,
         label: p.name,
-        sub: p.role === "SALES_MANAGER" ? "Sales manager" : "Sales executive",
+        sub: roleLabel(p.role),
         scope: "PERSON" as const,
         ownerId: p.id,
         target: targetOf("PERSON", p.id),
@@ -198,59 +218,79 @@ export default async function TargetsPage({
       </div>
 
       <ul className="erp-stagger space-y-3">
-        {rows.map((r) => (
-          <li
-            key={r.key}
-            className={cn(
-              "rounded-2xl border bg-card p-4",
-              r.scope === "COMPANY" && "border-navy/30 bg-navy/[0.03]",
-            )}
-          >
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="font-heading font-semibold">{r.label}</p>
-                <p className="text-xs text-muted-foreground">{r.sub}</p>
-              </div>
-              {canEdit && (
-                <TargetEditor
-                  scope={r.scope}
-                  ownerId={r.ownerId}
-                  period={period}
-                  periodStart={ymd(start)}
-                  revenue={r.target.revenue}
-                  visits={r.target.visits}
-                  organizations={r.target.organizations}
-                  label={`${r.label}, ${title}`}
-                />
+        {rows.map((r) => {
+          const met = r.target.revenue > 0 && r.done.revenue >= r.target.revenue;
+          // Same slack as the sales banner, so a day behind does not set it pulsing,
+          // and only while the period runs, since a closed month cannot catch up
+          const behind =
+            now < end &&
+            r.target.revenue > 0 &&
+            !met &&
+            r.done.revenue / r.target.revenue < elapsed - 0.1;
+          return (
+            <li
+              key={r.key}
+              className={cn(
+                "rounded-2xl border bg-card p-4",
+                r.scope === "COMPANY" && "border-navy/30 bg-navy/[0.03]",
+                met && "erp-glow-met border-green-600/50",
+                behind && "border-saffron/70",
               )}
-            </div>
-            <div className="mt-3 grid gap-4 sm:grid-cols-3">
-              <div>
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Revenue
-                </p>
-                <Meter done={r.done.revenue} target={r.target.revenue} money />
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="flex flex-wrap items-center gap-2 font-heading font-semibold">
+                    {r.label}
+                    {met && (
+                      <span className="erp-shimmer inline-flex items-center gap-1 rounded-full bg-green-600 px-2 py-0.5 font-sans text-[11px] font-semibold text-white">
+                        <Sparkles className="erp-twinkle size-3" aria-hidden /> Target achieved
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{r.sub}</p>
+                </div>
+                {canEdit && (
+                  <TargetEditor
+                    scope={r.scope}
+                    ownerId={r.ownerId}
+                    period={period}
+                    periodStart={ymd(start)}
+                    revenue={r.target.revenue}
+                    visits={r.target.visits}
+                    organizations={r.target.organizations}
+                    label={`${r.label}, ${title}`}
+                  />
+                )}
               </div>
-              <div>
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Visits
-                </p>
-                <Meter done={r.done.visits} target={r.target.visits} />
+              <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Revenue
+                  </p>
+                  <Meter done={r.done.revenue} target={r.target.revenue} money behind={behind} />
+                </div>
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Visits
+                  </p>
+                  <Meter done={r.done.visits} target={r.target.visits} />
+                </div>
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    New schools
+                  </p>
+                  <Meter done={r.done.organizations} target={r.target.organizations} />
+                </div>
               </div>
-              <div>
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  New schools
-                </p>
-                <Meter done={r.done.organizations} target={r.target.organizations} />
-              </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       {visible.length === 0 && (
         <p className="text-center text-sm text-muted-foreground">
-          No sales staff yet. Add them from Staff with the Sales or Sales manager role.
+          No sales staff yet. Add them from Staff with the {roleLabel("SALES")} or{" "}
+          {roleLabel("SALES_MANAGER")} role.
         </p>
       )}
     </div>

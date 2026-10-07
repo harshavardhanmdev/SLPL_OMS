@@ -4,7 +4,9 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErpShell, type NavGroup, type NavItem } from "@/components/erp/erp-shell";
 import { canEnterAdmin } from "@/lib/admin-gate";
+import { approvalCount } from "@/lib/approvals";
 import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
+import { roleLabel } from "@/lib/roles";
 import { staffSignOut } from "@/lib/staff-actions";
 import { canEnterErp, getStaff, roleCan, type Capability } from "@/lib/staff-auth";
 
@@ -24,6 +26,7 @@ const groups: { label: string | null; items: Entry[] }[] = [
     label: "Sales",
     items: [
       { href: "/erp/sales", label: "Sales home", icon: "sales", needs: "crm.read" },
+      { href: "/erp/approvals", label: "Approvals", icon: "bell", needs: "crm.read" },
       { href: "/erp/organizations", label: "Schools", icon: "schools", needs: "crm.read" },
       { href: "/erp/quotations", label: "Quotations", icon: "quotations", needs: "quotes.read" },
       { href: "/erp/invoices", label: "Invoices", icon: "invoices", needs: "crm.read" },
@@ -93,6 +96,10 @@ export default async function ErpLayout({ children }: Readonly<{ children: React
     );
   }
 
+  // Waiting for an approver, or sent back to everyone else
+  const approvals = roleCan(staff.role, "crm.read") ? await approvalCount(staff) : 0;
+  const approver = roleCan(staff.role, "invoices.approve");
+
   const visible: NavGroup[] = groups
     .map((g) => ({
       label: g.label,
@@ -104,7 +111,12 @@ export default async function ErpLayout({ children }: Readonly<{ children: React
               ? canEnterAdmin(staff.role)
               : roleCan(staff.role, i.needs),
         )
-        .map(({ href, label, icon }) => ({ href, label, icon })),
+        .map(({ href, label, icon }) => ({
+          href,
+          label,
+          icon,
+          badge: href === "/erp/approvals" ? approvals : undefined,
+        })),
     }))
     .filter((g) => g.items.length > 0);
 
@@ -112,7 +124,9 @@ export default async function ErpLayout({ children }: Readonly<{ children: React
   const quick: NavItem[] = roleCan(staff.role, "crm.write")
     ? [
         { href: "/erp/sales", label: "Today", icon: "sales" },
-        { href: "/erp/organizations", label: "Schools", icon: "schools" },
+        approver
+          ? { href: "/erp/approvals", label: "Approvals", icon: "bell", badge: approvals }
+          : { href: "/erp/organizations", label: "Schools", icon: "schools" },
         { href: "/erp/visits/new", label: "Log visit", icon: "plus" },
       ]
     : roleCan(staff.role, "finance.read")
@@ -128,7 +142,7 @@ export default async function ErpLayout({ children }: Readonly<{ children: React
       groups={visible}
       quick={quick}
       name={staff.breakGlass ? "Owner" : staff.name}
-      role={staff.breakGlass ? "shared password" : staff.role.toLowerCase().replace("_", " ")}
+      role={staff.breakGlass ? "shared password" : roleLabel(staff.role)}
       signOut={staffSignOut}
       banner={
         staff.breakGlass ? (

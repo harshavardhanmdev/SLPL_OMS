@@ -6,6 +6,7 @@ import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BadgeIndianRupee,
+  Bell,
   Boxes,
   Building2,
   FileSignature,
@@ -64,11 +65,27 @@ const ICONS = {
   company: Landmark,
   store: Store,
   plus: Plus,
+  bell: Bell,
 } as const;
 
 export type NavIcon = keyof typeof ICONS;
-export type NavItem = { href: string; label: string; icon: NavIcon };
+export type NavItem = { href: string; label: string; icon: NavIcon; badge?: number };
 export type NavGroup = { label: string | null; items: NavItem[] };
+
+/** A count that wants attention, pulsing gently so it is noticed but not shouted. */
+function CountBadge({ count, className }: { count?: number; className?: string }) {
+  if (!count) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex min-w-5 items-center justify-center rounded-full bg-saffron px-1.5 text-[11px] font-bold leading-5 text-navy tabular-nums motion-safe:animate-pulse",
+        className,
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 function isActive(pathname: string, href: string) {
   if (href === "/erp") return pathname === "/erp";
@@ -124,6 +141,7 @@ function NavLinks({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () 
                       )}
                     />
                     {item.label}
+                    <CountBadge count={item.badge} className="ml-auto" />
                     <Pending />
                   </Link>
                 </li>
@@ -279,6 +297,7 @@ export function ErpShell({
                       )}
                     >
                       <Icon className="size-5" />
+                      <CountBadge count={item.badge} className="absolute top-1 left-1/2 ml-1.5" />
                       {item.label}
                       <Pending />
                     </Link>

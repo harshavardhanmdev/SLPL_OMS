@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { giveSamples, settleSamples, takeSamples } from "@/lib/sample-actions";
+import { decideSamples, giveSamples, settleSamples, takeSamples } from "@/lib/sample-actions";
 import { todayLocalIso } from "@/lib/utils";
 
 const selectClass =
@@ -75,7 +75,13 @@ export function SampleTaker({
           .then((res) => {
             if (res.error) toast.error(res.error);
             else {
-              toast.success(v.organizationId ? "Recorded as given to the school." : "Recorded as in hand.");
+              toast.success(
+                res.pending
+                  ? "Recorded. It now waits for your manager to approve."
+                  : v.organizationId
+                    ? "Recorded as given to the school."
+                    : "Recorded as in hand.",
+              );
               setV((old) => ({ ...old, description: "", quantity: "1", organizationId: "", notes: "" }));
               setOpen(false);
               router.refresh();
@@ -190,11 +196,14 @@ export function SampleActions({
   status,
   quantity,
   organizations,
+  approval = "APPROVED",
 }: {
   id: string;
   status: string;
   quantity: number;
   organizations: Option[];
+  /** Only an approved batch can go to a school. */
+  approval?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
@@ -302,9 +311,11 @@ export function SampleActions({
     <div className="flex flex-wrap gap-1.5">
       {status === "IN_HAND" && (
         <>
-          <Button size="sm" className="gap-1.5" disabled={busy} onClick={() => setGiving(true)}>
-            <School className="size-3.5" /> Give to a school
-          </Button>
+          {approval === "APPROVED" && (
+            <Button size="sm" className="gap-1.5" disabled={busy} onClick={() => setGiving(true)}>
+              <School className="size-3.5" /> Give to a school
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -364,6 +375,64 @@ export function SampleActions({
           <PackageOpen className="size-3.5" /> Undo, back in hand
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * The manager's call on an executive's batch: approve it, or send it back with
+ * a reason the executive will see on the row.
+ */
+export function SampleDecision({ id, title }: { id: string; title: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  const [asking, setAsking] = React.useState(false);
+  const [reason, setReason] = React.useState("");
+
+  function run(decision: "APPROVED" | "REJECTED", why?: string) {
+    setBusy(true);
+    void decideSamples({ id, decision, reason: why })
+      .then((res) => {
+        if (res.error) toast.error(res.error);
+        else {
+          toast.success(decision === "APPROVED" ? "Approved." : "Sent back.");
+          setAsking(false);
+          setReason("");
+          router.refresh();
+        }
+      })
+      .finally(() => setBusy(false));
+  }
+
+  if (asking) {
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Why are these going back?"
+          className="h-9 w-56"
+          aria-label={`Reason for sending back ${title}`}
+        />
+        <Button size="sm" variant="destructive" disabled={busy} onClick={() => run("REJECTED", reason)}>
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : "Send back"}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
+          Cancel
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <Button size="sm" className="gap-1.5" disabled={busy} onClick={() => run("APPROVED")}>
+        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+        Approve
+      </Button>
+      <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsking(true)}>
+        Send back
+      </Button>
     </div>
   );
 }

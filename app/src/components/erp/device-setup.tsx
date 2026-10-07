@@ -6,7 +6,7 @@ import { Loader2, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { trustThisDevice, untrustThisDevice } from "@/lib/expense-pin-actions";
 
 /**
@@ -55,12 +55,11 @@ export function DeviceSetup({ trusted }: { trusted: boolean }) {
         </Button>
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Input
+          <PasswordInput
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
             placeholder="4 to 8 digits"
             inputMode="numeric"
-            type="password"
             className="h-11 w-40"
           />
           <Button

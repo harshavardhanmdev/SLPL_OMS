@@ -17,6 +17,7 @@ import {
   DOC_RULE,
   Letterhead,
   SignatureBlock,
+  TermsBlock,
 } from "@/components/erp/letterhead";
 import { getCompany, upiPayload } from "@/lib/company";
 import { db } from "@/lib/db";
@@ -77,19 +78,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const qty = invoice.items.reduce((s, i) => s + i.quantity, 0);
 
   const qr = company.upiId
-    ? await QRCode.toString(upiPayload(company, invoice.total, invoice.number), {
+    ? await QRCode.toString(upiPayload(company, invoice.number), {
         type: "svg",
         margin: 0,
         errorCorrectionLevel: "M",
       })
     : null;
 
-  const th = "px-2 py-2 text-right font-semibold";
-  const td = "px-2 py-2 text-right tabular-nums";
+  const th = "px-2 py-2 text-right font-semibold print:py-1";
+  const td = "px-2 py-2 text-right tabular-nums print:py-1";
 
   return (
     <div className="mx-auto max-w-4xl">
-      <style>{"@media print { @page { size: A4; margin: 10mm; } }"}</style>
+      <style>{"@media print { @page { size: A4; margin: 8mm; } }"}</style>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Link
@@ -151,7 +152,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </p>
       )}
 
-      <div className="bg-white p-7 text-black" style={{ color: DOC_NAVY }}>
+      <div className="bg-white p-7 text-black print:p-0 print:leading-snug" style={{ color: DOC_NAVY }}>
         <Letterhead
           company={company}
           docLabel={taxed ? "TAX INVOICE" : "BILL OF SUPPLY"}
@@ -159,7 +160,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         />
 
         <div
-          className="mt-3 flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs font-bold"
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs font-bold print:mt-2 print:py-1.5"
           style={{ backgroundColor: "#eef2f7" }}
         >
           <span>Invoice No.: {invoice.number}</span>
@@ -167,7 +168,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <span>Due Date: {dateIN(invoice.dueDate)}</span>
         </div>
 
-        <div className="mt-3 text-[11px]">
+        <div className="mt-3 text-[11px] print:mt-2">
           <p className="font-bold uppercase">Bill To</p>
           <p className="text-sm font-bold">{invoice.customerName}</p>
           {invoice.contactPerson && <p>Kind attention: {invoice.contactPerson}</p>}
@@ -182,10 +183,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <p className="mt-1">Place of Supply: {invoice.placeOfSupply}</p>
         </div>
 
-        <table className="mt-4 w-full border-collapse text-[11px]">
+        <table className="mt-4 w-full border-collapse text-[11px] print:mt-3">
           <thead>
             <tr style={{ borderBottom: `2px solid ${DOC_BLUE}` }}>
-              <th className="px-2 py-2 text-left font-semibold uppercase">Items</th>
+              <th className="px-2 py-2 text-left font-semibold uppercase print:py-1">Items</th>
               {taxed && <th className={th}>HSN</th>}
               <th className={th}>Qty.</th>
               {invoice.items.some((i) => i.mrp) && <th className={th}>MRP</th>}
@@ -199,7 +200,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               const t = lineTotals(lines[i]);
               return (
                 <tr key={item.id} style={{ borderBottom: `1px solid ${DOC_RULE}` }}>
-                  <td className="px-2 py-2 uppercase">{item.description}</td>
+                  <td className="px-2 py-2 uppercase print:py-1">{item.description}</td>
                   {taxed && <td className={td}>{item.hsnCode ?? "-"}</td>}
                   <td className={td}>
                     {item.quantity} {item.unit}
@@ -220,7 +221,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               );
             })}
             <tr style={{ borderTop: `2px solid ${DOC_BLUE}`, borderBottom: `2px solid ${DOC_BLUE}` }}>
-              <td className="px-2 py-2 font-bold uppercase">Subtotal</td>
+              <td className="px-2 py-2 font-bold uppercase print:py-1">Subtotal</td>
               <td className={`${td} font-bold`} colSpan={taxed ? 2 : 1}>
                 {qty}
               </td>
@@ -234,98 +235,92 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </tbody>
         </table>
 
-        <div className="mt-4 flex flex-wrap justify-between gap-6">
-          <BankBlock company={company} qrSvg={qr} />
+        {/* Bank and QR on the left, the money and the terms on the right, then
+            the signatures. One block that never splits, so the totals and the
+            signature always print on the same sheet */}
+        <div className="mt-4 break-inside-avoid print:mt-3">
+          <div className="grid gap-6 sm:grid-cols-2">
+            <BankBlock
+              company={company}
+              qrSvg={qr}
+              amount={invoice.total - balances.receivedAmount}
+            />
 
-          <dl className="w-full max-w-xs space-y-1 text-[11px]">
-            {totals.discount > 0 && (
-              <div className="flex justify-between">
-                <dt style={{ color: DOC_MUTED }}>
-                  Discount
-                  {invoice.billDiscountBp > 0 ? ` (${ratePercent(invoice.billDiscountBp)})` : ""}
-                </dt>
-                <dd className="tabular-nums">- {formatINR(totals.discount)}</dd>
-              </div>
-            )}
-            {taxed && (
-              <div className="flex justify-between">
-                <dt style={{ color: DOC_MUTED }}>Taxable Amount</dt>
-                <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>
-              </div>
-            )}
-            {taxed &&
-              totals.byRate
-                .filter((r) => r.rate > 0)
-                .map((r) =>
-                  totals.interState ? (
-                    <div key={r.rate} className="flex justify-between">
-                      <dt style={{ color: DOC_MUTED }}>IGST @{ratePercent(r.rate)}</dt>
-                      <dd className="tabular-nums">{formatINR(r.tax)}</dd>
-                    </div>
-                  ) : (
-                    <div key={r.rate} className="space-y-1">
-                      <div className="flex justify-between">
-                        <dt style={{ color: DOC_MUTED }}>CGST @{ratePercent(r.rate / 2)}</dt>
-                        <dd className="tabular-nums">{formatINR(r.cgst)}</dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt style={{ color: DOC_MUTED }}>SGST @{ratePercent(r.rate / 2)}</dt>
-                        <dd className="tabular-nums">{formatINR(r.sgst)}</dd>
-                      </div>
-                    </div>
-                  ),
+            <div className="text-[11px]">
+              <dl className="ml-auto w-full max-w-xs space-y-1">
+                {totals.discount > 0 && (
+                  <div className="flex justify-between">
+                    <dt style={{ color: DOC_MUTED }}>
+                      Discount
+                      {invoice.billDiscountBp > 0 ? ` (${ratePercent(invoice.billDiscountBp)})` : ""}
+                    </dt>
+                    <dd className="tabular-nums">- {formatINR(totals.discount)}</dd>
+                  </div>
                 )}
-            <div
-              className="flex justify-between border-y py-1 text-sm font-bold"
-              style={{ borderColor: DOC_RULE }}
-            >
-              <dt>Total Amount</dt>
-              <dd className="tabular-nums">{formatINR(totals.total)}</dd>
+                {taxed && (
+                  <div className="flex justify-between">
+                    <dt style={{ color: DOC_MUTED }}>Taxable Amount</dt>
+                    <dd className="tabular-nums">{formatINR(totals.taxable)}</dd>
+                  </div>
+                )}
+                {taxed &&
+                  totals.byRate
+                    .filter((r) => r.rate > 0)
+                    .map((r) =>
+                      totals.interState ? (
+                        <div key={r.rate} className="flex justify-between">
+                          <dt style={{ color: DOC_MUTED }}>IGST @{ratePercent(r.rate)}</dt>
+                          <dd className="tabular-nums">{formatINR(r.tax)}</dd>
+                        </div>
+                      ) : (
+                        <div key={r.rate} className="space-y-1">
+                          <div className="flex justify-between">
+                            <dt style={{ color: DOC_MUTED }}>CGST @{ratePercent(r.rate / 2)}</dt>
+                            <dd className="tabular-nums">{formatINR(r.cgst)}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt style={{ color: DOC_MUTED }}>SGST @{ratePercent(r.rate / 2)}</dt>
+                            <dd className="tabular-nums">{formatINR(r.sgst)}</dd>
+                          </div>
+                        </div>
+                      ),
+                    )}
+                <div
+                  className="flex justify-between border-y py-1 text-sm font-bold"
+                  style={{ borderColor: DOC_RULE }}
+                >
+                  <dt>Total Amount</dt>
+                  <dd className="tabular-nums">{formatINR(totals.total)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt style={{ color: DOC_MUTED }}>Received Amount</dt>
+                  <dd className="tabular-nums">{formatINR(balances.receivedAmount)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt style={{ color: DOC_MUTED }}>Previous Balance</dt>
+                  <dd className="tabular-nums">{formatINR(balances.previousBalance)}</dd>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <dt>Current Balance</dt>
+                  <dd className="tabular-nums">{formatINR(balances.currentBalance)}</dd>
+                </div>
+                <p className="pt-2 text-right print:pt-1" style={{ color: DOC_MUTED }}>
+                  <span className="block font-bold" style={{ color: DOC_NAVY }}>
+                    Total Amount (in words)
+                  </span>
+                  {rupeesInWords(totals.total)}
+                </p>
+              </dl>
+              <TermsBlock terms={invoice.terms} />
+              {!taxed && (
+                <p className="mt-2 text-[10px] leading-snug" style={{ color: DOC_MUTED }}>
+                  Printed books are exempt under HSN 4901, so no tax is charged and this is a bill of
+                  supply rather than a tax invoice.
+                </p>
+              )}
             </div>
-            <div className="flex justify-between">
-              <dt style={{ color: DOC_MUTED }}>Received Amount</dt>
-              <dd className="tabular-nums">{formatINR(balances.receivedAmount)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt style={{ color: DOC_MUTED }}>Previous Balance</dt>
-              <dd className="tabular-nums">{formatINR(balances.previousBalance)}</dd>
-            </div>
-            <div className="flex justify-between font-bold">
-              <dt>Current Balance</dt>
-              <dd className="tabular-nums">{formatINR(balances.currentBalance)}</dd>
-            </div>
-            <p className="pt-2 text-right" style={{ color: DOC_MUTED }}>
-              <span className="block font-bold" style={{ color: DOC_NAVY }}>
-                Total Amount (in words)
-              </span>
-              {rupeesInWords(totals.total)}
-            </p>
-          </dl>
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-end justify-between gap-6">
-          <div className="text-[11px]">
-            {invoice.terms && (
-              <>
-                <p className="mb-1 font-bold uppercase">Terms and Conditions</p>
-                <ol className="list-inside list-decimal leading-relaxed">
-                  {invoice.terms
-                    .split("\n")
-                    .map((t) => t.trim())
-                    .filter(Boolean)
-                    .map((t, i) => (
-                      <li key={i}>{t}</li>
-                    ))}
-                </ol>
-              </>
-            )}
-            {!taxed && (
-              <p className="mt-2" style={{ color: DOC_MUTED }}>
-                Printed books are exempt under HSN 4901, so no tax is charged and this is a bill of
-                supply rather than a tax invoice.
-              </p>
-            )}
           </div>
+
           <SignatureBlock company={company} />
         </div>
       </div>

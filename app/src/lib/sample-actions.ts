@@ -17,7 +17,7 @@ import { getStaff, requireCapability, roleCan } from "@/lib/staff-auth";
  * it, so what is still in the bag never gets lost inside a school's row.
  */
 
-type Result = { ok?: boolean; error?: string; id?: string };
+type Result = { ok?: boolean; error?: string; id?: string; pending?: boolean };
 
 const DENIED: Record<string, string> = {
   UNAUTHORIZED: "Sign in again.",
@@ -75,6 +75,9 @@ export async function takeSamples(input: z.infer<typeof takeSchema>): Promise<Re
     holderEmail = holder.email;
   }
 
+  // An executive's batch waits for the manager; a manager's stands as saved
+  const approver = roleCan(staff.role, "crm.manage");
+
   const row = await db.sampleIssue.create({
     data: {
       description: d.description,
@@ -87,6 +90,9 @@ export async function takeSamples(input: z.infer<typeof takeSchema>): Promise<Re
       status: d.organizationId ? "WITH_SCHOOL" : "IN_HAND",
       givenOn: d.organizationId ? issuedOn : null,
       notes: d.notes || null,
+      approvalStatus: approver ? "APPROVED" : "PENDING",
+      approvedById: approver && !staff.breakGlass ? staff.id : null,
+      approvedAt: approver ? new Date() : null,
     },
   });
 
@@ -99,10 +105,12 @@ export async function takeSamples(input: z.infer<typeof takeSchema>): Promise<Re
       quantity: row.quantity,
       holder: holderEmail,
       organizationId: row.organizationId,
+      approvalStatus: row.approvalStatus,
     },
   });
   revalidate(row.organizationId);
-  return { ok: true, id: row.id };
+  revalidatePath("/erp/approvals");
+  return { ok: true, id: row.id, pending: row.approvalStatus === "PENDING" };
 }
 
 const giveSchema = z.object({
@@ -124,6 +132,12 @@ export async function giveSamples(input: z.infer<typeof giveSchema>): Promise<Re
   const batch = await db.sampleIssue.findUnique({ where: { id: d.id } });
   if (!batch) return { error: "Those samples are no longer on record." };
   if (batch.status !== "IN_HAND") return { error: "Only copies still in hand can be given out." };
+  if (batch.approvalStatus === "PENDING") {
+    return { error: "These are waiting for your manager's approval before they go to a school." };
+  }
+  if (batch.approvalStatus === "REJECTED") {
+    return { error: "These were sent back, so they cannot go to a school." };
+  }
   const blocked = await mayHandle(batch.issuedById);
   if (blocked) return { error: blocked };
   if (d.quantity > batch.quantity) {
@@ -155,6 +169,11 @@ export async function giveSamples(input: z.infer<typeof giveSchema>): Promise<Re
         organizationId: d.organizationId,
         givenOn,
         notes: batch.notes,
+        // The split was approved along with the batch it came from
+        approvalStatus: batch.approvalStatus,
+        approvedById: batch.approvedById,
+        approvedAt: batch.approvedAt,
+        rejectedReason: batch.rejectedReason,
       },
     });
   });
@@ -207,5 +226,57 @@ export async function settleSamples(input: z.infer<typeof settleSchema>): Promis
     after: { status: row.status },
   });
   revalidate(before.organizationId);
+  return { ok: true, id: row.id };
+}
+
+const decideSchema = z.object({
+  id: z.string().min(1),
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  reason: z.string().trim().max(200).optional().or(z.literal("")),
+});
+
+/** The manager approves an executive's batch, or sends it back with a reason. */
+export async function decideSamples(input: z.infer<typeof decideSchema>): Promise<Result> {
+  const denied = await requireCapability("crm.manage");
+  if (denied) {
+    return {
+      error: denied === "FORBIDDEN" ? "Only a sales manager or an owner can do that." : DENIED.UNAUTHORIZED,
+    };
+  }
+  const staff = await getStaff();
+  if (!staff) return { error: DENIED.UNAUTHORIZED };
+
+  const parsed = decideSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { id, decision, reason } = parsed.data;
+
+  if (decision === "REJECTED" && !reason) {
+    return { error: "Say why they are being sent back." };
+  }
+  const before = await db.sampleIssue.findUnique({ where: { id } });
+  if (!before) return { error: "Those samples are no longer on record." };
+  if (before.approvalStatus !== "PENDING") {
+    return { error: "Only samples waiting for approval can be decided." };
+  }
+
+  const row = await db.sampleIssue.update({
+    where: { id },
+    data: {
+      approvalStatus: decision,
+      approvedById: decision === "APPROVED" && !staff.breakGlass ? staff.id : null,
+      approvedAt: decision === "APPROVED" ? new Date() : null,
+      rejectedReason: decision === "REJECTED" ? (reason ?? null) : null,
+    },
+  });
+
+  await audit({
+    action: `sample.${decision.toLowerCase()}`,
+    entityType: "SampleIssue",
+    entityId: row.id,
+    before: { approvalStatus: before.approvalStatus },
+    after: { approvalStatus: row.approvalStatus, reason: reason || null },
+  });
+  revalidate(row.organizationId);
+  revalidatePath("/erp/approvals");
   return { ok: true, id: row.id };
 }

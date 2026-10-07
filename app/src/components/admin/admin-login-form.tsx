@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { Loader2, LockKeyhole } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { adminLogin } from "@/lib/admin-actions";
 
 export function AdminLoginForm({ next }: { next?: string }) {
@@ -13,8 +13,7 @@ export function AdminLoginForm({ next }: { next?: string }) {
   return (
     <form action={formAction} className="space-y-4">
       {next && <input type="hidden" name="next" value={next} />}
-      <Input
-        type="password"
+      <PasswordInput
         name="password"
         required
         autoFocus

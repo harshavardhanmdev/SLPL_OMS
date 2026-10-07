@@ -1525,6 +1525,13 @@ enum SampleStatus {
   WRITTEN_OFF
 }
 
+/// An executive's batch waits for the sales manager before it goes to a school
+enum SampleApproval {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 /// Specimen copies a salesperson carries. They are stock in someone's hands
 /// first and only sometimes end up at a school, so the school is optional and
 /// is named when the copies are actually handed over.
@@ -1550,11 +1557,18 @@ model SampleIssue {
   returnedOn DateTime?
   notes      String?
 
+  /// Approved by default so rows from before the approval step stay valid
+  approvalStatus SampleApproval @default(APPROVED)
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
   @@index([issuedById, status])
+  @@index([approvalStatus])
   @@index([status])
 }
 

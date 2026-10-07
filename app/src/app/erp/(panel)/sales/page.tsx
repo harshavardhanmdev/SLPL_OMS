@@ -135,7 +135,7 @@ export default async function SalesHome() {
             Nothing overdue. Every follow-up is in the future.
           </p>
         ) : (
-          <ul className="divide-y">
+          <ul className="erp-stagger divide-y">
             {due.map((v) => {
               const overdue = v.nextActionOn < startOfDay;
               return (
@@ -152,7 +152,7 @@ export default async function SalesHome() {
                   <Badge
                     className={
                       overdue
-                        ? "border-destructive/40 bg-destructive/10 text-destructive"
+                        ? "erp-ring border-destructive/40 bg-destructive/10 text-destructive"
                         : "border-saffron/40 bg-saffron/15 text-saffron-deep"
                     }
                   >

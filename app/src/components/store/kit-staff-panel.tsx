@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import {
   lookupReceipt,
@@ -79,9 +80,8 @@ export function KitStaffPanel({
         </div>
         <div>
           <Label htmlFor="school-pin">PIN</Label>
-          <Input
+          <PasswordInput
             id="school-pin"
-            type="password"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
             inputMode="numeric"

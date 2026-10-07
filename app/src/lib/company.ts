@@ -115,14 +115,15 @@ export async function getCompany(): Promise<CompanyProfile> {
 /**
  * The UPI payment string a phone understands when it scans the QR.
  *
- * Amount is included so the payer cannot mistype it. `tn` carries the document
- * number so the money arriving can be matched to the bill it paid.
+ * No amount, because phone apps then lock it and a school paying part of a
+ * bill could not; the amount due is printed beside the QR instead. `tn`
+ * carries the document number so the money arriving can be matched to the
+ * bill it paid.
  */
-export function upiPayload(company: CompanyProfile, amountPaise: number, note: string): string {
+export function upiPayload(company: CompanyProfile, note: string): string {
   const params = new URLSearchParams({
     pa: company.upiId,
     pn: company.name,
-    am: (amountPaise / 100).toFixed(2),
     cu: "INR",
     tn: note.slice(0, 50),
   });

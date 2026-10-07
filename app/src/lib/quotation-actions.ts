@@ -32,6 +32,7 @@ const DENIED: Record<string, string> = {
 const lineSchema = z.object({
   productId: z.string().optional().nullable(),
   description: z.string().trim().min(2, "Every line needs a description").max(200),
+  contents: z.string().trim().max(500).optional().or(z.literal("")),
   hsnCode: z.string().trim().max(12).optional().or(z.literal("")),
   unit: z.string().trim().max(12).optional().or(z.literal("")),
   quantity: z.number().int().min(1, "Quantity must be at least one").max(1_000_000),
@@ -139,6 +140,7 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
     return {
       productId: lineProductId(l.productId, line.description),
       description: line.description,
+      contents: l.contents || null,
       hsnCode: line.hsnCode,
       unit: line.unit ?? "PCS",
       quantity: line.quantity,

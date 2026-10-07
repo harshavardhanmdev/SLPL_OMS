@@ -1113,6 +1113,8 @@ model QuotationItem {
   /// Snapshotted, so a later price change cannot rewrite a quotation
   productId      String?
   description    String
+  /// Copied from the price list line when picked, so a later edit there leaves this quotation alone
+  contents       String?
   /// 4901 for books, 9992 for services
   hsnCode        String?
   unit           String    @default("Nos")
@@ -1142,6 +1144,8 @@ model PriceListItem {
   /// Groups the picker and the price list screen, e.g. "Little Leaps Grade 3"
   group       String
   description String
+  /// What a set holds, such as its books, printed under the line on a quotation
+  contents    String?
   hsnCode     String? @default("4901")
   unit        String  @default("PCS")
   /// Printed price, paise. Shown as MRP on an invoice.

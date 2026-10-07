@@ -21,6 +21,8 @@ const schema = z.object({
   id: z.string().optional(),
   group: z.string().trim().min(2, "Which group does it belong to?").max(60),
   description: z.string().trim().min(2, "What is it?").max(200),
+  /** What a set holds, printed under the line on a quotation. */
+  contents: z.string().trim().max(500).optional().or(z.literal("")),
   hsnCode: z.string().trim().max(12).optional().or(z.literal("")),
   unit: z.string().trim().min(1).max(12),
   /** Rupees as typed. */
@@ -48,6 +50,7 @@ export async function savePriceItem(input: PriceItemInput): Promise<Result> {
   const data = {
     group: d.group,
     description: d.description,
+    contents: d.contents || null,
     hsnCode: d.hsnCode || null,
     unit: d.unit.toUpperCase(),
     mrp: d.mrp == null ? null : Math.round(d.mrp * 100),

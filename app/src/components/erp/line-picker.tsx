@@ -20,6 +20,8 @@ export type CatalogItem = {
   /** Heading in the picker: a price list group, Services, or the store. */
   group: string;
   title: string;
+  /** What a price list set holds, carried onto the quotation line. */
+  contents?: string | null;
   hsnCode: string | null;
   gstRate: number;
   /** What we charge, paise. */

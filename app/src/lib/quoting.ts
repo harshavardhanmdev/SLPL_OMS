@@ -41,6 +41,7 @@ export async function catalogForQuoting(): Promise<CatalogItem[]> {
       id: `price:${p.id}`,
       group: p.group,
       title: p.description,
+      contents: p.contents,
       hsnCode: p.hsnCode,
       gstRate: p.gstRate,
       price: p.rate,

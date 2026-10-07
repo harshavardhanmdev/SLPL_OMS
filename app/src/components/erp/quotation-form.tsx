@@ -30,6 +30,8 @@ const selectClass =
 export type QuoteRow = {
   productId: string | null;
   description: string;
+  /** What a set holds, printed under the line. */
+  contents: string;
   hsnCode: string;
   unit: string;
   quantity: string;
@@ -45,6 +47,7 @@ export type QuoteRow = {
 const blankRow: QuoteRow = {
   productId: null,
   description: "",
+  contents: "",
   hsnCode: BOOK_HSN,
   unit: "PCS",
   quantity: "1",
@@ -157,6 +160,7 @@ export function QuotationForm({
     setRow(i, {
       productId: item.id,
       description: item.title,
+      contents: item.contents ?? "",
       hsnCode: item.hsnCode ?? "",
       unit: item.unit,
       mrp: item.mrp ? String(item.mrp / 100) : "",
@@ -200,6 +204,7 @@ export function QuotationForm({
           return {
             productId: r.productId,
             description: l.description,
+            contents: r.contents,
             hsnCode: l.hsnCode,
             unit: l.unit,
             quantity: l.quantity,
@@ -368,6 +373,14 @@ export function QuotationForm({
                       className="h-10"
                       required
                     />
+                    {row.contents && (
+                      <Input
+                        aria-label={`In the set, line ${i + 1}`}
+                        value={row.contents}
+                        onChange={(e) => setRow(i, { contents: e.target.value })}
+                        className="h-9 text-xs text-muted-foreground"
+                      />
+                    )}
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor={`q-hsn-${i}`} className="text-xs">

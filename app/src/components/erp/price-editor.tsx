@@ -17,6 +17,7 @@ export type PriceRow = {
   id: string;
   group: string;
   description: string;
+  contents: string | null;
   hsnCode: string | null;
   unit: string;
   /** Paise. */
@@ -33,6 +34,7 @@ const cell = "h-9 text-sm";
 type Draft = {
   group: string;
   description: string;
+  contents: string;
   hsnCode: string;
   unit: string;
   mrp: string;
@@ -44,6 +46,7 @@ type Draft = {
 const toDraft = (r: PriceRow): Draft => ({
   group: r.group,
   description: r.description,
+  contents: r.contents ?? "",
   hsnCode: r.hsnCode ?? "",
   unit: r.unit,
   mrp: r.mrp == null ? "" : String(r.mrp / 100),
@@ -57,6 +60,7 @@ async function save(id: string | undefined, d: Draft) {
     id,
     group: d.group,
     description: d.description,
+    contents: d.contents,
     hsnCode: d.hsnCode,
     unit: d.unit,
     mrp: d.mrp === "" ? null : Number(d.mrp),
@@ -146,6 +150,15 @@ function Fields({
           <option value="1800">18%, service</option>
         </select>
       </div>
+      <div className="space-y-1 sm:col-span-12">
+        <Label className="text-xs">In the set, printed under the line on a quotation</Label>
+        <Input
+          value={d.contents}
+          onChange={(e) => set({ contents: e.target.value })}
+          className={cell}
+          placeholder="History, Geography, Polity, Economics"
+        />
+      </div>
     </div>
   );
 }
@@ -210,6 +223,7 @@ export function PriceLine({ row, canEdit, groups }: { row: PriceRow; canEdit: bo
       <span className="min-w-0">
         <span className="font-medium">{row.description}</span>
         {!row.isActive && <span className="ml-2 text-xs text-muted-foreground">retired</span>}
+        {row.contents && <span className="block text-xs text-muted-foreground">{row.contents}</span>}
       </span>
       <span className="hidden text-muted-foreground sm:block">{row.unit}</span>
       <span className="hidden text-right tabular-nums text-muted-foreground sm:block">
@@ -252,6 +266,7 @@ export function AddPriceItem({ groups }: { groups: string[] }) {
   const blank: Draft = {
     group: groups[0] ?? "",
     description: "",
+    contents: "",
     hsnCode: "4901",
     unit: "PCS",
     mrp: "",

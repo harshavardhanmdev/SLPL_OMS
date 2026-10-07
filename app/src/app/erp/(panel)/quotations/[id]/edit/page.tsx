@@ -80,6 +80,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
           lines: quotation.items.map((i) => ({
             productId: i.productId,
             description: i.description,
+            contents: i.contents ?? "",
             hsnCode: i.hsnCode ?? "",
             unit: i.unit.toUpperCase(),
             quantity: String(i.quantity),

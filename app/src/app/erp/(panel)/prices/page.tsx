@@ -103,6 +103,7 @@ export default async function PricesPage() {
                         id: r.id,
                         group: r.group,
                         description: r.description,
+                        contents: r.contents,
                         hsnCode: r.hsnCode,
                         unit: r.unit,
                         mrp: r.mrp,

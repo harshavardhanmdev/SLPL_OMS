@@ -248,6 +248,11 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                   <tr key={item.id} style={{ borderBottom: `1px solid ${DOC_RULE}` }}>
                     <td className="px-2 py-2.5 align-top uppercase print:py-1">
                       {item.description}
+                      {item.contents && (
+                        <span className={`${sub} normal-case`} style={{ color: DOC_MUTED }}>
+                          Includes {item.contents}
+                        </span>
+                      )}
                     </td>
                     <td className={td}>{item.hsnCode || "-"}</td>
                     <td className={`${td} whitespace-nowrap`}>

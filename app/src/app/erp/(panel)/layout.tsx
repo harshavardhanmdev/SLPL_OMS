@@ -24,6 +24,7 @@ const groups: { label: string | null; items: Entry[] }[] = [
     items: [
       { href: "/erp", label: "Overview", icon: "overview", needs: "erp.enter" },
       { href: "/erp/claims", label: "My expenses", icon: "expenses", needs: "erp.enter" },
+      { href: "/erp/passkeys", label: "Fingerprint sign-in", icon: "fingerprint", needs: "erp.enter" },
     ],
   },
   {
@@ -68,6 +69,7 @@ const groups: { label: string | null; items: Entry[] }[] = [
 ];
 
 export const metadata = {
+  manifest: "/erp.webmanifest",
   appleWebApp: { capable: true, title: "SLPL", statusBarStyle: "black-translucent" as const },
   icons: { apple: "/brand/apple-touch-icon.png" },
 };

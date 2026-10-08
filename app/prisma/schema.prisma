@@ -787,6 +787,7 @@ model AdminUser {
   reportsTo   AdminUser?  @relation("reports", fields: [reportsToId], references: [id], onDelete: SetNull)
   reports     AdminUser[] @relation("reports")
   expenseClaims ExpenseClaim[]
+  passkeys      StaffPasskey[]
 
   sessions       AdminSession[]
   auditLogs      AdminAuditLog[]
@@ -818,6 +819,26 @@ model AdminSession {
 
   @@index([adminUserId, revokedAt])
   @@index([expiresAt])
+}
+
+/// Signing in with a fingerprint or face on one phone or computer (a WebAuthn
+/// passkey). Signing a person out everywhere removes these too, so a lost
+/// phone cannot get back in.
+model StaffPasskey {
+  id           String    @id @default(cuid())
+  adminUserId  String
+  adminUser    AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  /// The credential ID, base64url, as the browser reports it
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      Int       @default(0)
+  transports   String[]
+  /// Shown where they are listed, such as "Android phone, Chrome"
+  deviceName   String
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([adminUserId])
 }
 
 model AdminAuditLog {

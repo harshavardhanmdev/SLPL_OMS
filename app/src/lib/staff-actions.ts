@@ -9,22 +9,30 @@ import { audit } from "@/lib/audit";
 import { clientIp, destroyAdminSession, isLockedOut, recordLoginResult } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { getStaff, requireCapability, signIn, signOut, type AdminRole } from "@/lib/staff-auth";
+import { safeRelativePath } from "@/lib/utils";
 
 type Result = { ok?: boolean; error?: string };
 
+/**
+ * Signs in and goes straight to `destination`. The redirect happens here
+ * rather than in the browser, so the sign-in page, which sends anyone signed
+ * in onward by itself, cannot take them somewhere else first.
+ */
 export async function staffSignIn(
   email: string,
   password: string,
+  trusted: boolean,
+  destination: string,
 ): Promise<{ ok?: boolean; error?: string }> {
   const ip = await clientIp();
   if (isLockedOut(ip)) return { error: "Too many wrong attempts - locked for 15 minutes." };
 
-  const res = await signIn(email, password);
+  const res = await signIn(email, password, trusted);
   recordLoginResult(ip, Boolean(res.session));
   if (res.error) return { error: res.error };
 
   await audit({ action: "staff.signin", entityType: "AdminUser", entityId: res.session!.id });
-  return { ok: true };
+  redirect(safeRelativePath(destination, "/erp"));
 }
 
 export async function staffSignOut(): Promise<void> {
@@ -102,6 +110,8 @@ export async function saveStaff(input: StaffInput): Promise<Result> {
       data: { revokedAt: new Date() },
     });
   }
+  // Someone who has left loses fingerprint sign-in on every phone too
+  if (!d.isActive) await db.staffPasskey.deleteMany({ where: { adminUserId: row.id } });
 
   await audit({
     action: d.id ? "staff.update" : "staff.create",
@@ -122,9 +132,16 @@ export async function revokeSessions(adminUserId: string): Promise<Result> {
     where: { adminUserId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
-  await audit({ action: "staff.revoke", entityType: "AdminUser", entityId: adminUserId });
+  // A lost phone must not sign back in with a fingerprint either
+  const keys = await db.staffPasskey.deleteMany({ where: { adminUserId } });
+  await audit({
+    action: "staff.revoke",
+    entityType: "AdminUser",
+    entityId: adminUserId,
+    after: { sessions: res.count, passkeys: keys.count },
+  });
   revalidatePath("/erp/staff");
-  return res.count > 0 ? { ok: true } : { error: "They had no active sessions." };
+  return res.count + keys.count > 0 ? { ok: true } : { error: "They had no active sessions." };
 }
 
 /** Anyone signed in can change their own password. */

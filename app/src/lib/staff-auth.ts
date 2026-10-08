@@ -37,6 +37,8 @@ export type StaffSession = {
 
 const COOKIE = "slpl_staff";
 const HOURS = 12;
+/** A phone its owner said to trust, or one signed in with a fingerprint or face. */
+const TRUSTED_HOURS = 60 * 24;
 const secretKey = () => new TextEncoder().encode(process.env.SESSION_SECRET!);
 
 // ── Capabilities ─────────────────────────────────────────────────────────────
@@ -147,13 +149,26 @@ export function canEnterErp(role: AdminRole): boolean {
 export async function signIn(
   email: string,
   password: string,
+  trusted = false,
 ): Promise<{ session?: StaffSession; error?: string }> {
   const user = await db.adminUser.findUnique({ where: { email: email.trim().toLowerCase() } });
   if (!user || !user.isActive) return { error: "Wrong email or password." };
   if (!bcrypt.compareSync(password, user.passwordHash)) return { error: "Wrong email or password." };
+  return startSession(user, trusted);
+}
 
+/**
+ * Opens a session for someone already proven to be who they say. A trusted
+ * phone stays signed in for 60 days instead of 12 hours; signing out
+ * everywhere on the Staff screen still ends it at once.
+ */
+export async function startSession(
+  user: { id: string; email: string; name: string; role: string },
+  trusted: boolean,
+): Promise<{ session: StaffSession }> {
+  const hours = trusted ? TRUSTED_HOURS : HOURS;
   const jar = await headers();
-  const expiresAt = new Date(Date.now() + HOURS * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
   const row = await db.adminSession.create({
     data: {
       adminUserId: user.id,
@@ -167,7 +182,7 @@ export async function signIn(
   const token = await new SignJWT({ sid: row.id })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${HOURS}h`)
+    .setExpirationTime(`${hours}h`)
     .sign(secretKey());
   const cookieJar = await cookies();
   cookieJar.set(COOKIE, token, {
@@ -176,7 +191,7 @@ export async function signIn(
     secure: process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "1",
     sameSite: "lax",
     path: "/",
-    maxAge: HOURS * 60 * 60,
+    maxAge: hours * 60 * 60,
   });
 
   return {

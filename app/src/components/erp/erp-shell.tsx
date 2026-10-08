@@ -10,6 +10,7 @@ import {
   Boxes,
   Building2,
   FileSignature,
+  Fingerprint,
   Gift,
   Landmark,
   LayoutDashboard,
@@ -30,6 +31,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { InstallApp } from "@/components/erp/install-app";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +68,7 @@ const ICONS = {
   store: Store,
   plus: Plus,
   bell: Bell,
+  fingerprint: Fingerprint,
 } as const;
 
 export type NavIcon = keyof typeof ICONS;
@@ -235,7 +238,8 @@ export function ErpShell({
         <div className="no-scrollbar flex-1 overflow-y-auto px-3 pb-4">
           <NavLinks groups={groups} />
         </div>
-        <div className="border-t border-white/10 p-3">
+        <div className="space-y-2 border-t border-white/10 p-3">
+          <InstallApp variant="menu" />
           <Person name={name} role={role} signOut={signOut} />
         </div>
       </aside>
@@ -267,7 +271,8 @@ export function ErpShell({
               <div className="flex-1 overflow-y-auto px-3 pb-4">
                 <NavLinks groups={groups} onNavigate={() => setOpen(false)} />
               </div>
-              <div className="border-t border-white/10 p-3">
+              <div className="space-y-2 border-t border-white/10 p-3">
+                <InstallApp variant="menu" />
                 <Person name={name} role={role} signOut={signOut} />
               </div>
             </div>

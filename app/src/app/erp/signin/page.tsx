@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   robots: { index: false },
   // Added to a home screen from here, it still opens as the back office app
   manifest: "/erp.webmanifest",
-  appleWebApp: { capable: true, title: "SLPL", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "SLPL ERP", statusBarStyle: "black-translucent" },
 };
 
 export default async function StaffSignInPage({

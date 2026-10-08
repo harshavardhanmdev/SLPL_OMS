@@ -70,7 +70,7 @@ const groups: { label: string | null; items: Entry[] }[] = [
 
 export const metadata = {
   manifest: "/erp.webmanifest",
-  appleWebApp: { capable: true, title: "SLPL", statusBarStyle: "black-translucent" as const },
+  appleWebApp: { capable: true, title: "SLPL ERP", statusBarStyle: "black-translucent" as const },
   icons: { apple: "/brand/apple-touch-icon.png" },
 };
 

@@ -1,7 +1,7 @@
 {
   "id": "/erp",
   "name": "SLPL Back office",
-  "short_name": "SLPL",
+  "short_name": "SLPL ERP",
   "description": "Schools, quotations, bills, samples and expenses, on your phone.",
   "start_url": "/erp",
   "scope": "/erp",

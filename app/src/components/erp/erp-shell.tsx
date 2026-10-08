@@ -12,6 +12,7 @@ import {
   FileSignature,
   Fingerprint,
   Gift,
+  Handshake,
   Landmark,
   LayoutDashboard,
   LogOut,
@@ -69,6 +70,7 @@ const ICONS = {
   plus: Plus,
   bell: Bell,
   fingerprint: Fingerprint,
+  vendors: Handshake,
 } as const;
 
 export type NavIcon = keyof typeof ICONS;

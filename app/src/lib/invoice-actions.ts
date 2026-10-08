@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
+import { formatINR } from "@/lib/money";
 import { nextInvoiceNumber } from "@/lib/number-series";
 import { documentKindFor, documentTotals, type QuoteLine } from "@/lib/quotation-math";
 import { lineProductId } from "@/lib/quoting";
@@ -172,6 +173,23 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
       select: { number: true },
     });
     if (billed) return { error: `Quotation ${quotation.number} is already billed as ${billed.number}.` };
+  }
+
+  // One live bill per school per amount: a second person raising the same one
+  // is told whose it is, rather than the school receiving it twice
+  const twin = await db.invoice.findFirst({
+    where: {
+      organizationId: org.id,
+      total: totals.total,
+      status: { in: ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT"] },
+      ...(d.id ? { NOT: { id: d.id } } : {}),
+    },
+    select: { number: true, createdEmail: true, createdBy: { select: { name: true } } },
+  });
+  if (twin) {
+    return {
+      error: `${twin.number} for ${org.name} is already open at ${formatINR(totals.total)}, raised by ${twin.createdBy?.name ?? twin.createdEmail}. Use that one instead of raising it again.`,
+    };
   }
 
   if (d.id) {

@@ -677,6 +677,7 @@ enum ExpenseCategory {
   TRAVEL
   STATIONERY
   PRINTING
+  PAPER
   COURIER
   OFFICE
   UTILITIES
@@ -716,11 +717,42 @@ model Expense {
   gstAmount   Int?
   vendorGstin String?
   enteredBy   String          @default("Director")
+  /// Set when this was a payment to a vendor recorded from the Vendors screen
+  vendorId    String?
+  vendor      Vendor?         @relation(fields: [vendorId], references: [id], onDelete: SetNull)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
   @@index([spentAt])
   @@index([category, spentAt])
+  @@index([vendorId, spentAt])
+}
+
+/// Someone we pay: a printer, a paper supplier, the landlord, the electricity
+/// board. Each payment is an Expense, so the expense log stays the one record
+/// of money out; a vendor with a due day is a recurring payment.
+model Vendor {
+  id            String          @id @default(cuid())
+  name          String
+  /// What its payments are filed under in the expense log
+  category      ExpenseCategory @default(MISC)
+  contactPerson String?
+  phone         String?
+  email         String?
+  gstin         String?
+  /// Bank account or UPI ID to pay them
+  payTo         String?
+  notes         String?
+  /// A payment due every month, such as rent: the day it falls due (1 to 28)
+  recurringDay  Int?
+  /// The usual amount, paise. Left empty when it varies, as an electricity bill does
+  recurringAmount Int?
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  expenses      Expense[]
+
+  @@index([isActive, name])
 }
 
 enum ClaimStatus {

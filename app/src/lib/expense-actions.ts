@@ -51,6 +51,8 @@ const expenseSchema = z.object({
   billImage: z.string().max(300).nullable().optional(),
   gstAmount: z.number().min(0).max(10_000_000).nullable().optional(),
   vendorGstin: z.string().trim().max(20).optional().or(z.literal("")),
+  /** A payment to a vendor, made from the Vendors screen. */
+  vendorId: z.string().nullable().optional(),
 });
 
 export type ExpenseInput = z.infer<typeof expenseSchema>;
@@ -72,6 +74,10 @@ export async function saveExpense(input: ExpenseInput): Promise<Result> {
     return { error: "That date is in the future." };
   }
 
+  if (d.vendorId && !(await db.vendor.findUnique({ where: { id: d.vendorId }, select: { id: true } }))) {
+    return { error: "That vendor is no longer on the list." };
+  }
+
   const amount = Math.round(d.amount * 100);
   const gstAmount = d.gstAmount != null ? Math.round(d.gstAmount * 100) : null;
   if (gstAmount != null && gstAmount > amount) {
@@ -89,6 +95,7 @@ export async function saveExpense(input: ExpenseInput): Promise<Result> {
     billImage: d.billImage || null,
     gstAmount,
     vendorGstin: d.vendorGstin || null,
+    vendorId: d.vendorId || null,
   };
 
   const staff = await getStaff();
@@ -111,6 +118,7 @@ export async function saveExpense(input: ExpenseInput): Promise<Result> {
     after: row,
   });
   revalidatePath("/erp/expenses");
+  if (row.vendorId) revalidatePath("/erp/vendors");
   return { ok: true, voucherNo: row.voucherNo };
 }
 

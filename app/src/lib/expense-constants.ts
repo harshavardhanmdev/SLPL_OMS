@@ -8,6 +8,7 @@ export const EXPENSE_CATEGORIES = [
   { value: "TRAVEL", label: "Travel and conveyance" },
   { value: "STATIONERY", label: "Stationery" },
   { value: "PRINTING", label: "Printing and binding" },
+  { value: "PAPER", label: "Paper" },
   { value: "COURIER", label: "Courier and postage" },
   { value: "OFFICE", label: "Office supplies" },
   { value: "UTILITIES", label: "Electricity, water, internet" },

@@ -47,6 +47,7 @@ const groups: { label: string | null; items: Entry[] }[] = [
     items: [
       { href: "/erp/payments", label: "Payments in", icon: "payments", needs: "finance.read" },
       { href: "/erp/expenses", label: "Expenses", icon: "expenses", needs: "finance.read" },
+      { href: "/erp/vendors", label: "Vendors", icon: "vendors", needs: "staff.manage" },
     ],
   },
   {

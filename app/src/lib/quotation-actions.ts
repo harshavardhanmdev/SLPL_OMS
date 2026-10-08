@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
+import { formatINR } from "@/lib/money";
 import { nextQuotationNumber } from "@/lib/number-series";
 import { lineProductId } from "@/lib/quoting";
 import { documentTotals, lineTotals, type QuoteLine } from "@/lib/quotation-math";
@@ -153,6 +154,22 @@ export async function saveQuotation(input: QuotationInput): Promise<Result> {
       sortOrder: i,
     };
   });
+
+  // One open quotation per school per amount, so two people never quote the same thing twice
+  const twin = await db.quotation.findFirst({
+    where: {
+      organizationId: org.id,
+      total: totals.total,
+      status: { in: ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT"] },
+      ...(d.id ? { NOT: { id: d.id } } : {}),
+    },
+    select: { number: true, createdEmail: true, createdBy: { select: { name: true } } },
+  });
+  if (twin) {
+    return {
+      error: `${twin.number} for ${org.name} is already open at ${formatINR(totals.total)}, raised by ${twin.createdBy?.name ?? twin.createdEmail}. Use that one instead of raising it again.`,
+    };
+  }
 
   if (d.id) {
     const before = await db.quotation.findUnique({ where: { id: d.id } });

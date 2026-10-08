@@ -57,8 +57,12 @@ export type Capability =
   | "crm.read"
   | "crm.write"
   | "crm.manage"
+  // Reading every bill and return, which the CA needs without the rest of sales
+  | "invoices.read"
   | "invoices.write"
   | "invoices.approve"
+  // The vendor list and what each was paid: the owner, and the CA to audit it
+  | "vendors.read"
   | "challan.write"
   | "staff.manage";
 
@@ -73,12 +77,14 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "quotes.read",
     "quotes.write",
     "crm.read",
+    "invoices.read",
     "crm.write",
     "crm.manage",
     "invoices.write",
     "invoices.approve",
     "challan.write",
     "staff.manage",
+    "vendors.read",
   ],
   MANAGER: [
     "store.manage",
@@ -90,6 +96,7 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "quotes.read",
     "quotes.write",
     "crm.read",
+    "invoices.read",
     "crm.write",
     "crm.manage",
     "invoices.write",
@@ -102,6 +109,7 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "finance.write",
     "quotes.read",
     "crm.read",
+    "invoices.read",
     "invoices.write",
   ],
   // The manager raises and approves; the executive raises and waits. Neither
@@ -110,6 +118,7 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "quotes.read",
     "quotes.write",
     "crm.read",
+    "invoices.read",
     "crm.write",
     "crm.manage",
     "invoices.write",
@@ -119,12 +128,14 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "quotes.read",
     "quotes.write",
     "crm.read",
+    "invoices.read",
     "crm.write",
     "invoices.write",
   ],
   WAREHOUSE: ["orders.manage", "shipments.manage"],
   SUPPORT: ["grievances.manage"],
-  CA_READONLY: ["finance.read"],
+  // The auditor reads the money: stock, payments in and out, bills, returns, vendors
+  CA_READONLY: ["finance.read", "invoices.read", "vendors.read"],
 };
 
 export function roleCan(role: AdminRole, capability: Capability): boolean {

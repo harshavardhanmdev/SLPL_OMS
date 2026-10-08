@@ -1310,6 +1310,7 @@ model Organization {
   visits     Visit[]
   quotations Quotation[]
   invoices   Invoice[]
+  returns    SalesReturn[]
   receipts   Receipt[]
   samples    SampleIssue[]
   gifts      Gift[]
@@ -1485,6 +1486,7 @@ model Invoice {
   visits        Visit[]
   challans      DeliveryChallan[]
   subscriptions Subscription[]
+  returns       SalesReturn[]
 
   @@index([status, invoiceDate])
   @@index([organizationId])
@@ -1690,4 +1692,49 @@ model Gift {
   createdAt DateTime @default(now())
 
   @@index([organizationId])
+}
+
+/// Goods a school sent back: a sales return, or credit note. Its value comes off
+/// what the school owes, less anything paid back to them, as a payment would.
+model SalesReturn {
+  id             String       @id @default(cuid())
+  /// SLPL/SR/2026-27/0004
+  number         String       @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  /// The bill the goods went out on, when known
+  invoiceId      String?
+  invoice        Invoice?     @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  returnedOn     DateTime
+  /// Snapshotted, as on an invoice
+  customerName   String
+  phone          String?
+  placeOfSupply  String       @default("Telangana")
+  reason         String?
+  /// Paise
+  total          Int
+  /// Paid back to the school, paise. Only the rest is credited to their account
+  refunded       Int          @default(0)
+  createdEmail   String
+  createdAt      DateTime     @default(now())
+  items          SalesReturnItem[]
+
+  @@index([organizationId, returnedOn])
+  @@index([returnedOn])
+}
+
+model SalesReturnItem {
+  id            String      @id @default(cuid())
+  salesReturnId String
+  salesReturn   SalesReturn @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
+  description   String
+  hsnCode       String?
+  unit          String      @default("SET")
+  quantity      Int
+  /// Paise
+  mrp           Int?
+  /// Paise, the rate it was sold at
+  rate          Int
+  amount        Int
+  sortOrder     Int         @default(0)
 }

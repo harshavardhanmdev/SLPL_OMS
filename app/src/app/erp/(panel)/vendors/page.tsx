@@ -23,7 +23,9 @@ const dateIN = (d: Date) =>
  */
 export default async function VendorsPage() {
   const staff = await getStaff();
-  if (!staff || !roleCan(staff.role, "staff.manage")) redirect("/erp");
+  if (!staff || !roleCan(staff.role, "vendors.read")) redirect("/erp");
+  // The CA reads; only an owner adds, changes or pays
+  const canEdit = roleCan(staff.role, "staff.manage");
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -65,11 +67,13 @@ export default async function VendorsPage() {
             Everyone we pay. A payment recorded here goes straight into Expenses.
           </p>
         </div>
-        <Button className="gap-2" asChild>
-          <Link href="/erp/vendors/new">
-            <Plus className="size-4" /> Add a vendor
-          </Link>
-        </Button>
+        {canEdit && (
+          <Button className="gap-2" asChild>
+            <Link href="/erp/vendors/new">
+              <Plus className="size-4" /> Add a vendor
+            </Link>
+          </Button>
+        )}
       </div>
 
       {recurring.length > 0 && (
@@ -113,9 +117,11 @@ export default async function VendorsPage() {
                     >
                       {r.late ? "Overdue" : "Due"}
                     </span>
-                    <Button size="sm" asChild>
-                      <Link href={`/erp/vendors/${r.id}#pay`}>Pay</Link>
-                    </Button>
+                    {canEdit && (
+                      <Button size="sm" asChild>
+                        <Link href={`/erp/vendors/${r.id}#pay`}>Pay</Link>
+                      </Button>
+                    )}
                   </div>
                 )}
               </li>

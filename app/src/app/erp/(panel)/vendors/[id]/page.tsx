@@ -20,7 +20,9 @@ const dateIN = (d: Date) =>
 export default async function VendorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const staff = await getStaff();
-  if (!staff || !roleCan(staff.role, "staff.manage")) redirect("/erp");
+  if (!staff || !roleCan(staff.role, "vendors.read")) redirect("/erp");
+  // The CA reads; only an owner adds, changes or pays
+  const canEdit = roleCan(staff.role, "staff.manage");
 
   const vendor = await db.vendor.findUnique({
     where: { id },
@@ -77,7 +79,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      {vendor.isActive && (
+      {canEdit && vendor.isActive && (
         <VendorPayForm
           vendor={{
             id: vendor.id,
@@ -132,6 +134,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
         )}
       </section>
 
+      {canEdit && (
       <details className="rounded-2xl border bg-card p-4">
         <summary className="cursor-pointer font-heading font-semibold">Edit {vendor.name}</summary>
         <div className="mt-4">
@@ -153,6 +156,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
           />
         </div>
       </details>
+      )}
     </div>
   );
 }

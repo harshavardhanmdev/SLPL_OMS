@@ -27,7 +27,7 @@ export default async function NewPaymentPage({
 
   // Outstanding the same way the ledger works it out: billed less received,
   // in two grouped queries rather than one per school
-  const [organizations, billed, received, invoices] = await Promise.all([
+  const [organizations, billed, received, invoices, returned] = await Promise.all([
     db.organization.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.invoice.groupBy({
       by: ["organizationId"],
@@ -52,6 +52,8 @@ export default async function NewPaymentPage({
         allocations: { select: { amount: true } },
       },
     }),
+    // Goods sent back come off what a school owes, less anything paid back
+    db.salesReturn.groupBy({ by: ["organizationId"], _sum: { total: true, refunded: true } }),
   ]);
 
   if (organizations.length === 0) {
@@ -74,6 +76,7 @@ export default async function NewPaymentPage({
 
   const billedBy = new Map(billed.map((b) => [b.organizationId, b._sum.total ?? 0]));
   const receivedBy = new Map(received.map((r) => [r.organizationId, r._sum.amount ?? 0]));
+  const returnedBy = new Map(returned.map((r) => [r.organizationId, (r._sum.total ?? 0) - (r._sum.refunded ?? 0)]));
 
   const openInvoices: OpenInvoice[] = invoices
     .map((i) => ({
@@ -103,7 +106,7 @@ export default async function NewPaymentPage({
       <PaymentForm
         organizations={organizations.map((o) => ({
           ...o,
-          outstanding: (billedBy.get(o.id) ?? 0) - (receivedBy.get(o.id) ?? 0),
+          outstanding: (billedBy.get(o.id) ?? 0) - (receivedBy.get(o.id) ?? 0) - (returnedBy.get(o.id) ?? 0),
         }))}
         openInvoices={openInvoices}
         defaultOrgId={org}

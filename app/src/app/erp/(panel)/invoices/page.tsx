@@ -36,7 +36,7 @@ const dateIN = (d: Date) =>
 
 export default async function InvoicesPage() {
   const staff = await getStaff();
-  if (!staff || !roleCan(staff.role, "crm.read")) redirect("/erp");
+  if (!staff || !roleCan(staff.role, "invoices.read")) redirect("/erp");
   const canWrite = roleCan(staff.role, "invoices.write");
   const canApprove = roleCan(staff.role, "invoices.approve");
 

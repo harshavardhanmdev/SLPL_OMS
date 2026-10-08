@@ -50,7 +50,7 @@ const dateIN = (d: Date) =>
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const staff = await getStaff();
-  if (!staff || !roleCan(staff.role, "crm.read")) redirect("/erp");
+  if (!staff || !roleCan(staff.role, "invoices.read")) redirect("/erp");
 
   const invoice = await db.invoice.findUnique({
     where: { id },

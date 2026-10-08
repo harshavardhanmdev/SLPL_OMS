@@ -45,6 +45,7 @@ export default async function OrganizationsPage({
       owner: { select: { name: true } },
       invoices: { where: { status: { in: [...BILLED_STATUSES] } }, select: { total: true } },
       receipts: { where: { voidedAt: null }, select: { amount: true } },
+      returns: { select: { total: true, refunded: true } },
       _count: { select: { visits: true } },
     },
   });
@@ -52,7 +53,8 @@ export default async function OrganizationsPage({
   const rows = organizations.map((o) => {
     const billed = o.invoices.reduce((s, i) => s + i.total, 0);
     const received = o.receipts.reduce((s, r) => s + r.amount, 0);
-    return { ...o, billed, outstanding: billed - received };
+    const returned = o.returns.reduce((s, r) => s + r.total - r.refunded, 0);
+    return { ...o, billed, outstanding: billed - received - returned };
   });
 
   const params = new URLSearchParams();

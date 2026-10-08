@@ -63,6 +63,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
         orderBy: { invoiceDate: "desc" },
         include: { allocations: { select: { amount: true } }, challans: { select: { id: true } } },
       },
+      returns: { orderBy: { returnedOn: "desc" } },
       receipts: {
         where: { voidedAt: null },
         orderBy: { receivedOn: "desc" },
@@ -144,6 +145,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
     ["quotations", "Quotations", org.quotations.length],
     ["invoices", "Invoices", org.invoices.length],
     ["payments", "Payments", org.receipts.length],
+    ...(org.returns.length ? ([["returns", "Returns", org.returns.length]] as const) : []),
     ["history", "History", timeline.length],
   ] as const;
 
@@ -202,7 +204,13 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
           ["Billed", formatINR(position.billed), `${org.invoices.length} bills`],
-          ["Received", formatINR(position.received), `${org.receipts.length} payments`],
+          [
+            "Received",
+            formatINR(position.received),
+            position.returned > 0
+              ? `${org.receipts.length} payments, and ${formatINR(position.returned)} returned`
+              : `${org.receipts.length} payments`,
+          ],
           credit > 0
             ? ["In credit", formatINR(credit), "paid ahead, held for them"]
             : [
@@ -403,6 +411,33 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
           </ul>
         )}
       </section>
+
+      {org.returns.length > 0 && (
+        <section id="returns" className="scroll-mt-20 rounded-2xl border bg-card">
+          <div className="border-b p-4">
+            <h2 className="font-heading font-semibold">Sales returns</h2>
+            <p className="text-sm text-muted-foreground">Goods sent back, taken off what they owe.</p>
+          </div>
+          <ul className="divide-y">
+            {org.returns.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-start justify-between gap-2 p-4">
+                <div className="min-w-0">
+                  <Link href={`/erp/returns/${r.id}`} className="font-medium hover:underline">
+                    {r.number}
+                  </Link>
+                  <p className="text-sm text-muted-foreground">{dateIN(r.returnedOn)}</p>
+                </div>
+                <div className="text-right text-sm">
+                  <p className="font-semibold tabular-nums">{formatINR(r.total)}</p>
+                  {r.refunded > 0 && (
+                    <p className="text-xs text-muted-foreground">{formatINR(r.refunded)} paid back</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section id="history" className="scroll-mt-20 rounded-2xl border bg-card">
         <div className="border-b p-4">

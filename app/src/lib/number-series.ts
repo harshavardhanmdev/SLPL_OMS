@@ -95,6 +95,12 @@ export async function nextChallanNumber(tx: Tx, on: Date): Promise<string> {
   return `SLPL/DC/${fy}/${pad(await allocateSerial(tx, `challan:${fy}`), 4)}`;
 }
 
+/** `SLPL/SR/2026-27/0001`, a sales return */
+export async function nextReturnNumber(tx: Tx, on: Date): Promise<string> {
+  const fy = financialYearLabel(on);
+  return `SLPL/SR/${fy}/${pad(await allocateSerial(tx, `return:${fy}`), 4)}`;
+}
+
 /** `SLPL/R/2026-27/0001` */
 export async function nextReceiptNumber(tx: Tx, on: Date): Promise<string> {
   const fy = financialYearLabel(on);

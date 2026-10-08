@@ -17,6 +17,8 @@ export const BILLED_STATUSES = ["APPROVED", "SENT", "PAID"] as const;
 export type AccountPosition = {
   billed: number;
   received: number;
+  /** Goods sent back, less anything paid back to the school. */
+  returned: number;
   outstanding: number;
   oldestUnpaidOn: Date | null;
   oldestUnpaidDays: number;
@@ -26,7 +28,7 @@ export async function accountPosition(
   organizationId: string,
   upTo?: Date,
 ): Promise<AccountPosition> {
-  const [invoices, receipts] = await Promise.all([
+  const [invoices, receipts, returns] = await Promise.all([
     db.invoice.findMany({
       where: {
         organizationId,
@@ -40,10 +42,15 @@ export async function accountPosition(
       where: { organizationId, voidedAt: null, ...(upTo ? { receivedOn: { lte: upTo } } : {}) },
       _sum: { amount: true },
     }),
+    db.salesReturn.aggregate({
+      where: { organizationId, ...(upTo ? { returnedOn: { lte: upTo } } : {}) },
+      _sum: { total: true, refunded: true },
+    }),
   ]);
 
   const billed = invoices.reduce((sum, i) => sum + i.total, 0);
   const received = receipts._sum.amount ?? 0;
+  const returned = (returns._sum.total ?? 0) - (returns._sum.refunded ?? 0);
 
   const unpaid = invoices.find(
     (i) => i.allocations.reduce((s, a) => s + a.amount, 0) < i.total,
@@ -53,7 +60,8 @@ export async function accountPosition(
   return {
     billed,
     received,
-    outstanding: billed - received,
+    returned,
+    outstanding: billed - received - returned,
     oldestUnpaidOn,
     oldestUnpaidDays: oldestUnpaidOn
       ? Math.max(0, Math.floor((Date.now() - oldestUnpaidOn.getTime()) / 86400000))

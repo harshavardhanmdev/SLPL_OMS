@@ -34,7 +34,8 @@ const groups: { label: string | null; items: Entry[] }[] = [
       { href: "/erp/approvals", label: "Approvals", icon: "bell", needs: "crm.read" },
       { href: "/erp/organizations", label: "Schools", icon: "schools", needs: "crm.read" },
       { href: "/erp/quotations", label: "Quotations", icon: "quotations", needs: "quotes.read" },
-      { href: "/erp/invoices", label: "Invoices", icon: "invoices", needs: "crm.read" },
+      { href: "/erp/invoices", label: "Invoices", icon: "invoices", needs: "invoices.read" },
+      { href: "/erp/returns", label: "Sales returns", icon: "returns", needs: "invoices.read" },
       { href: "/erp/challans", label: "Delivery challans", icon: "challans", needs: "crm.read" },
       { href: "/erp/samples", label: "Samples", icon: "samples", needs: "crm.read" },
       { href: "/erp/gifts", label: "Gifts", icon: "gifts", needs: "crm.read" },
@@ -47,7 +48,7 @@ const groups: { label: string | null; items: Entry[] }[] = [
     items: [
       { href: "/erp/payments", label: "Payments in", icon: "payments", needs: "finance.read" },
       { href: "/erp/expenses", label: "Expenses", icon: "expenses", needs: "finance.read" },
-      { href: "/erp/vendors", label: "Vendors", icon: "vendors", needs: "staff.manage" },
+      { href: "/erp/vendors", label: "Vendors", icon: "vendors", needs: "vendors.read" },
     ],
   },
   {

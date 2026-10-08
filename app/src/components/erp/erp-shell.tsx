@@ -22,6 +22,7 @@ import {
   Package,
   Plus,
   ReceiptText,
+  RotateCcw,
   ScrollText,
   Store,
   Tags,
@@ -71,6 +72,7 @@ const ICONS = {
   bell: Bell,
   fingerprint: Fingerprint,
   vendors: Handshake,
+  returns: RotateCcw,
 } as const;
 
 export type NavIcon = keyof typeof ICONS;

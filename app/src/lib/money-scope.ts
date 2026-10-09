@@ -29,3 +29,10 @@ export function schoolMoneyWhere(team: string[] | null) {
 
 export const ownsSchool = (team: string[] | null, ownerId: string | null) =>
   !team || (ownerId !== null && team.includes(ownerId));
+
+/**
+ * People billed directly (a student's SOP, one reader's magazine) are customers
+ * but not schools: they stay out of school lists, pickers and targets, and
+ * sales never see them.
+ */
+export const SCHOOLS_ONLY = { kind: { not: "INDIVIDUAL" as const } };

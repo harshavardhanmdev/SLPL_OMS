@@ -100,7 +100,7 @@ export default async function NewInvoicePage({
   const { quotation } = await searchParams;
   const [catalog, organizations, visits, initial, quotations] = await Promise.all([
     catalogForQuoting(),
-    organizationsForBilling(),
+    organizationsForBilling(roleCan(staff.role, "finance.read")),
     openVisits(),
     quotation ? fromQuotation(quotation) : null,
     billableQuotations(),

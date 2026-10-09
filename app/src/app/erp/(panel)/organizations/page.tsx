@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { BILLED_STATUSES } from "@/lib/ledger";
-import { ownsSchool, salesTeam } from "@/lib/money-scope";
+import { ownsSchool, salesTeam, SCHOOLS_ONLY } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Organisations", robots: { index: false } };
@@ -33,17 +33,21 @@ const tone: Record<string, string> = {
 export default async function OrganizationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; month?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; month?: string; kind?: string }>;
 }) {
   const staff = await getStaff();
   if (!staff || !roleCan(staff.role, "crm.read")) redirect("/erp");
   const canAdd = roleCan(staff.role, "crm.write");
   const team = await salesTeam(staff);
 
-  const { q, status, month: rawMonth } = await searchParams;
+  const { q, status, month: rawMonth, kind } = await searchParams;
+  // People billed directly are listed apart, and only for those who see every bill
+  const people = team === null && kind === "people";
+  const kindWhere = people ? { kind: "INDIVIDUAL" as const } : SCHOOLS_ONLY;
   const month = rawMonth && /^\d{4}-\d{2}$/.test(rawMonth) ? rawMonth : undefined;
   const [y, m] = (month ?? "").split("-").map(Number);
   const where = {
+    ...kindWhere,
     ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
     ...(status && status !== "all" ? { status: status as never } : {}),
     ...(month ? { createdAt: { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) } } : {}),
@@ -51,11 +55,13 @@ export default async function OrganizationsPage({
 
   // How many schools were added each month, for the filter
   const added = new Map<string, number>();
-  for (const o of await db.organization.findMany({ select: { createdAt: true } })) {
+  for (const o of await db.organization.findMany({ where: kindWhere, select: { createdAt: true } })) {
     const key = monthKey(o.createdAt);
     added.set(key, (added.get(key) ?? 0) + 1);
   }
   const months = [...added.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
+  const peopleCount = team === null && !people ? await db.organization.count({ where: { kind: "INDIVIDUAL" } }) : 0;
 
   const organizations = await db.organization.findMany({
     where,
@@ -93,16 +99,26 @@ export default async function OrganizationsPage({
   if (q) params.set("q", q);
   if (status) params.set("status", status);
   if (month) params.set("month", month);
+  if (people) params.set("kind", "people");
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Organisations</h1>
+          <h1 className="font-heading text-2xl font-bold">{people ? "People billed directly" : "Organisations"}</h1>
           <p className="text-sm text-muted-foreground">
-            One record per school. Everything hangs off it: visits, quotations, bills, payments,
-            samples and gifts.
+            {people
+              ? "Customers billed as individuals, not schools. Sales do not see them."
+              : "One record per school. Everything hangs off it: visits, quotations, bills, payments, samples and gifts."}
           </p>
+          {(people || peopleCount > 0) && (
+            <Link
+              href={people ? "/erp/organizations" : "/erp/organizations?kind=people"}
+              className="text-sm font-medium underline"
+            >
+              {people ? "Back to schools" : `People billed directly (${peopleCount})`}
+            </Link>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="gap-2" asChild>
@@ -128,6 +144,7 @@ export default async function OrganizationsPage({
       </div>
 
       <form className="flex flex-wrap gap-2" action="/erp/organizations">
+        {people && <input type="hidden" name="kind" value="people" />}
         <Input
           name="q"
           defaultValue={q ?? ""}
@@ -166,7 +183,7 @@ export default async function OrganizationsPage({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           [
-            "Organisations",
+            people ? "People" : "Organisations",
             String(rows.length),
             month ? `added in ${monthLabel(month)}` : q || status ? "matching" : "on the books",
           ],

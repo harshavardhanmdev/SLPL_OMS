@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { csvResponse, day, rupees, toCsv } from "@/lib/csv";
 import { db } from "@/lib/db";
 import { BILLED_STATUSES } from "@/lib/ledger";
-import { invoiceWhere, ownsSchool, salesTeam, schoolMoneyWhere } from "@/lib/money-scope";
+import { invoiceWhere, ownsSchool, salesTeam, schoolMoneyWhere, SCHOOLS_ONLY } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
@@ -34,8 +34,14 @@ export async function GET(
 
   switch (what) {
     case "organizations": {
+      // The same rows as the list: schools, or the owner's people billed directly
+      const month = url.searchParams.get("month") ?? "";
+      const [y, m] = month.split("-").map(Number);
+      const people = team === null && url.searchParams.get("kind") === "people";
       const rows = await db.organization.findMany({
         where: {
+          ...(people ? { kind: "INDIVIDUAL" as const } : SCHOOLS_ONLY),
+          ...(/^\d{4}-\d{2}$/.test(month) ? { createdAt: { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) } } : {}),
           ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
           ...(status && status !== "all" ? { status: status as never } : {}),
         },

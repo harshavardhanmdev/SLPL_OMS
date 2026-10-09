@@ -84,8 +84,10 @@ export async function catalogForQuoting(): Promise<CatalogItem[]> {
   ];
 }
 
-export async function organizationsForBilling(): Promise<OrgOption[]> {
+/** People billed directly are offered only to those who see every bill. */
+export async function organizationsForBilling(withPeople: boolean): Promise<OrgOption[]> {
   const rows = await db.organization.findMany({
+    where: withPeople ? {} : { kind: { not: "INDIVIDUAL" } },
     orderBy: { name: "asc" },
     select: { id: true, name: true, code: true, state: true },
   });

@@ -26,7 +26,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
       include: { items: { orderBy: { sortOrder: "asc" } } },
     }),
     catalogForQuoting(),
-    organizationsForBilling(),
+    organizationsForBilling(roleCan(staff.role, "finance.read")),
   ]);
   if (!quotation) notFound();
   // Once it has gone out, the figures a school is holding must not change

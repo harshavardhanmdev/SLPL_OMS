@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SampleActions, SampleDecision, SampleTaker } from "@/components/erp/sample-board";
 import { db } from "@/lib/db";
+import { SCHOOLS_ONLY } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Samples", robots: { index: false } };
@@ -91,7 +92,7 @@ export default async function SamplesPage() {
         issuedBy: { select: { id: true, name: true } },
       },
     }),
-    db.organization.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.organization.findMany({ where: SCHOOLS_ONLY, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     canManage
       ? db.adminUser.findMany({
           where: { isActive: true, role: { in: ["SALES", "SALES_MANAGER", "OWNER", "MANAGER"] } },

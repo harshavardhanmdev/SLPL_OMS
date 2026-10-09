@@ -90,6 +90,8 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
   // only the bills they raised anywhere else
   const team = await salesTeam(staff);
   const mine = ownsSchool(team, org.ownerId);
+  // A person billed directly is not a school; sales have no part in them
+  if (team && org.kind === "INDIVIDUAL") notFound();
 
   const [position, subscriptions] = await Promise.all([
     accountPosition(org.id),

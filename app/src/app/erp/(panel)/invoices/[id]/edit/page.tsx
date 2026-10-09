@@ -25,7 +25,7 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
       include: { items: { orderBy: { sortOrder: "asc" } } },
     }),
     catalogForQuoting(),
-    organizationsForBilling(),
+    organizationsForBilling(roleCan(staff.role, "finance.read")),
     openVisits(),
   ]);
   if (!invoice) notFound();

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { GiftLogger } from "@/components/erp/simple-logger";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { SCHOOLS_ONLY } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Gifts", robots: { index: false } };
@@ -30,7 +31,7 @@ export default async function GiftsPage() {
         givenBy: { select: { name: true } },
       },
     }),
-    db.organization.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.organization.findMany({ where: SCHOOLS_ONLY, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const spent = gifts.reduce((s, g) => s + (g.value ?? 0), 0);

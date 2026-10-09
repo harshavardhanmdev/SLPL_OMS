@@ -10,6 +10,7 @@ import { TargetEditor } from "@/components/erp/target-editor";
 import { db } from "@/lib/db";
 import { BILLED_STATUSES } from "@/lib/ledger";
 import { formatINR } from "@/lib/money";
+import { SCHOOLS_ONLY } from "@/lib/money-scope";
 import { roleLabel } from "@/lib/roles";
 import { financialYearWindow } from "@/lib/sales-summary";
 import { getStaff, roleCan } from "@/lib/staff-auth";
@@ -45,7 +46,7 @@ async function achieved(start: Date, end: Date, personId: string | null): Promis
       where: { visitedOn: { gte: start, lt: end }, ...(personId ? { byId: personId } : {}) },
     }),
     db.organization.count({
-      where: { createdAt: { gte: start, lt: end }, ...(personId ? { ownerId: personId } : {}) },
+      where: { ...SCHOOLS_ONLY, createdAt: { gte: start, lt: end }, ...(personId ? { ownerId: personId } : {}) },
     }),
   ]);
   return { revenue: billed._sum.total ?? 0, visits, organizations };

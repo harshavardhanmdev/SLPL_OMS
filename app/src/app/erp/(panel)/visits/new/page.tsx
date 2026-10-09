@@ -7,6 +7,7 @@ import { ChevronLeft } from "lucide-react";
 
 import { VisitForm } from "@/components/erp/visit-form";
 import { db } from "@/lib/db";
+import { SCHOOLS_ONLY } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Log a visit", robots: { index: false } };
@@ -21,6 +22,7 @@ export default async function NewVisitPage({
   const { org } = await searchParams;
 
   const organizations = await db.organization.findMany({
+    where: SCHOOLS_ONLY,
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });

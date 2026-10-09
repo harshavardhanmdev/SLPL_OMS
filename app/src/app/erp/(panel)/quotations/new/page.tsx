@@ -21,7 +21,7 @@ export default async function NewQuotationPage({
   if (!staff || !roleCan(staff.role, "quotes.write")) redirect("/erp/quotations");
 
   const { org } = await searchParams;
-  const [catalog, organizations] = await Promise.all([catalogForQuoting(), organizationsForBilling()]);
+  const [catalog, organizations] = await Promise.all([catalogForQuoting(), organizationsForBilling(roleCan(staff.role, "finance.read"))]);
 
   if (organizations.length === 0) {
     return (

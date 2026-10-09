@@ -54,8 +54,11 @@ export default async function EditOrganizationPage({
           state: org.state ?? "",
           pincode: org.pincode ?? "",
           gstin: org.gstin ?? "",
+          strength: org.strength,
+          board: org.board ?? "",
           ownerId: org.ownerId ?? "",
           source: org.source ?? "",
+          referredBy: org.referredBy ?? "",
           status: org.status,
           notes: org.notes ?? "",
         }}

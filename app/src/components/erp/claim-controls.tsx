@@ -140,7 +140,6 @@ export function ClaimForm() {
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="environment"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -169,7 +168,7 @@ export function ClaimForm() {
             onClick={() => fileRef.current?.click()}
           >
             {uploading ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
-            Photograph the bill
+            Add a photo of the bill
           </Button>
         )}
         <Button type="submit" className="ml-auto gap-2" disabled={busy || uploading}>

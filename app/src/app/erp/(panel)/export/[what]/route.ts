@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { csvResponse, day, rupees, toCsv } from "@/lib/csv";
 import { db } from "@/lib/db";
 import { BILLED_STATUSES } from "@/lib/ledger";
+import { invoiceWhere, ownsSchool, salesTeam, schoolMoneyWhere } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const runtime = "nodejs";
@@ -28,6 +29,8 @@ export async function GET(
   const q = url.searchParams.get("q") ?? "";
   const status = url.searchParams.get("status") ?? "";
   const stamp = new Date().toISOString().slice(0, 10);
+  // Sales download their own schools' money, not the whole company's
+  const team = await salesTeam(staff);
 
   switch (what) {
     case "organizations": {
@@ -47,15 +50,18 @@ export async function GET(
       return csvResponse(
         `organisations-${stamp}.csv`,
         toCsv(
-          ["Code", "Name", "Type", "Status", "Contact", "Phone", "Email", "City", "State",
-           "GSTIN", "Looked after by", "Source", "Visits", "Samples", "Gifts",
-           "Billed", "Received", "Outstanding"],
+          ["Code", "Name", "Type", "Status", "Contact", "Designation", "Phone", "Email", "City",
+           "State", "Board", "Students", "GSTIN", "Looked after by", "Source", "Referred by",
+           "Visits", "Samples", "Gifts", "Billed", "Received", "Outstanding"],
           rows.map((o) => {
             const billed = o.invoices.reduce((s, i) => s + i.total, 0);
             const received = o.receipts.reduce((s, r) => s + r.amount, 0);
-            return [o.code, o.name, o.kind, o.status, o.contactPerson, o.phone, o.email, o.city,
-              o.state, o.gstin, o.owner?.name, o.source, o._count.visits, o._count.samples,
-              o._count.gifts, rupees(billed), rupees(received), rupees(billed - received)];
+            const money = ownsSchool(team, o.ownerId)
+              ? [rupees(billed), rupees(received), rupees(billed - received)]
+              : ["", "", ""];
+            return [o.code, o.name, o.kind, o.status, o.contactPerson, o.designation, o.phone,
+              o.email, o.city, o.state, o.board, o.strength, o.gstin, o.owner?.name, o.source,
+              o.referredBy, o._count.visits, o._count.samples, o._count.gifts, ...money];
           }),
         ),
       );
@@ -84,6 +90,7 @@ export async function GET(
 
     case "invoices": {
       const rows = await db.invoice.findMany({
+        where: invoiceWhere(team),
         orderBy: { invoiceDate: "desc" },
         include: {
           createdBy: { select: { name: true } },
@@ -126,6 +133,7 @@ export async function GET(
 
     case "receipts": {
       const rows = await db.receipt.findMany({
+        where: schoolMoneyWhere(team),
         orderBy: { receivedOn: "desc" },
         include: {
           organization: { select: { name: true, code: true } },

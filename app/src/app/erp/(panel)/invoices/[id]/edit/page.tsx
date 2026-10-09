@@ -7,6 +7,7 @@ import { ChevronLeft } from "lucide-react";
 
 import { InvoiceForm } from "@/components/erp/invoice-form";
 import { db } from "@/lib/db";
+import { invoiceWhere, salesTeam } from "@/lib/money-scope";
 import { openVisits } from "@/lib/open-visits";
 import { catalogForQuoting, organizationsForBilling } from "@/lib/quoting";
 import { getStaff, roleCan } from "@/lib/staff-auth";
@@ -19,7 +20,10 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
   if (!staff || !roleCan(staff.role, "invoices.write")) redirect("/erp/invoices");
 
   const [invoice, catalog, organizations, visits] = await Promise.all([
-    db.invoice.findUnique({ where: { id }, include: { items: { orderBy: { sortOrder: "asc" } } } }),
+    db.invoice.findFirst({
+      where: { id, ...invoiceWhere(await salesTeam(staff)) },
+      include: { items: { orderBy: { sortOrder: "asc" } } },
+    }),
     catalogForQuoting(),
     organizationsForBilling(),
     openVisits(),

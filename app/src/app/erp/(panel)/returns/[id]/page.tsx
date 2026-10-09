@@ -19,6 +19,7 @@ import {
 import { getCompany } from "@/lib/company";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { salesTeam, schoolMoneyWhere } from "@/lib/money-scope";
 import { rupeesInWords } from "@/lib/quotation-math";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
@@ -50,8 +51,8 @@ export default async function ReturnPage({ params }: { params: Promise<{ id: str
   const staff = await getStaff();
   if (!staff || !roleCan(staff.role, "invoices.read")) redirect("/erp");
 
-  const doc = await db.salesReturn.findUnique({
-    where: { id },
+  const doc = await db.salesReturn.findFirst({
+    where: { id, ...schoolMoneyWhere(await salesTeam(staff)) },
     include: { items: { orderBy: { sortOrder: "asc" } }, invoice: { select: { id: true, number: true } } },
   });
   if (!doc) notFound();

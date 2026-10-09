@@ -142,6 +142,7 @@ export async function salesBanner(staffId: string | null, now = new Date()): Pro
       where: {
         nextActionOn: { lt: new Date(now.getFullYear(), now.getMonth(), now.getDate()) },
         converted: false,
+        organization: { status: { not: "LOST" } },
         ...(personal ? { byId: personal } : {}),
       },
     }),

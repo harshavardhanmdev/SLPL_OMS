@@ -45,6 +45,8 @@ export default async function SalesHome() {
     db.visit.findMany({
       where: {
         converted: false,
+        // A school marked lost needs no more follow-ups
+        organization: { status: { not: "LOST" } },
         nextActionOn: { lt: new Date(startOfDay.getTime() + 86400000) },
         ...(personal ? { byId: personal } : {}),
       },

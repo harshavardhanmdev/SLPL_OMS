@@ -1295,13 +1295,19 @@ model Organization {
   state         String? @default("Telangana")
   pincode       String?
   gstin         String?
+  /// Number of students, as the school told us
+  strength      Int?
+  /// CBSE, State board (SSC), ICSE, IB, or whatever was typed under Other
+  board         String?
 
   /// Whoever is responsible for this school
   ownerId String?
   owner   AdminUser? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
-  source String?
-  status OrganizationStatus @default(LEAD)
+  source     String?
+  /// Whose referral, when source is Referral
+  referredBy String?
+  status     OrganizationStatus @default(LEAD)
   notes  String?
 
   createdAt DateTime @default(now())

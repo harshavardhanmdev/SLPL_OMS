@@ -137,7 +137,6 @@ export function ExpenseForm() {
               ref={fileRef}
               type="file"
               accept="image/*"
-              capture="environment"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -166,7 +165,7 @@ export function ExpenseForm() {
                 onClick={() => fileRef.current?.click()}
               >
                 {uploading ? <Loader2 className="size-5 animate-spin" /> : <Camera className="size-5" />}
-                Photograph the bill
+                Add a photo of the bill
               </Button>
             )}
           </div>

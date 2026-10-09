@@ -6,6 +6,7 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { invoiceWhere, salesTeam } from "@/lib/money-scope";
 import { nextInvoiceNumber } from "@/lib/number-series";
 import { documentKindFor, documentTotals, type QuoteLine } from "@/lib/quotation-math";
 import { lineProductId } from "@/lib/quoting";
@@ -193,7 +194,9 @@ export async function saveInvoice(input: InvoiceInput): Promise<Result> {
   }
 
   if (d.id) {
-    const before = await db.invoice.findUnique({ where: { id: d.id } });
+    const before = await db.invoice.findFirst({
+      where: { id: d.id, ...invoiceWhere(await salesTeam(staff)) },
+    });
     if (!before) return { error: "That invoice no longer exists." };
     if (!["DRAFT", "PENDING_APPROVAL"].includes(before.status)) {
       return { error: "This invoice has been approved. Raise a credit note or a fresh one." };

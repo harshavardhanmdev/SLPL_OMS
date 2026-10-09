@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { invoiceWhere, salesTeam } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Invoices", robots: { index: false } };
@@ -40,7 +41,9 @@ export default async function InvoicesPage() {
   const canWrite = roleCan(staff.role, "invoices.write");
   const canApprove = roleCan(staff.role, "invoices.approve");
 
+  // Sales see their own schools' bills, not the whole company's
   const invoices = await db.invoice.findMany({
+    where: invoiceWhere(await salesTeam(staff)),
     orderBy: { createdAt: "desc" },
     take: 200,
     include: {

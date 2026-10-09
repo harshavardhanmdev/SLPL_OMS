@@ -40,7 +40,10 @@ export default async function NewOrganizationPage() {
         </p>
       </div>
       {/* A salesperson's new school is theirs to look after */}
-      <OrganizationForm people={canManage ? await salesPeople() : [{ id: staff.id, name: staff.name }]} />
+      <OrganizationForm
+        people={canManage ? await salesPeople() : [{ id: staff.id, name: staff.name }]}
+        canPickOwner={canManage}
+      />
     </div>
   );
 }

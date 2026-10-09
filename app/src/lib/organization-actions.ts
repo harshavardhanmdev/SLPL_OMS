@@ -30,9 +30,9 @@ const DENIED: Record<string, string> = {
  * a code. Two that match on all three, which a bulk import can produce, take a
  * letter, GLOWAR1026B, so nobody adding one has to think about numbering.
  */
-export async function suggestCode(name: string, city?: string | null): Promise<string> {
+export async function suggestCode(name: string, city?: string | null, added?: Date): Promise<string> {
   const letters = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
-  const now = new Date();
+  const now = added ?? new Date();
   const month = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getFullYear()).slice(2)}`;
   const stem = `${(letters(name).slice(0, 3) || "ORG").padEnd(3, "X")}${letters(city ?? "").slice(0, 3)}${month}`;
   for (const extra of ["", ..."BCDEFGHJKLMNPQRSTUVWXYZ"]) {
@@ -57,8 +57,11 @@ const schema = z.object({
   state: z.string().trim().max(60).optional().or(z.literal("")),
   pincode: z.string().trim().max(10).optional().or(z.literal("")),
   gstin: z.string().trim().max(20).optional().or(z.literal("")),
+  strength: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  board: z.string().trim().max(40).optional().or(z.literal("")),
   ownerId: z.string().optional().nullable(),
   source: z.string().trim().max(60).optional().or(z.literal("")),
+  referredBy: z.string().trim().max(120).optional().or(z.literal("")),
   status: z.enum(["LEAD", "ACTIVE", "DORMANT", "LOST"]),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
 });
@@ -97,8 +100,11 @@ export async function saveOrganization(input: OrganizationInput): Promise<Result
     state: d.state || null,
     pincode: d.pincode || null,
     gstin: d.gstin || null,
+    strength: d.strength ?? null,
+    board: d.board || null,
     ownerId: d.ownerId || null,
     source: d.source || null,
+    referredBy: d.source === "Referral" ? d.referredBy || null : null,
     status: d.status,
     notes: d.notes || null,
   };

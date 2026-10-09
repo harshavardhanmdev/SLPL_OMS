@@ -8,6 +8,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
+import { salesTeam, schoolMoneyWhere } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Sales returns", robots: { index: false } };
@@ -22,6 +23,7 @@ export default async function ReturnsPage() {
   const canWrite = roleCan(staff.role, "finance.write");
 
   const returns = await db.salesReturn.findMany({
+    where: schoolMoneyWhere(await salesTeam(staff)),
     orderBy: [{ returnedOn: "desc" }, { createdAt: "desc" }],
     take: 300,
     include: { invoice: { select: { number: true } } },

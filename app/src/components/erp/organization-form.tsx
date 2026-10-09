@@ -40,12 +40,81 @@ const SOURCES = [
   "Other",
 ];
 
+const DESIGNATIONS = [
+  "Principal",
+  "Vice Principal",
+  "Chairman",
+  "Correspondent",
+  "Director",
+  "Manager",
+  "Coordinator",
+  "Administrator",
+];
+
+const BOARDS = ["CBSE", "SSC (State board)", "ICSE", "IB", "Cambridge"];
+
+/** A list to pick from, with Other opening a box for anything not on it. */
+function PickOrType({
+  id,
+  label,
+  options,
+  value,
+  onChange,
+  blank,
+}: {
+  id: string;
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  blank: string;
+}) {
+  const [other, setOther] = React.useState(value !== "" && !options.includes(value));
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <select
+        id={id}
+        className={selectClass}
+        value={other ? "__other" : value}
+        onChange={(e) => {
+          const next = e.target.value;
+          setOther(next === "__other");
+          onChange(next === "__other" ? "" : next);
+        }}
+      >
+        <option value="">{blank}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        <option value="__other">Other</option>
+      </select>
+      {other && (
+        <Input
+          id={`${id}-other`}
+          aria-label={`${label}, other`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Type it"
+          className="h-11"
+          required
+        />
+      )}
+    </div>
+  );
+}
+
 export function OrganizationForm({
   initial,
   people,
+  canPickOwner = true,
 }: {
   initial?: OrganizationInput & { id?: string };
   people: { id: string; name: string }[];
+  /** False for a salesperson: a school they add is theirs, so the list is only them. */
+  canPickOwner?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
@@ -63,8 +132,11 @@ export function OrganizationForm({
       state: "Telangana",
       pincode: "",
       gstin: "",
-      ownerId: "",
+      strength: null,
+      board: "",
+      ownerId: canPickOwner ? "" : (people[0]?.id ?? ""),
       source: "Field prospecting",
+      referredBy: "",
       status: "LEAD",
       notes: "",
     },
@@ -139,10 +211,39 @@ export function OrganizationForm({
             </select>
           </div>
           {text("contactPerson", "Contact person")}
-          {text("designation", "Designation")}
+          <PickOrType
+            id="og-designation"
+            label="Designation"
+            options={DESIGNATIONS}
+            value={v.designation ?? ""}
+            onChange={(d) => set("designation", d)}
+            blank="Not known"
+          />
           {text("phone", "Phone")}
           {text("email", "Email")}
           {text("gstin", "Their GSTIN")}
+          <PickOrType
+            id="og-board"
+            label="Board"
+            options={BOARDS}
+            value={v.board ?? ""}
+            onChange={(b) => set("board", b)}
+            blank="Not known"
+          />
+          <div className="space-y-1.5">
+            <Label htmlFor="og-strength">Number of students</Label>
+            <Input
+              id="og-strength"
+              inputMode="numeric"
+              value={v.strength == null ? "" : String(v.strength)}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                set("strength", digits ? Number(digits) : null);
+              }}
+              placeholder="About how many"
+              className="h-11"
+            />
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="og-status">Status</Label>
             <select
@@ -177,6 +278,18 @@ export function OrganizationForm({
               ))}
             </select>
           </div>
+          {v.source === "Referral" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="og-referredBy">Whose referral</Label>
+              <Input
+                id="og-referredBy"
+                value={v.referredBy ?? ""}
+                onChange={(e) => set("referredBy", e.target.value)}
+                placeholder="Name, and school or phone if known"
+                className="h-11"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="og-owner">Looked after by</Label>
             <select
@@ -185,7 +298,7 @@ export function OrganizationForm({
               value={v.ownerId ?? ""}
               onChange={(e) => set("ownerId", e.target.value)}
             >
-              <option value="">Nobody yet</option>
+              {canPickOwner && <option value="">Nobody yet</option>}
               {people.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}

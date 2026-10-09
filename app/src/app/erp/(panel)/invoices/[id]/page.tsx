@@ -23,6 +23,7 @@ import { getCompany, upiPayload } from "@/lib/company";
 import { db } from "@/lib/db";
 import { invoiceBalances } from "@/lib/ledger";
 import { formatINR } from "@/lib/money";
+import { invoiceWhere, salesTeam } from "@/lib/money-scope";
 import { documentTotals, lineTotals, ratePercent, rupeesInWords } from "@/lib/quotation-math";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
@@ -52,8 +53,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const staff = await getStaff();
   if (!staff || !roleCan(staff.role, "invoices.read")) redirect("/erp");
 
-  const invoice = await db.invoice.findUnique({
-    where: { id },
+  const invoice = await db.invoice.findFirst({
+    where: { id, ...invoiceWhere(await salesTeam(staff)) },
     include: {
       items: { orderBy: { sortOrder: "asc" } },
       createdBy: { select: { name: true } },

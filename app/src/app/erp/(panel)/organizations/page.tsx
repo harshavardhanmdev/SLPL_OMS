@@ -11,9 +11,17 @@ import { Input } from "@/components/ui/input";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { BILLED_STATUSES } from "@/lib/ledger";
+import { ownsSchool, salesTeam } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Organisations", robots: { index: false } };
+
+/** 2026-10 -> October 2026 */
+const monthLabel = (key: string) => {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+};
+const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
 const tone: Record<string, string> = {
   LEAD: "bg-muted text-muted-foreground border-border",
@@ -25,22 +33,34 @@ const tone: Record<string, string> = {
 export default async function OrganizationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; month?: string }>;
 }) {
   const staff = await getStaff();
   if (!staff || !roleCan(staff.role, "crm.read")) redirect("/erp");
   const canAdd = roleCan(staff.role, "crm.write");
+  const team = await salesTeam(staff);
 
-  const { q, status } = await searchParams;
+  const { q, status, month: rawMonth } = await searchParams;
+  const month = rawMonth && /^\d{4}-\d{2}$/.test(rawMonth) ? rawMonth : undefined;
+  const [y, m] = (month ?? "").split("-").map(Number);
   const where = {
     ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
     ...(status && status !== "all" ? { status: status as never } : {}),
+    ...(month ? { createdAt: { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) } } : {}),
   };
+
+  // How many schools were added each month, for the filter
+  const added = new Map<string, number>();
+  for (const o of await db.organization.findMany({ select: { createdAt: true } })) {
+    const key = monthKey(o.createdAt);
+    added.set(key, (added.get(key) ?? 0) + 1);
+  }
+  const months = [...added.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
   const organizations = await db.organization.findMany({
     where,
-    orderBy: { name: "asc" },
-    take: 300,
+    orderBy: [{ createdAt: "desc" }],
+    take: 500,
     include: {
       owner: { select: { name: true } },
       invoices: { where: { status: { in: [...BILLED_STATUSES] } }, select: { total: true } },
@@ -50,16 +70,29 @@ export default async function OrganizationsPage({
     },
   });
 
+  // A salesperson sees what their own schools owe, not every school's
   const rows = organizations.map((o) => {
+    if (!ownsSchool(team, o.ownerId)) return { ...o, billed: 0, outstanding: 0 };
     const billed = o.invoices.reduce((s, i) => s + i.total, 0);
     const received = o.receipts.reduce((s, r) => s + r.amount, 0);
     const returned = o.returns.reduce((s, r) => s + r.total - r.refunded, 0);
     return { ...o, billed, outstanding: billed - received - returned };
   });
 
+  // Divided by the month each school was added, newest month first
+  const groups: { key: string; rows: typeof rows }[] = [];
+  for (const o of rows) {
+    const key = monthKey(o.createdAt);
+    const group = groups.find((g) => g.key === key);
+    if (group) group.rows.push(o);
+    else groups.push({ key, rows: [o] });
+  }
+  for (const g of groups) g.rows.sort((a, b) => a.name.localeCompare(b.name));
+
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (status) params.set("status", status);
+  if (month) params.set("month", month);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -112,6 +145,19 @@ export default async function OrganizationsPage({
           <option value="DORMANT">Dormant</option>
           <option value="LOST">Lost</option>
         </select>
+        <select
+          name="month"
+          aria-label="Month added"
+          defaultValue={month ?? ""}
+          className="flex h-11 rounded-md border border-input bg-transparent px-3 text-sm"
+        >
+          <option value="">Every month</option>
+          {months.map(([key, count]) => (
+            <option key={key} value={key}>
+              {monthLabel(key)} ({count})
+            </option>
+          ))}
+        </select>
         <Button type="submit" variant="outline" className="h-11">
           Search
         </Button>
@@ -119,9 +165,17 @@ export default async function OrganizationsPage({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          ["Organisations", String(rows.length), q || status ? "matching" : "on the books"],
+          [
+            "Organisations",
+            String(rows.length),
+            month ? `added in ${monthLabel(month)}` : q || status ? "matching" : "on the books",
+          ],
           ["Active", String(rows.filter((r) => r.status === "ACTIVE").length), "buying from us"],
-          ["Billed", formatINR(rows.reduce((s, r) => s + r.billed, 0)), "across these rows"],
+          [
+            "Billed",
+            formatINR(rows.reduce((s, r) => s + r.billed, 0)),
+            team ? "your schools" : "across these rows",
+          ],
           [
             "Outstanding",
             formatINR(rows.reduce((s, r) => s + Math.max(0, r.outstanding), 0)),
@@ -145,45 +199,63 @@ export default async function OrganizationsPage({
           </p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {rows.map((o) => (
-            <li key={o.id}>
-              <Link
-                href={`/erp/organizations/${o.id}`}
-                className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border bg-card p-4 transition hover:border-saffron"
-              >
-                <div className="min-w-0">
-                  <p className="font-heading font-semibold">
-                    {o.name}
-                    <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
-                      {o.code}
-                    </span>
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {[o.contactPerson, o.phone, o.city].filter(Boolean).join(" · ") || "No contact yet"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {o._count.visits} {o._count.visits === 1 ? "visit" : "visits"}
-                    {o.owner ? ` · ${o.owner.name}` : ""}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <Badge className={tone[o.status]}>{o.status.toLowerCase()}</Badge>
-                  {o.billed > 0 && (
-                    <p className="mt-1 text-sm">
-                      {formatINR(o.billed)} billed
-                      {o.outstanding > 0 && (
-                        <span className="block text-xs text-destructive">
-                          {formatINR(o.outstanding)} outstanding
-                        </span>
-                      )}
-                    </p>
-                  )}
-                </div>
-              </Link>
-            </li>
+        <div className="space-y-6">
+          {groups.map((g) => (
+            <section key={g.key} aria-label={monthLabel(g.key)} className="space-y-3">
+              <h2 className="flex items-baseline justify-between gap-2 border-b pb-1 font-heading font-semibold">
+                {monthLabel(g.key)}
+                <span className="text-sm font-normal text-muted-foreground">
+                  {g.rows.length} {g.rows.length === 1 ? "school" : "schools"} added
+                </span>
+              </h2>
+              <ul className="space-y-3">
+                {g.rows.map((o) => (
+                  <li key={o.id}>
+                    <Link
+                      href={`/erp/organizations/${o.id}`}
+                      className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border bg-card p-4 transition hover:border-saffron"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-heading font-semibold">
+                          {o.name}
+                          <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                            {o.code}
+                          </span>
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {[o.contactPerson, o.phone, o.city].filter(Boolean).join(" · ") || "No contact yet"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {[
+                            `${o._count.visits} ${o._count.visits === 1 ? "visit" : "visits"}`,
+                            o.board,
+                            o.strength ? `${o.strength.toLocaleString("en-IN")} students` : null,
+                            o.owner?.name,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Badge className={tone[o.status]}>{o.status.toLowerCase()}</Badge>
+                        {o.billed > 0 && (
+                          <p className="mt-1 text-sm">
+                            {formatINR(o.billed)} billed
+                            {o.outstanding > 0 && (
+                              <span className="block text-xs text-destructive">
+                                {formatINR(o.outstanding)} outstanding
+                              </span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

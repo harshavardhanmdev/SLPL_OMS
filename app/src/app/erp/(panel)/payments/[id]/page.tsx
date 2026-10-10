@@ -9,7 +9,6 @@ import { PrintButton } from "@/components/store/print-button";
 import { DOC_MUTED, DOC_NAVY, DOC_RULE, Letterhead, SignatureBlock } from "@/components/erp/letterhead";
 import { getCompany } from "@/lib/company";
 import { db } from "@/lib/db";
-import { accountPosition } from "@/lib/ledger";
 import { formatINR } from "@/lib/money";
 import { PAYMENT_MODE_LABEL } from "@/lib/payment-modes";
 import { rupeesInWords } from "@/lib/quotation-math";
@@ -44,7 +43,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
   });
   if (!receipt) notFound();
 
-  const [company, position] = await Promise.all([getCompany(), accountPosition(receipt.organizationId)]);
+  const company = await getCompany();
   const applied = receipt.allocations.reduce((s, a) => s + a.amount, 0);
   const onAccount = receipt.amount - applied;
   const org = receipt.organization;
@@ -138,13 +137,6 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
             )}
           </tbody>
         </table>
-
-        <div className="mt-3 flex justify-end text-[12px]">
-          <p>
-            <span style={{ color: DOC_MUTED }}>Balance outstanding with us today: </span>
-            <b>{formatINR(Math.max(0, position.outstanding))}</b>
-          </p>
-        </div>
 
         {receipt.notes && <p className="mt-3 text-[11px]" style={{ color: DOC_MUTED }}>{receipt.notes}</p>}
 

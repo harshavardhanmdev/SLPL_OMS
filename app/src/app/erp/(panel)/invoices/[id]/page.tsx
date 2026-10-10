@@ -9,6 +9,7 @@ import QRCode from "qrcode";
 import { PrintButton } from "@/components/store/print-button";
 import { Button } from "@/components/ui/button";
 import { InvoiceDecisions } from "@/components/erp/invoice-decisions";
+import { InvoicePayment } from "@/components/erp/payment-form";
 import {
   BankBlock,
   DOC_BLUE,
@@ -60,6 +61,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       createdBy: { select: { name: true } },
       visits: { select: { id: true, visitedOn: true, by: { select: { name: true } } } },
       challans: { select: { id: true, number: true } },
+      allocations: {
+        orderBy: { receipt: { receivedOn: "asc" } },
+        include: { receipt: { select: { id: true, number: true, receivedOn: true } } },
+      },
     },
   });
   if (!invoice) notFound();
@@ -72,6 +77,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const company = await getCompany();
   const balances = await invoiceBalances(invoice.id);
+  // Money is recorded from the bill itself, by whoever records payments
+  const due = invoice.total - balances.receivedAmount;
+  const canPay =
+    roleCan(staff.role, "finance.write") &&
+    invoice.organizationId !== null &&
+    ["APPROVED", "SENT"].includes(invoice.status) &&
+    due > 0;
+  const canSeeReceipts = roleCan(staff.role, "finance.read");
 
   const lines = invoice.items.map((i) => ({
     description: i.description,
@@ -137,7 +150,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {(quotation || invoice.visits.length > 0 || invoice.challans.length > 0) && (
+      {canPay && (
+        <div className="mb-4 print:hidden">
+          <InvoicePayment organizationId={invoice.organizationId!} invoiceId={invoice.id} due={due} />
+        </div>
+      )}
+
+      {(quotation || invoice.visits.length > 0 || invoice.challans.length > 0 || invoice.allocations.length > 0) && (
         <p className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground print:hidden">
           {quotation && (
             <span>
@@ -151,6 +170,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <span key={v.id}>
               Won on the visit of {v.visitedOn.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
               {v.by ? ` by ${v.by.name}` : ""}
+            </span>
+          ))}
+          {invoice.allocations.map((a) => (
+            <span key={a.id}>
+              {formatINR(a.amount)} paid on{" "}
+              {a.receipt.receivedOn.toLocaleDateString("en-IN", { day: "numeric", month: "short" })},{" "}
+              {canSeeReceipts ? (
+                <Link href={`/erp/payments/${a.receipt.id}`} className="font-medium text-foreground underline">
+                  {a.receipt.number}
+                </Link>
+              ) : (
+                a.receipt.number
+              )}
             </span>
           ))}
           {invoice.challans.map((c) => (

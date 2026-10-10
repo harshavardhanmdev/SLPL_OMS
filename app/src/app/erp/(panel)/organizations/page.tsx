@@ -13,15 +13,9 @@ import { formatINR } from "@/lib/money";
 import { BILLED_STATUSES } from "@/lib/ledger";
 import { ownsSchool, salesTeam, SCHOOLS_ONLY } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
+import { monthKey, monthLabel, monthRange } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Organisations", robots: { index: false } };
-
-/** 2026-10 -> October 2026 */
-const monthLabel = (key: string) => {
-  const [y, m] = key.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-};
-const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
 const tone: Record<string, string> = {
   LEAD: "bg-muted text-muted-foreground border-border",
@@ -44,13 +38,13 @@ export default async function OrganizationsPage({
   // People billed directly are listed apart, and only for those who see every bill
   const people = team === null && kind === "people";
   const kindWhere = people ? { kind: "INDIVIDUAL" as const } : SCHOOLS_ONLY;
-  const month = rawMonth && /^\d{4}-\d{2}$/.test(rawMonth) ? rawMonth : undefined;
-  const [y, m] = (month ?? "").split("-").map(Number);
+  const range = monthRange(rawMonth);
+  const month = range ? rawMonth : undefined;
   const where = {
     ...kindWhere,
     ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
     ...(status && status !== "all" ? { status: status as never } : {}),
-    ...(month ? { createdAt: { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) } } : {}),
+    ...(range ? { createdAt: range } : {}),
   };
 
   // How many schools were added each month, for the filter

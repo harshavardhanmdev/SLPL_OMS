@@ -33,8 +33,9 @@ export default async function PaymentsPage({
   const staff = await getStaff();
   if (!staff || !roleCan(staff.role, "finance.read")) redirect("/erp");
   const canWrite = roleCan(staff.role, "finance.write");
-  // The school and invoice screens, and the export, sit behind crm.read
+  // School screens sit behind crm.read; the CA reads bills but not schools
   const canSeeSchools = roleCan(staff.role, "crm.read");
+  const canSeeInvoices = roleCan(staff.role, "invoices.read");
 
   const { q } = await searchParams;
   const term = q?.trim() ?? "";
@@ -69,13 +70,11 @@ export default async function PaymentsPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canSeeSchools && (
-            <Button variant="outline" className="gap-2" asChild>
-              <Link href="/erp/export/receipts">
-                <Download className="size-4" /> Download
-              </Link>
-            </Button>
-          )}
+          <Button variant="outline" className="gap-2" asChild>
+            <Link href="/erp/export/receipts">
+              <Download className="size-4" /> Download
+            </Link>
+          </Button>
           {canWrite && (
             <Button className="gap-2" asChild>
               <Link href="/erp/payments/new">
@@ -183,7 +182,7 @@ export default async function PaymentsPage({
                       {r.allocations.map((a, i) => (
                         <span key={a.id}>
                           {i > 0 ? ", " : ""}
-                          {canSeeSchools ? (
+                          {canSeeInvoices ? (
                             <Link href={`/erp/invoices/${a.invoice.id}`} className="font-mono text-xs hover:underline">
                               {a.invoice.number}
                             </Link>

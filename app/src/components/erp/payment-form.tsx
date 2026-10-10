@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -258,6 +258,146 @@ export function PaymentForm({
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
         Record the payment
       </Button>
+    </form>
+  );
+}
+
+/**
+ * Money in, straight from the bill: the amount starts at what is still due on
+ * it, and the payment settles this bill before anything else. The page stays
+ * put, so the balance on the bill updates in front of you.
+ */
+export function InvoicePayment({
+  organizationId,
+  invoiceId,
+  due,
+}: {
+  organizationId: string;
+  invoiceId: string;
+  /** Paise still due on this bill. */
+  due: number;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const blank = () => ({
+    receivedOn: todayInIndia(),
+    amount: String(due / 100),
+    mode: "BANK_TRANSFER" as PaymentModeValue,
+    reference: "",
+  });
+  const [v, setV] = React.useState(blank);
+  const amountPaise = Math.round((Number(v.amount) || 0) * 100);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const res = await recordReceipt({
+        organizationId,
+        invoiceIds: [invoiceId],
+        receivedOn: v.receivedOn,
+        amount: Number(v.amount) || 0,
+        mode: v.mode,
+        reference: v.reference,
+      });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success(`Recorded as ${res.number}.`, {
+          action: res.id ? { label: "Open the receipt", onClick: () => router.push(`/erp/payments/${res.id}`) } : undefined,
+        });
+        setOpen(false);
+        router.refresh();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <Button
+        className="gap-2"
+        onClick={() => {
+          setV(blank());
+          setOpen(true);
+        }}
+      >
+        <Wallet className="size-4" /> Record a payment
+      </Button>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="w-full space-y-3 rounded-2xl border bg-card p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-heading font-semibold">Record a payment against this bill</h2>
+        <span className="text-sm text-muted-foreground">{formatINR(due)} still due</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="ip-amount">Amount in rupees</Label>
+          <Input
+            id="ip-amount"
+            inputMode="decimal"
+            value={v.amount}
+            onChange={(e) => setV((old) => ({ ...old, amount: e.target.value.replace(/[^\d.]/g, "") }))}
+            className="h-11"
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="ip-date">Received on</Label>
+          <Input
+            id="ip-date"
+            type="date"
+            value={v.receivedOn}
+            onChange={(e) => setV((old) => ({ ...old, receivedOn: e.target.value }))}
+            className="h-11"
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="ip-mode">How they paid</Label>
+          <select
+            id="ip-mode"
+            className={`${selectClass} h-11 text-sm`}
+            value={v.mode}
+            onChange={(e) => setV((old) => ({ ...old, mode: e.target.value as PaymentModeValue }))}
+          >
+            {PAYMENT_MODES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="ip-ref">Reference</Label>
+          <Input
+            id="ip-ref"
+            value={v.reference}
+            onChange={(e) => setV((old) => ({ ...old, reference: e.target.value }))}
+            className="h-11"
+            placeholder="UTR or cheque number"
+          />
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {amountPaise > due
+          ? `That is ${formatINR(amountPaise - due)} more than this bill. The rest is held on their account.`
+          : amountPaise > 0 && amountPaise < due
+            ? `A part payment: ${formatINR(due - amountPaise)} will still be due on this bill.`
+            : "This settles the bill in full."}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={busy} className="gap-2">
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Save the payment
+        </Button>
+        <Button type="button" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
     </form>
   );
 }

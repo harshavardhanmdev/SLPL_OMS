@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { invoiceWhere, salesTeam } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
+import { monthKey, monthLabel, monthRange } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Invoices", robots: { index: false } };
 
@@ -35,17 +36,30 @@ const label: Record<string, string> = {
 const dateIN = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const staff = await getStaff();
   if (!staff || !roleCan(staff.role, "invoices.read")) redirect("/erp");
   const canWrite = roleCan(staff.role, "invoices.write");
   const canApprove = roleCan(staff.role, "invoices.approve");
 
   // Sales see their own schools' bills, not the whole company's
+  const scope = invoiceWhere(await salesTeam(staff));
+  const { month: rawMonth } = await searchParams;
+  const range = monthRange(rawMonth);
+  const month = range ? rawMonth : undefined;
+
+  // How many bills fall in each month, for the filter
+  const perMonth = new Map<string, number>();
+  for (const i of await db.invoice.findMany({ where: scope, select: { invoiceDate: true } })) {
+    const key = monthKey(i.invoiceDate);
+    perMonth.set(key, (perMonth.get(key) ?? 0) + 1);
+  }
+  const months = [...perMonth.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
   const invoices = await db.invoice.findMany({
-    where: invoiceWhere(await salesTeam(staff)),
-    orderBy: { createdAt: "desc" },
-    take: 200,
+    where: { ...scope, ...(range ? { invoiceDate: range } : {}) },
+    orderBy: [{ invoiceDate: "desc" }, { createdAt: "desc" }],
+    take: 500,
     include: {
       createdBy: { select: { name: true } },
       allocations: { select: { amount: true } },
@@ -59,6 +73,15 @@ export default async function InvoicesPage() {
     0,
   );
 
+  // Divided by the month on the bill, newest first
+  const groups: { key: string; rows: typeof invoices }[] = [];
+  for (const i of invoices) {
+    const key = monthKey(i.invoiceDate);
+    const group = groups.find((g) => g.key === key);
+    if (group) group.rows.push(i);
+    else groups.push({ key, rows: [i] });
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -70,7 +93,7 @@ export default async function InvoicesPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="gap-2" asChild>
-            <Link href="/erp/export/invoices">
+            <Link href={`/erp/export/invoices${month ? `?month=${month}` : ""}`}>
               <Download className="size-4" /> Excel
             </Link>
           </Button>
@@ -91,9 +114,34 @@ export default async function InvoicesPage() {
         </p>
       )}
 
+      {months.length > 1 && (
+        <form className="flex flex-wrap gap-2" action="/erp/invoices">
+          <select
+            name="month"
+            aria-label="Month"
+            defaultValue={month ?? ""}
+            className="flex h-11 rounded-md border border-input bg-transparent px-3 text-sm"
+          >
+            <option value="">Every month</option>
+            {months.map(([key, count]) => (
+              <option key={key} value={key}>
+                {monthLabel(key)} ({count})
+              </option>
+            ))}
+          </select>
+          <Button type="submit" variant="outline" className="h-11">
+            Show
+          </Button>
+        </form>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          ["Billed", formatINR(billed.reduce((s, i) => s + i.total, 0)), `${billed.length} bills`],
+          [
+            "Billed",
+            formatINR(billed.reduce((s, i) => s + i.total, 0)),
+            `${billed.length} bills${month ? ` in ${monthLabel(month)}` : ""}`,
+          ],
           ["Outstanding", formatINR(outstanding), "still to collect"],
           ["Waiting", String(waiting.length), "need approval"],
           ["Paid", String(invoices.filter((i) => i.status === "PAID").length), "settled in full"],
@@ -115,38 +163,56 @@ export default async function InvoicesPage() {
           </p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {invoices.map((i) => {
-            const received = i.allocations.reduce((s, a) => s + a.amount, 0);
-            return (
-              <li key={i.id}>
-                <Link
-                  href={`/erp/invoices/${i.id}`}
-                  className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border bg-card p-4 transition hover:border-saffron"
-                >
-                  <div className="min-w-0">
-                    <p className="font-heading font-semibold">{i.customerName}</p>
-                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">{i.number}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {i.kind === "TAX_INVOICE" ? "Tax invoice" : "Bill of supply"} ·{" "}
-                      {dateIN(i.invoiceDate)} · due {dateIN(i.dueDate)}
-                      {i.createdBy ? ` · ${i.createdBy.name}` : ""}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <Badge className={tone[i.status]}>{label[i.status] ?? i.status}</Badge>
-                    <p className="mt-1 font-heading font-bold">{formatINR(i.total)}</p>
-                    {received > 0 && received < i.total && (
-                      <p className="text-xs text-muted-foreground">
-                        {formatINR(i.total - received)} still due
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="space-y-6">
+          {groups.map((g) => (
+            <section key={g.key} aria-label={monthLabel(g.key)} className="space-y-3">
+              <h2 className="flex flex-wrap items-baseline justify-between gap-2 border-b pb-1 font-heading font-semibold">
+                {monthLabel(g.key)}
+                <span className="text-sm font-normal text-muted-foreground">
+                  {g.rows.length} {g.rows.length === 1 ? "invoice" : "invoices"} ·{" "}
+                  {formatINR(
+                    g.rows
+                      .filter((i) => ["APPROVED", "SENT", "PAID"].includes(i.status))
+                      .reduce((sum, i) => sum + i.total, 0),
+                  )}{" "}
+                  billed
+                </span>
+              </h2>
+              <ul className="space-y-3">
+                {g.rows.map((i) => {
+                  const received = i.allocations.reduce((s, a) => s + a.amount, 0);
+                  return (
+                    <li key={i.id}>
+                      <Link
+                        href={`/erp/invoices/${i.id}`}
+                        className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border bg-card p-4 transition hover:border-saffron"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-heading font-semibold">{i.customerName}</p>
+                          <p className="mt-0.5 font-mono text-xs text-muted-foreground">{i.number}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {i.kind === "TAX_INVOICE" ? "Tax invoice" : "Bill of supply"} ·{" "}
+                            {dateIN(i.invoiceDate)} · due {dateIN(i.dueDate)}
+                            {i.createdBy ? ` · ${i.createdBy.name}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <Badge className={tone[i.status]}>{label[i.status] ?? i.status}</Badge>
+                          <p className="mt-1 font-heading font-bold">{formatINR(i.total)}</p>
+                          {received > 0 && received < i.total && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatINR(i.total - received)} still due
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { BILLED_STATUSES } from "@/lib/ledger";
 import { invoiceWhere, ownsSchool, salesTeam, schoolMoneyWhere, SCHOOLS_ONLY } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
+import { monthRange } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
@@ -20,11 +21,19 @@ export async function GET(
   { params }: { params: Promise<{ what: string }> },
 ) {
   const staff = await getStaff();
-  if (!staff || !roleCan(staff.role, "crm.read")) {
+  const { what } = await params;
+  // The CA has no sales screens but reads every bill and payment
+  const allowed =
+    staff &&
+    (what === "invoices"
+      ? roleCan(staff.role, "invoices.read")
+      : what === "receipts"
+        ? roleCan(staff.role, "finance.read") || roleCan(staff.role, "crm.read")
+        : roleCan(staff.role, "crm.read"));
+  if (!staff || !allowed) {
     return NextResponse.json({ error: "Not for you" }, { status: 403 });
   }
 
-  const { what } = await params;
   const url = new URL(request.url);
   const q = url.searchParams.get("q") ?? "";
   const status = url.searchParams.get("status") ?? "";
@@ -35,13 +44,12 @@ export async function GET(
   switch (what) {
     case "organizations": {
       // The same rows as the list: schools, or the owner's people billed directly
-      const month = url.searchParams.get("month") ?? "";
-      const [y, m] = month.split("-").map(Number);
+      const range = monthRange(url.searchParams.get("month"));
       const people = team === null && url.searchParams.get("kind") === "people";
       const rows = await db.organization.findMany({
         where: {
           ...(people ? { kind: "INDIVIDUAL" as const } : SCHOOLS_ONLY),
-          ...(/^\d{4}-\d{2}$/.test(month) ? { createdAt: { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) } } : {}),
+          ...(range ? { createdAt: range } : {}),
           ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
           ...(status && status !== "all" ? { status: status as never } : {}),
         },
@@ -95,8 +103,9 @@ export async function GET(
     }
 
     case "invoices": {
+      const range = monthRange(url.searchParams.get("month"));
       const rows = await db.invoice.findMany({
-        where: invoiceWhere(team),
+        where: { ...invoiceWhere(team), ...(range ? { invoiceDate: range } : {}) },
         orderBy: { invoiceDate: "desc" },
         include: {
           createdBy: { select: { name: true } },

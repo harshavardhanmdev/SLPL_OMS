@@ -3,11 +3,13 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 import { PrintButton } from "@/components/store/print-button";
 import { getSetting } from "@/lib/catalog";
 import { site } from "@/lib/site";
+import { getStaff, roleCan } from "@/lib/staff-auth";
 import { monthlyStatement } from "@/lib/stock-ledger";
 import { monthWindow } from "@/lib/stock-moves";
 
@@ -34,6 +36,9 @@ export default async function StockStatementPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  // Money and stock: owners, the manager, accounts and the CA, not sales by link
+  const staff = await getStaff();
+  if (!staff || !roleCan(staff.role, "finance.read")) redirect("/erp");
   const { month } = await searchParams;
   const [statement, gstin] = await Promise.all([
     monthlyStatement(month),

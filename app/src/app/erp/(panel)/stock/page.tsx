@@ -2,11 +2,13 @@ export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { FileText, Layers, Truck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
+import { getStaff, roleCan } from "@/lib/staff-auth";
 import { copiesFor, setComposition, type RegisterRow } from "@/lib/stock-register";
 
 export const metadata: Metadata = { title: "Stock register", robots: { index: false } };
@@ -14,6 +16,9 @@ export const metadata: Metadata = { title: "Stock register", robots: { index: fa
 const n = (v: number) => v.toLocaleString("en-IN");
 
 export default async function StockPage() {
+  // Money and stock: owners, the manager, accounts and the CA, not sales by link
+  const staff = await getStaff();
+  if (!staff || !roleCan(staff.role, "finance.read")) redirect("/erp");
   const latest = await db.stockCount.findFirst({ orderBy: { asOf: "desc" }, select: { asOf: true } });
   if (!latest) {
     return (

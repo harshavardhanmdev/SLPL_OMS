@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ChevronLeft, FileText, Truck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +21,8 @@ const dateIN = (d: Date) =>
 
 export default async function MovementsPage() {
   const staff = await getStaff();
-  const canWrite = staff ? roleCan(staff.role, "finance.write") : false;
+  if (!staff || !roleCan(staff.role, "finance.read")) redirect("/erp");
+  const canWrite = roleCan(staff.role, "finance.write");
 
   const latest = await db.stockCount.findFirst({ orderBy: { asOf: "desc" }, select: { asOf: true } });
   const [counted, movements] = await Promise.all([

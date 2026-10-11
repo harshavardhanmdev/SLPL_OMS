@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { FileText, Receipt, Wallet } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import {
   type ExpenseQuery,
 } from "@/lib/expense-query";
 import { formatINR } from "@/lib/money";
+import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Expenses", robots: { index: false } };
 
@@ -30,6 +32,11 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<ExpenseQuery>;
 }) {
+  // Money and stock: owners, the manager, accounts and the CA, not sales by link
+  const staff = await getStaff();
+  if (!staff || !roleCan(staff.role, "finance.read")) redirect("/erp");
+  // The CA reads the log; logging and voiding stay with those who keep it
+  const canWrite = roleCan(staff.role, "finance.write");
   const query = await searchParams;
   const { where, window, filters } = buildWhere(query);
 
@@ -63,7 +70,7 @@ export default async function ExpensesPage({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <ExpenseForm />
+        {canWrite && <ExpenseForm />}
         <Button variant="outline" className="gap-2" asChild>
           <Link href={`/erp/expenses/report${toSearchParams(query)}`}>
             <FileText className="size-4" /> Statement for the auditor
@@ -187,7 +194,7 @@ export default async function ExpensesPage({
                         </>
                       )}
                     </div>
-                    {!voided && <ExpenseRowActions id={e.id} />}
+                    {!voided && canWrite && <ExpenseRowActions id={e.id} />}
                   </div>
                 </li>
               );

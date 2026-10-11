@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 import { PrintButton } from "@/components/store/print-button";
@@ -11,6 +12,7 @@ import { applyDayOfWeek, buildWhere, type ExpenseQuery } from "@/lib/expense-que
 import { formatINR } from "@/lib/money";
 import { getSetting } from "@/lib/catalog";
 import { site } from "@/lib/site";
+import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Expense statement", robots: { index: false } };
 
@@ -27,6 +29,9 @@ export default async function ExpenseReportPage({
 }: {
   searchParams: Promise<ExpenseQuery>;
 }) {
+  // Money and stock: owners, the manager, accounts and the CA, not sales by link
+  const staff = await getStaff();
+  if (!staff || !roleCan(staff.role, "finance.read")) redirect("/erp");
   const query = await searchParams;
   const { where, window, filters } = buildWhere(query);
 

@@ -64,6 +64,8 @@ export type Capability =
   // The vendor list and what each was paid: the owner, and the CA to audit it
   | "vendors.read"
   | "challan.write"
+  // Claiming back money spent on the job: staff, not the outside auditor
+  | "claims.submit"
   | "staff.manage";
 
 const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
@@ -85,6 +87,7 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "challan.write",
     "staff.manage",
     "vendors.read",
+    "claims.submit",
   ],
   MANAGER: [
     "store.manage",
@@ -102,6 +105,7 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "invoices.write",
     "invoices.approve",
     "challan.write",
+    "claims.submit",
   ],
   ACCOUNTS: [
     "orders.manage",
@@ -111,6 +115,7 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "crm.read",
     "invoices.read",
     "invoices.write",
+    "claims.submit",
   ],
   // The manager raises and approves; the executive raises and waits. Neither
   // has any part of the online store admin: the owner keeps sales in /erp.
@@ -123,6 +128,7 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "crm.manage",
     "invoices.write",
     "invoices.approve",
+    "claims.submit",
   ],
   SALES: [
     "quotes.read",
@@ -131,6 +137,7 @@ const ROLE_CAPABILITIES: Record<AdminRole, Capability[]> = {
     "invoices.read",
     "crm.write",
     "invoices.write",
+    "claims.submit",
   ],
   WAREHOUSE: ["orders.manage", "shipments.manage"],
   SUPPORT: ["grievances.manage"],

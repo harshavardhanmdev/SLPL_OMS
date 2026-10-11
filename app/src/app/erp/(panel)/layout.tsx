@@ -23,7 +23,7 @@ const groups: { label: string | null; items: Entry[] }[] = [
     label: null,
     items: [
       { href: "/erp", label: "Overview", icon: "overview", needs: "erp.enter" },
-      { href: "/erp/claims", label: "My expenses", icon: "expenses", needs: "erp.enter" },
+      { href: "/erp/claims", label: "My expenses", icon: "expenses", needs: "claims.submit" },
       { href: "/erp/passkeys", label: "Fingerprint sign-in", icon: "fingerprint", needs: "erp.enter" },
     ],
   },
@@ -55,8 +55,8 @@ const groups: { label: string | null; items: Entry[] }[] = [
     label: "Stock and titles",
     items: [
       { href: "/erp/stock", label: "Stock", icon: "stock", needs: "finance.read" },
-      { href: "/erp/subscriptions", label: "Subscriptions", icon: "subs", needs: "finance.read" },
-      { href: "/erp/digital", label: "Digital editions", icon: "digital", needs: "finance.read" },
+      { href: "/erp/subscriptions", label: "Subscriptions", icon: "subs", needs: "orders.manage" },
+      { href: "/erp/digital", label: "Digital editions", icon: "digital", needs: "orders.manage" },
     ],
   },
   {

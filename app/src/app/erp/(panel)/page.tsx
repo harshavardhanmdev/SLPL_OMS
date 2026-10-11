@@ -22,6 +22,7 @@ export default async function ErpHome() {
   const staff = await getStaff();
   const canFinance = staff ? roleCan(staff.role, "finance.read") : false;
   const canQuote = staff ? roleCan(staff.role, "quotes.read") : false;
+  const canSubs = staff ? roleCan(staff.role, "orders.manage") : false;
   const year = financialYearOf(new Date());
   const issue = issueLabelFor();
 
@@ -33,8 +34,8 @@ export default async function ErpHome() {
           _count: true,
         })
       : null,
-    canFinance ? db.subscription.count({ where: { status: "ACTIVE" } }) : 0,
-    canFinance
+    canSubs ? db.subscription.count({ where: { status: "ACTIVE" } }) : 0,
+    canSubs
       ? db.subscription.count({
           where: { status: "ACTIVE", dispatches: { none: { issueLabel: issue } } },
         })
@@ -99,7 +100,7 @@ export default async function ErpHome() {
         </Link>
       )}
 
-      {canFinance && (
+      {canSubs && (
         <Link href="/erp/subscriptions" className={tile}>
           <span className="flex items-center gap-4">
             <span className={icon}>

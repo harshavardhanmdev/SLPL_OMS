@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Mail, Monitor, Phone } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +21,7 @@ const RECENT_DAYS = 30;
 
 export default async function DigitalPage() {
   const staff = await getStaff();
-  const canManage = staff ? roleCan(staff.role, "orders.manage") : false;
+  if (!staff || !roleCan(staff.role, "orders.manage")) redirect("/erp");
   const since = daysAgo(RECENT_DAYS);
 
   const licences = await db.digitalEntitlement.findMany({
@@ -118,11 +119,9 @@ export default async function DigitalPage() {
                 {l.revokeReason ? ` · withdrawn: ${l.revokeReason}` : ""}
               </p>
 
-              {canManage && (
-                <div className="mt-3 border-t pt-3">
-                  <LicenceControls id={l.id} code={l.code} revoked={Boolean(l.revokedAt)} />
-                </div>
-              )}
+              <div className="mt-3 border-t pt-3">
+                <LicenceControls id={l.id} code={l.code} revoked={Boolean(l.revokedAt)} />
+              </div>
             </li>
           ))}
         </ul>

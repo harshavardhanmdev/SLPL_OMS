@@ -90,6 +90,7 @@ function ClaimRow({ c, children }: { c: Claim; children?: React.ReactNode }) {
 export default async function ClaimsPage() {
   const staff = await getStaff();
   if (!staff) redirect("/erp/signin?next=/erp/claims");
+  if (!roleCan(staff.role, "claims.submit")) redirect("/erp");
   const owner = roleCan(staff.role, "staff.manage");
 
   const [mine, waiting, approved] = await Promise.all([

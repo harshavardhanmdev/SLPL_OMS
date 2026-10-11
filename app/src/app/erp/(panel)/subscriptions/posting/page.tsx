@@ -3,11 +3,13 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 import { PrintButton } from "@/components/store/print-button";
 import { db } from "@/lib/db";
 import { site } from "@/lib/site";
+import { getStaff, roleCan } from "@/lib/staff-auth";
 import { isOwed, issueLabelFor } from "@/lib/subscription-plans";
 
 export const metadata: Metadata = { title: "Posting list", robots: { index: false } };
@@ -26,6 +28,8 @@ export default async function PostingListPage({
 }: {
   searchParams: Promise<{ issue?: string }>;
 }) {
+  const staff = await getStaff();
+  if (!staff || !roleCan(staff.role, "orders.manage")) redirect("/erp");
   const { issue: raw } = await searchParams;
   const issue = raw?.trim() || issueLabelFor();
 

@@ -34,6 +34,7 @@ function refresh() {
 export async function submitClaim(input: z.infer<typeof claimSchema>): Promise<Result> {
   const staff = await getStaff();
   if (!staff || staff.breakGlass) return { error: "Sign in with your own account to claim an expense." };
+  if (!roleCan(staff.role, "claims.submit")) return { error: "Your role does not claim expenses." };
 
   const parsed = claimSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };

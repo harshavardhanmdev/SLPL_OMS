@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Mail, Newspaper, Phone, Printer } from "lucide-react";
 
@@ -41,7 +42,8 @@ const monthYear = (d: Date) => d.toLocaleDateString("en-IN", { month: "short", y
 
 export default async function SubscriptionsPage() {
   const staff = await getStaff();
-  const canPost = staff ? roleCan(staff.role, "orders.manage") : false;
+  // Readers' addresses and the posting run: owners, the manager and accounts
+  if (!staff || !roleCan(staff.role, "orders.manage")) redirect("/erp");
   const issue = issueLabelFor();
 
   const subs = await db.subscription.findMany({
@@ -94,7 +96,7 @@ export default async function SubscriptionsPage() {
         ))}
       </div>
 
-      {canPost && <PostingRun issue={issue} due={due.length} />}
+      <PostingRun issue={issue} due={due.length} />
 
       {subs.length === 0 ? (
         <div className="rounded-2xl border bg-card p-10 text-center">
@@ -159,7 +161,7 @@ export default async function SubscriptionsPage() {
                   : " · nothing posted yet"}
               </p>
 
-              {canPost && s.status === "ACTIVE" && (
+              {s.status === "ACTIVE" && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
                   <DispatchOne id={s.id} issue={issue} code={s.code} />
                   <EditAddress

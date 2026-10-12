@@ -41,3 +41,8 @@ export function monthRange(key: string | null | undefined): { gte: Date; lt: Dat
   const [y, m] = key.split("-").map(Number)
   return { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) }
 }
+
+/** 12 Oct 2026, 9:54 am, on the server's clock (India). */
+export function dateTimeIN(d: Date): string {
+  return d.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })
+}

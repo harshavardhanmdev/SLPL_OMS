@@ -67,8 +67,18 @@ export default async function OrganizationsPage({
       receipts: { where: { voidedAt: null }, select: { amount: true } },
       returns: { select: { total: true, refunded: true } },
       _count: { select: { visits: true } },
+      // The latest visit holds the school's next follow-up
+      visits: {
+        orderBy: [{ visitedOn: "desc" }, { createdAt: "desc" }],
+        take: 1,
+        select: { nextActionOn: true, converted: true },
+      },
     },
   });
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const followUpDate = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
   // A salesperson sees what their own schools owe, not every school's
   const rows = organizations.map((o) => {
@@ -246,6 +256,14 @@ export default async function OrganizationsPage({
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
+                        {o.visits[0] && !o.visits[0].converted && o.status !== "LOST" && (
+                          <p
+                            className={`text-xs ${o.visits[0].nextActionOn < startOfToday ? "font-semibold text-destructive" : "text-muted-foreground"}`}
+                          >
+                            Next follow-up {followUpDate(o.visits[0].nextActionOn)}
+                            {o.visits[0].nextActionOn < startOfToday ? ", overdue" : ""}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <Badge className={tone[o.status]}>{o.status.toLowerCase()}</Badge>

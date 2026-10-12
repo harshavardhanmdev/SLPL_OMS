@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TargetBanner } from "@/components/erp/target-banner";
 import { db } from "@/lib/db";
+import { followUps } from "@/lib/open-visits";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 import { salesBanner } from "@/lib/sales-summary";
 
@@ -42,18 +43,10 @@ export default async function SalesHome() {
 
   const [banner, due, recent] = await Promise.all([
     salesBanner(personal),
-    db.visit.findMany({
-      where: {
-        converted: false,
-        // A school marked lost needs no more follow-ups
-        organization: { status: { not: "LOST" } },
-        nextActionOn: { lt: new Date(startOfDay.getTime() + 86400000) },
-        ...(personal ? { byId: personal } : {}),
-      },
-      orderBy: { nextActionOn: "asc" },
-      take: 12,
-      include: { organization: { select: { id: true, name: true } } },
-    }),
+    // Each school once, by its latest entry; lost schools need no more follow-ups
+    followUps(personal).then((list) =>
+      list.filter((v) => v.nextActionOn < new Date(startOfDay.getTime() + 86400000)).slice(0, 12),
+    ),
     db.visit.findMany({
       where: personal ? { byId: personal } : {},
       orderBy: { visitedOn: "desc" },

@@ -820,6 +820,7 @@ model AdminUser {
   reports     AdminUser[] @relation("reports")
   expenseClaims ExpenseClaim[]
   passkeys      StaffPasskey[]
+  schoolRemarks OrganizationRemark[]
 
   sessions       AdminSession[]
   auditLogs      AdminAuditLog[]
@@ -1314,6 +1315,7 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   visits     Visit[]
+  remarks    OrganizationRemark[]
   quotations Quotation[]
   invoices   Invoice[]
   returns    SalesReturn[]
@@ -1325,6 +1327,21 @@ model Organization {
   @@index([status])
   @@index([ownerId])
   @@index([name])
+}
+
+/// A dated remark on a school, by whoever wrote it. The running notebook that
+/// sits beside the visits: no next action needed, nothing to approve.
+model OrganizationRemark {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  text           String
+  byId           String?
+  by             AdminUser?   @relation(fields: [byId], references: [id], onDelete: SetNull)
+  byEmail        String
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
 }
 
 enum VisitKind {

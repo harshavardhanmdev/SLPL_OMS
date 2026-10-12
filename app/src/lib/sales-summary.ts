@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { BILLED_STATUSES } from "@/lib/ledger";
 import { financialYearLabel } from "@/lib/number-series";
+import { followUps } from "@/lib/open-visits";
 
 /**
  * Target against achieved.
@@ -118,8 +119,7 @@ export async function salesBanner(staffId: string | null, now = new Date()): Pro
     myYear,
     myVisits,
     myVisitTargetRow,
-    overdueActions,
-    todayActions,
+    pending,
   ] = await Promise.all([
     targetFor("COMPANY", "MONTH", m.start, null),
     targetFor("COMPANY", "YEAR", y.start, null),
@@ -138,24 +138,12 @@ export async function salesBanner(staffId: string | null, now = new Date()): Pro
           select: { visitTarget: true },
         })
       : null,
-    db.visit.count({
-      where: {
-        nextActionOn: { lt: new Date(now.getFullYear(), now.getMonth(), now.getDate()) },
-        converted: false,
-        organization: { status: { not: "LOST" } },
-        ...(personal ? { byId: personal } : {}),
-      },
-    }),
-    db.visit.count({
-      where: {
-        nextActionOn: {
-          gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-          lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
-        },
-        ...(personal ? { byId: personal } : {}),
-      },
-    }),
+    followUps(personal),
   ]);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const overdueActions = pending.filter((v) => v.nextActionOn < startOfToday).length;
+  const todayActions = pending.filter((v) => v.nextActionOn >= startOfToday && v.nextActionOn < startOfTomorrow).length;
 
   return {
     mine: personal

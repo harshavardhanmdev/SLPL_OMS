@@ -6,6 +6,7 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { getStaff, requireCapability } from "@/lib/staff-auth";
+import { dateTimeIN } from "@/lib/utils";
 
 /**
  * The customer master.
@@ -255,4 +256,57 @@ export async function importOrganizations(input: { rows: ImportRow[]; ownerId?: 
   });
   revalidatePath("/erp/organizations");
   return { created, skipped };
+}
+
+const remarkSchema = z.object({
+  organizationId: z.string().min(1),
+  text: z.string().trim().min(2, "Write the remark").max(1000, "Keep a remark under 1,000 characters"),
+});
+
+/** A dated remark on a school. Anyone in sales may add one to any school. */
+export async function addRemark(
+  input: z.infer<typeof remarkSchema>,
+): Promise<Result & { remark?: { id: string; text: string; by: string; at: string; canDelete: boolean } }> {
+  const denied = await requireCapability("crm.write");
+  if (denied) return { error: DENIED[denied] };
+  const staff = await getStaff();
+  if (!staff) return { error: DENIED.UNAUTHORIZED };
+  const parsed = remarkSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const d = parsed.data;
+  if (!(await db.organization.findUnique({ where: { id: d.organizationId }, select: { id: true } }))) {
+    return { error: "That school no longer exists." };
+  }
+
+  const row = await db.organizationRemark.create({
+    data: {
+      organizationId: d.organizationId,
+      text: d.text,
+      byId: staff.breakGlass ? null : staff.id,
+      byEmail: staff.email,
+    },
+  });
+  await audit({ action: "remark.create", entityType: "OrganizationRemark", entityId: row.id, after: row });
+  // Handed back so the page shows it at once, without waiting on a refresh
+  return {
+    ok: true,
+    id: row.id,
+    remark: { id: row.id, text: row.text, by: staff.name, at: dateTimeIN(row.createdAt), canDelete: true },
+  };
+}
+
+/** Whoever wrote a remark can take it back; so can a manager. */
+export async function deleteRemark(id: string): Promise<Result> {
+  const denied = await requireCapability("crm.write");
+  if (denied) return { error: DENIED[denied] };
+  const staff = await getStaff();
+  if (!staff) return { error: DENIED.UNAUTHORIZED };
+  const row = await db.organizationRemark.findUnique({ where: { id } });
+  if (!row) return { error: "That remark is already gone." };
+  const manager = (await requireCapability("crm.manage")) === null;
+  if (!manager && row.byEmail !== staff.email) return { error: "Only whoever wrote it, or a manager, can remove a remark." };
+
+  await db.organizationRemark.delete({ where: { id } });
+  await audit({ action: "remark.delete", entityType: "OrganizationRemark", entityId: id, before: row });
+  return { ok: true };
 }

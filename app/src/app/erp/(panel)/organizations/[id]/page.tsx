@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { SchoolRemarks } from "@/components/erp/school-remarks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
@@ -20,6 +21,7 @@ import { formatINR } from "@/lib/money";
 import { ownsSchool, salesTeam } from "@/lib/money-scope";
 import { PAYMENT_MODE_LABEL } from "@/lib/payment-modes";
 import { getStaff, roleCan } from "@/lib/staff-auth";
+import { dateTimeIN } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Organisation", robots: { index: false } };
 
@@ -65,7 +67,11 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
     where: { id },
     include: {
       owner: { select: { name: true } },
-      visits: { orderBy: { visitedOn: "desc" }, include: { by: { select: { name: true } } } },
+      visits: {
+        orderBy: [{ visitedOn: "desc" }, { createdAt: "desc" }],
+        include: { by: { select: { name: true } } },
+      },
+      remarks: { orderBy: { createdAt: "desc" }, include: { by: { select: { name: true } } } },
       quotations: { orderBy: { quotedOn: "desc" } },
       invoices: {
         orderBy: { invoiceDate: "desc" },
@@ -153,7 +159,14 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
   const credit = Math.max(0, -position.outstanding);
   const owed = undelivered.length + toPost.length + (credit > 0 ? 1 : 0);
 
+  // The school's next follow-up is the next action on its latest visit, call or note
+  const latest = org.visits[0];
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const followUpOverdue = latest && !latest.converted && latest.nextActionOn < startOfToday;
+
   const sections = [
+    ["remarks", "Remarks", org.remarks.length],
     ...(mine ? ([["deliver", "Still to give them", owed]] as const) : []),
     ["quotations", "Quotations", org.quotations.length],
     ["invoices", "Invoices", bills.length],
@@ -247,6 +260,38 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-4 ${
+          followUpOverdue ? "border-destructive/40 bg-destructive/10" : "bg-card"
+        }`}
+      >
+        {!latest ? (
+          <p className="text-sm text-muted-foreground">
+            No follow-up set. Log a visit, a call or a note to set the next one.
+          </p>
+        ) : latest.converted ? (
+          <p className="text-sm">
+            <span className="font-semibold">Order won</span> on the visit of {dateIN(latest.visitedOn)}.
+          </p>
+        ) : (
+          <div className="min-w-0">
+            <p className={`text-sm font-semibold ${followUpOverdue ? "text-destructive" : ""}`}>
+              Next follow-up: {dateIN(latest.nextActionOn)}
+              {followUpOverdue ? ", overdue" : ""}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {latest.nextAction}
+              {latest.by ? ` · set by ${latest.by.name} on ${dateIN(latest.visitedOn)}` : ""}
+            </p>
+          </div>
+        )}
+        {canWrite && (
+          <Link href={`/erp/visits/new?org=${org.id}`} className="text-sm font-medium underline">
+            {latest ? "Change it" : "Set one"}
+          </Link>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
           ...(mine ? moneyCards : []),
@@ -281,6 +326,40 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
           </a>
         ))}
       </nav>
+
+      <section id="remarks" className="scroll-mt-20 rounded-2xl border bg-card">
+        <div className="border-b p-4">
+          <h2 className="font-heading font-semibold">Remarks</h2>
+          <p className="text-sm text-muted-foreground">Anything worth remembering about this school, newest first.</p>
+        </div>
+        {org.notes && (
+          <div className="border-b bg-muted/30 p-4 text-sm">
+            <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Notes on the school</p>
+            <p className="whitespace-pre-line break-words">
+              {org.notes.split(/(https?:\/\/\S+)/).map((part, i) =>
+                /^https?:\/\//.test(part) ? (
+                  <a key={i} href={part} target="_blank" rel="noreferrer" className="underline">
+                    {part}
+                  </a>
+                ) : (
+                  part
+                ),
+              )}
+            </p>
+          </div>
+        )}
+        <SchoolRemarks
+          organizationId={org.id}
+          canAdd={canWrite}
+          remarks={org.remarks.map((r) => ({
+            id: r.id,
+            text: r.text,
+            by: r.by?.name ?? r.byEmail,
+            at: dateTimeIN(r.createdAt),
+            canDelete: canWrite && (canManage || r.byEmail === staff.email),
+          }))}
+        />
+      </section>
 
       {mine && (
         <section id="deliver" className="scroll-mt-20 rounded-2xl border bg-card">

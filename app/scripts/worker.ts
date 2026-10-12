@@ -7,6 +7,7 @@
  *  - every 3 h:    sync Shiprocket tracking → order statuses + emails
  *  - daily 9 am:   email the owner any grievance past its statutory deadline
  *  - 1st and 15th: email the owner who is still owed this month's GenZ Times
+ *  - every 30 s:   two-way sync with the Team Expenses app, when configured
  *
  * Start: npx tsx scripts/worker.ts   (NODE_OPTIONS=--conditions=react-server)
  */
@@ -17,6 +18,7 @@ import { releaseExpiredOrders, reconcilePendingPayments } from "../src/lib/order
 import { syncShipmentTracking } from "../src/lib/shipping/tracking-sync";
 import { reportOverdueGrievances } from "../src/lib/grievance-sla";
 import { remindExpiringSubscriptions, remindPosting } from "../src/lib/subscription-notify";
+import { syncTeamExpenses, teamExpensesEnabled } from "../src/lib/team-expenses";
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), "[worker]", ...args);
 
@@ -65,6 +67,17 @@ async function grievanceSlaTick() {
   }
 }
 
+async function teamExpensesTick() {
+  try {
+    const done = await syncTeamExpenses();
+    if (done && (done.pulled || done.pushed)) {
+      log(`Team Expenses: ${done.pulled} bill(s) in from the app, ${done.pushed} sent to it`);
+    }
+  } catch (err) {
+    console.error("[worker] Team Expenses sync failed", err);
+  }
+}
+
 log("starting - payments every 10 min, tracking every 3 h, grievance SLA daily");
 void paymentsTick();
 void trackingTick();
@@ -77,6 +90,11 @@ cron.schedule("0 9 * * *", grievanceSlaTick);
 cron.schedule("0 10 * * *", subscriptionTick);
 // 9:30 am on the 1st, and again on the 15th if the run is still not recorded
 cron.schedule("30 9 1,15 * *", postingTick);
+// Seconds field: the phones sync every few seconds, so half a minute keeps up
+if (teamExpensesEnabled()) {
+  void teamExpensesTick();
+  cron.schedule("*/30 * * * * *", teamExpensesTick);
+}
 
 process.on("SIGTERM", () => {
   log("SIGTERM — bye");

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { StaffManager } from "@/components/erp/staff-manager";
 import { db } from "@/lib/db";
 import { getStaff, roleCan } from "@/lib/staff-auth";
+import { appEmployees } from "@/lib/team-expenses";
 
 export const metadata: Metadata = { title: "Staff", robots: { index: false } };
 
@@ -24,6 +25,7 @@ export default async function StaffPage() {
       phone: true,
       reportsToId: true,
       reportsTo: { select: { name: true } },
+      expensesAppName: true,
       isActive: true,
       lastLoginAt: true,
       _count: { select: { sessions: { where: { revokedAt: null, expiresAt: { gt: new Date() } } } } },
@@ -43,6 +45,7 @@ export default async function StaffPage() {
         <Badge variant="outline">No staff accounts yet, add the first below</Badge>
       )}
       <StaffManager
+        appNames={await appEmployees()}
         people={people.map((p) => ({
           id: p.id,
           email: p.email,
@@ -51,6 +54,7 @@ export default async function StaffPage() {
           phone: p.phone,
           reportsToId: p.reportsToId,
           reportsToName: p.reportsTo?.name ?? null,
+          expensesAppName: p.expensesAppName,
           isActive: p.isActive,
           lastLoginAt: p.lastLoginAt?.toISOString() ?? null,
           activeSessions: p._count.sessions,

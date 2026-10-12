@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ClaimDecision, ClaimForm, WithdrawClaim } from "@/components/erp/claim-controls";
-import { claimCategoryLabel } from "@/lib/claims";
+import { claimCategoryLabel, paymentModeLabel } from "@/lib/claims";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { getStaff, roleCan } from "@/lib/staff-auth";
@@ -26,6 +26,11 @@ type Claim = {
   spentOn: Date;
   amount: number;
   category: string;
+  appCategory: string | null;
+  paymentMode: string | null;
+  tripName: string | null;
+  externalId: string | null;
+  appData: unknown;
   note: string;
   billImage: string | null;
   status: string;
@@ -51,7 +56,8 @@ function StatusNote({ c }: { c: Claim }) {
   }
   return (
     <span className="rounded-full border border-green-300 bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-      Approved{c.decidedByName ? ` by ${c.decidedByName}` : ""}
+      {c.status === "PAID" ? "Paid back" : "Approved"}
+      {c.decidedByName ? ` by ${c.decidedByName}` : ""}
     </span>
   );
 }
@@ -62,10 +68,22 @@ function ClaimRow({ c, children }: { c: Claim; children?: React.ReactNode }) {
       <div className="min-w-0 flex-1">
         <p className="font-medium">
           {c.claimedBy ? `${c.claimedBy.name} · ` : ""}
-          {claimCategoryLabel(c.category)}
+          {claimCategoryLabel(c.category, c.appCategory)}
           <span className="font-normal text-muted-foreground"> · {dateIN(c.spentOn)}</span>
         </p>
         <p className="text-sm text-muted-foreground">{c.note}</p>
+        {(c.externalId || c.paymentMode) && (
+          <p className="text-xs text-muted-foreground">
+            {[
+              // Came in from the phone app, rather than claimed on this page
+              c.externalId && c.externalId !== c.id && c.appData ? "From the Team Expenses app" : null,
+              c.tripName ? `Trip: ${c.tripName}` : null,
+              paymentModeLabel(c.paymentMode) ? `Paid by ${paymentModeLabel(c.paymentMode)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <StatusNote c={c} />
           {c.billImage && (
@@ -92,6 +110,9 @@ export default async function ClaimsPage() {
   if (!staff) redirect("/erp/signin?next=/erp/claims");
   if (!roleCan(staff.role, "claims.submit")) redirect("/erp");
   const owner = roleCan(staff.role, "staff.manage");
+  const me = staff.breakGlass
+    ? null
+    : await db.adminUser.findUnique({ where: { id: staff.id }, select: { expensesAppName: true } });
 
   const [mine, waiting, approved] = await Promise.all([
     staff.breakGlass
@@ -110,7 +131,7 @@ export default async function ClaimsPage() {
       : [],
     owner
       ? db.expenseClaim.findMany({
-          where: { status: "APPROVED" },
+          where: { status: { in: ["APPROVED", "PAID"] } },
           orderBy: { decidedAt: "desc" },
           take: 30,
           include: { claimedBy: { select: { name: true } } },
@@ -124,6 +145,8 @@ export default async function ClaimsPage() {
         <h1 className="font-heading text-2xl font-bold">My expenses</h1>
         <p className="text-sm text-muted-foreground">
           Travel, fuel or food you paid for yourself. Send it here and an owner approves it.
+          {me?.expensesAppName &&
+            " Bills you add in the Team Expenses app show here too, and claims made here go to the app."}
         </p>
       </div>
 
@@ -138,7 +161,7 @@ export default async function ClaimsPage() {
                 <ClaimRow key={c.id} c={c}>
                   <ClaimDecision
                     id={c.id}
-                    title={`${c.claimedBy.name}'s ${claimCategoryLabel(c.category)} claim`}
+                    title={`${c.claimedBy.name}'s ${claimCategoryLabel(c.category, c.appCategory)} claim`}
                   />
                 </ClaimRow>
               ))}
@@ -158,7 +181,7 @@ export default async function ClaimsPage() {
             <ul className="divide-y">
               {mine.map((c) => (
                 <ClaimRow key={c.id} c={c}>
-                  {c.status !== "APPROVED" && <WithdrawClaim id={c.id} />}
+                  {c.status !== "APPROVED" && c.status !== "PAID" && <WithdrawClaim id={c.id} />}
                 </ClaimRow>
               ))}
             </ul>

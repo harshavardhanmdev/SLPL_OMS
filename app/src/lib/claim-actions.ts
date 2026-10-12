@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { audit } from "@/lib/audit";
+import { CLAIM_CATEGORIES, ledgerFor, PAYMENT_MODES } from "@/lib/claims";
 import { db } from "@/lib/db";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
@@ -19,11 +20,18 @@ const claimSchema = z.object({
   spentOn: z.string().min(1, "Pick the date you spent it"),
   /** Rupees as typed. */
   amount: z.number().positive("Enter the amount").max(1_000_000, "Check the amount"),
-  category: z.enum(["TRAVEL", "FUEL", "MEALS", "MISC"], {
+  category: z.enum(CLAIM_CATEGORIES.map((c) => c.value) as [string, ...string[]], {
     message: "Pick what it was for",
   }),
+  paymentMode: z.enum(PAYMENT_MODES.map((m) => m.value) as [string, ...string[]]).optional(),
   note: z.string().trim().min(3, "Say what it was for").max(300),
   billImage: z.string().max(300).nullable().optional(),
+});
+
+/** A claim row for the audit trail: JSON has no BigInt. */
+const forAudit = <T extends { appUpdatedAt: bigint | null }>(c: T) => ({
+  ...c,
+  appUpdatedAt: c.appUpdatedAt?.toString() ?? null,
 });
 
 function refresh() {
@@ -47,21 +55,26 @@ export async function submitClaim(input: z.infer<typeof claimSchema>): Promise<R
   if (d.billImage && !d.billImage.startsWith("/media/receipt-"))
     return { error: "Upload the bill photo again." };
 
+  // Someone linked to the Team Expenses app gets the claim there too
+  const me = await db.adminUser.findUnique({ where: { id: staff.id }, select: { expensesAppName: true } });
   const row = await db.expenseClaim.create({
     data: {
       claimedById: staff.id,
       spentOn,
       amount: Math.round(d.amount * 100),
-      category: d.category,
+      category: ledgerFor(d.category) as never,
+      appCategory: d.category,
+      paymentMode: d.paymentMode ?? null,
       note: d.note,
       billImage: d.billImage || null,
+      syncPending: Boolean(me?.expensesAppName),
     },
   });
   await audit({
     action: "claim.create",
     entityType: "ExpenseClaim",
     entityId: row.id,
-    after: row,
+    after: forAudit(row),
   });
   refresh();
   return { ok: true };
@@ -85,7 +98,10 @@ export async function decideClaim(input: z.infer<typeof decideSchema>): Promise<
     return { error: "Say why it is going back, so they can fix it." };
   }
 
-  const claim = await db.expenseClaim.findUnique({ where: { id: d.id } });
+  const claim = await db.expenseClaim.findUnique({
+    where: { id: d.id },
+    include: { claimedBy: { select: { expensesAppName: true } } },
+  });
   if (!claim || claim.status !== "PENDING") return { error: "That claim has already been decided." };
   if (claim.claimedById === staff.id) return { error: "Another owner approves your own claim." };
 
@@ -96,6 +112,8 @@ export async function decideClaim(input: z.infer<typeof decideSchema>): Promise<
       decidedByName: staff.breakGlass ? "Owner" : staff.name,
       decidedAt: new Date(),
       rejectedReason: d.decision === "REJECTED" ? d.reason : null,
+      // The decision reaches the Team Expenses app on the next sync
+      syncPending: claim.externalId !== null || Boolean(claim.claimedBy.expensesAppName),
     },
   });
   await audit({
@@ -115,14 +133,19 @@ export async function withdrawClaim(id: string): Promise<Result> {
   if (!staff) return { error: "Sign in again." };
   const claim = await db.expenseClaim.findUnique({ where: { id } });
   if (!claim || claim.claimedById !== staff.id) return { error: "That claim is not yours." };
-  if (claim.status === "APPROVED") return { error: "An approved claim stays on record." };
+  if (claim.status === "APPROVED" || claim.status === "PAID") return { error: "An approved claim stays on record." };
 
-  await db.expenseClaim.delete({ where: { id } });
+  // Already in the Team Expenses app: the next sync deletes it there too
+  const inApp = claim.externalId !== null && claim.appUpdatedAt !== null;
+  await db.$transaction([
+    db.expenseClaim.delete({ where: { id } }),
+    ...(inApp ? [db.teamExpenseDeletion.create({ data: { externalId: claim.externalId! } })] : []),
+  ]);
   await audit({
     action: "claim.withdraw",
     entityType: "ExpenseClaim",
     entityId: id,
-    before: claim,
+    before: forAudit(claim),
   });
   refresh();
   return { ok: true };

@@ -759,6 +759,8 @@ enum ClaimStatus {
   PENDING
   APPROVED
   REJECTED
+  /// Approved and paid back, marked in the Team Expenses app
+  PAID
 }
 
 /// What a staff member paid for themselves, such as travel or food, sent to an
@@ -778,6 +780,22 @@ model ExpenseClaim {
   decidedByName  String?
   decidedAt      DateTime?
   rejectedReason String?
+  paidAt         DateTime?
+
+  // ─ The Team Expenses app (expenses.theslpl.in), synced both ways ─
+  /// The bill's id in the app: the app's own id, or this claim's id once sent there
+  externalId   String?  @unique
+  /// The app's category (HOTEL, LOCAL_TRANSPORT ...); category above is the ledger head
+  appCategory  String?
+  paymentMode  String?
+  tripName     String?
+  /// The app's copy of the bill as last seen, so fields kept only there survive a round trip
+  appData      Json?
+  /// The app's updatedAt (ms) for the version held here
+  appUpdatedAt BigInt?
+  /// Changed here and not yet sent to the app
+  syncPending  Boolean  @default(false)
+
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -820,6 +838,8 @@ model AdminUser {
   reports     AdminUser[] @relation("reports")
   expenseClaims ExpenseClaim[]
   passkeys      StaffPasskey[]
+  /// Their name in the Team Expenses app, which links their bills both ways
+  expensesAppName String? @unique
   schoolRemarks OrganizationRemark[]
 
   sessions       AdminSession[]
@@ -1327,6 +1347,13 @@ model Organization {
   @@index([status])
   @@index([ownerId])
   @@index([name])
+}
+
+/// A claim taken back here after it reached the Team Expenses app: the next
+/// sync tells the app to delete it, then this row goes.
+model TeamExpenseDeletion {
+  externalId String   @id
+  createdAt  DateTime @default(now())
 }
 
 /// A dated remark on a school, by whoever wrote it. The running notebook that

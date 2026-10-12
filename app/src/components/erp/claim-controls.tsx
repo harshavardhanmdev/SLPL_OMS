@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { decideClaim, submitClaim, withdrawClaim } from "@/lib/claim-actions";
-import { CLAIM_CATEGORIES, type ClaimCategory } from "@/lib/claims";
+import { CLAIM_CATEGORIES, PAYMENT_MODES, type ClaimCategory } from "@/lib/claims";
 import { todayLocalIso } from "@/lib/utils";
 
 const selectClass =
@@ -22,6 +22,7 @@ export function ClaimForm() {
   const blank = {
     spentOn: todayLocalIso(),
     category: "TRAVEL" as ClaimCategory,
+    paymentMode: "CASH",
     amount: "",
     note: "",
   };
@@ -79,7 +80,7 @@ export function ClaimForm() {
   return (
     <form onSubmit={submit} className="space-y-3 rounded-2xl border bg-card p-4 sm:p-5">
       <h2 className="font-heading font-semibold">Claim an expense</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="cl-cat">What for</Label>
           <select
@@ -91,6 +92,21 @@ export function ClaimForm() {
             {CLAIM_CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="cl-mode">How you paid</Label>
+          <select
+            id="cl-mode"
+            className={selectClass}
+            value={v.paymentMode}
+            onChange={(e) => setV((o) => ({ ...o, paymentMode: e.target.value }))}
+          >
+            {PAYMENT_MODES.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
               </option>
             ))}
           </select>

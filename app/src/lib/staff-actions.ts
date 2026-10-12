@@ -64,6 +64,8 @@ const staffSchema = z.object({
   phone: z.string().trim().max(20).optional().or(z.literal("")),
   /** Who they report to, so a sales team has a shape the screens can follow. */
   reportsToId: z.string().optional().nullable(),
+  /** Their name in the Team Expenses app; left out, it stays as it was. */
+  expensesAppName: z.string().trim().max(80).optional().nullable(),
   password: z.string().min(8, "Password must be at least 8 characters").optional().or(z.literal("")),
   isActive: z.boolean(),
 });
@@ -85,6 +87,13 @@ export async function saveStaff(input: StaffInput): Promise<Result> {
   if (clash) return { error: `${d.email} already has an account.` };
 
   if (!d.id && !d.password) return { error: "Set a password for the new account." };
+  if (d.expensesAppName) {
+    const taken = await db.adminUser.findFirst({
+      where: { expensesAppName: d.expensesAppName, ...(d.id ? { NOT: { id: d.id } } : {}) },
+      select: { name: true },
+    });
+    if (taken) return { error: `${d.expensesAppName} in the app is already linked to ${taken.name}.` };
+  }
 
   const before = d.id ? await db.adminUser.findUnique({ where: { id: d.id } }) : null;
   // Nobody reports to themselves, which would make the tree a loop
@@ -96,6 +105,7 @@ export async function saveStaff(input: StaffInput): Promise<Result> {
     role: d.role as never,
     phone: d.phone || null,
     reportsToId,
+    ...(d.expensesAppName !== undefined ? { expensesAppName: d.expensesAppName || null } : {}),
     isActive: d.isActive,
     ...(d.password ? { passwordHash: bcrypt.hashSync(d.password, 10) } : {}),
   };

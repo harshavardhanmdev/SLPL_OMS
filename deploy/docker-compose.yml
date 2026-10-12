@@ -81,6 +81,10 @@ services:
     env_file: .env
     environment:
       TZ: Asia/Kolkata
+      UPLOADS_DIR: /app/uploads
+    # Read only: the Team Expenses sync sends website bill photos to the app
+    volumes:
+      - oms-uploads:/app/uploads:ro
     depends_on:
       oms-db:
         condition: service_healthy

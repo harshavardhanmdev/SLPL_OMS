@@ -116,7 +116,7 @@ export default async function ApprovalsPage() {
       title: c.note,
       href: "/erp/claims",
       raisedBy: c.claimedBy.name,
-      school: claimCategoryLabel(c.category),
+      school: claimCategoryLabel(c.category, c.appCategory),
       amount: formatINR(c.amount),
       when: c.updatedAt,
       reason: c.rejectedReason,

@@ -36,6 +36,7 @@ type Person = {
   phone: string | null;
   reportsToId: string | null;
   reportsToName: string | null;
+  expensesAppName: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
   activeSessions: number;
@@ -48,6 +49,7 @@ type FormValue = {
   role: string;
   phone: string;
   reportsToId: string;
+  expensesAppName: string;
   password: string;
   isActive: boolean;
 };
@@ -58,11 +60,12 @@ const blank: FormValue = {
   role: "SALES",
   phone: "",
   reportsToId: "",
+  expensesAppName: "",
   password: "",
   isActive: true,
 };
 
-export function StaffManager({ people }: { people: Person[] }) {
+export function StaffManager({ people, appNames }: { people: Person[]; appNames: string[] }) {
   const router = useRouter();
   const [editing, setEditing] = React.useState<string | null>(people.length === 0 ? "new" : null);
   const [v, setV] = React.useState<FormValue>(blank);
@@ -96,6 +99,7 @@ export function StaffManager({ people }: { people: Person[] }) {
       role: p.role,
       phone: p.phone ?? "",
       reportsToId: p.reportsToId ?? "",
+      expensesAppName: p.expensesAppName ?? "",
       password: "",
       isActive: p.isActive,
     });
@@ -115,6 +119,7 @@ export function StaffManager({ people }: { people: Person[] }) {
               role: v.role,
               phone: v.phone,
               reportsToId: v.reportsToId || null,
+              expensesAppName: v.expensesAppName || null,
               password: v.password,
               isActive: v.isActive,
             }),
@@ -189,6 +194,25 @@ export function StaffManager({ people }: { people: Person[] }) {
           </select>
         </div>
         <div className="space-y-1.5">
+          <Label htmlFor="st-app">Name in the Team Expenses app</Label>
+          <select
+            id="st-app"
+            className={selectClass}
+            value={v.expensesAppName}
+            onChange={(e) => set("expensesAppName", e.target.value)}
+          >
+            <option value="">Not linked</option>
+            {[...new Set([...appNames, ...(v.expensesAppName ? [v.expensesAppName] : [])])].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Linked, their bills in the app show in My expenses here, and their claims here go to the app.
+          </p>
+        </div>
+        <div className="space-y-1.5">
           <Label htmlFor="st-password">{v.id ? "New password, to change it" : "Password"}</Label>
           <PasswordInput
             id="st-password"
@@ -246,8 +270,15 @@ export function StaffManager({ people }: { people: Person[] }) {
                     ? ` · last in ${new Date(p.lastLoginAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
                     : " · never signed in"}
                 </p>
-                {p.reportsToName && (
-                  <p className="text-xs text-muted-foreground">Reports to {p.reportsToName}</p>
+                {(p.reportsToName || p.expensesAppName) && (
+                  <p className="text-xs text-muted-foreground">
+                    {[
+                      p.reportsToName && `Reports to ${p.reportsToName}`,
+                      p.expensesAppName && `${p.expensesAppName} in the Team Expenses app`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
                 )}
               </div>
               <div className="flex gap-2">

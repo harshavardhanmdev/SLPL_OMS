@@ -367,6 +367,7 @@ export function VendorPayForm({
           <>
             <Image
               src={billImage}
+              unoptimized
               alt="Bill"
               width={44}
               height={58}

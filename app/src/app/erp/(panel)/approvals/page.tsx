@@ -72,7 +72,7 @@ export default async function ApprovalsPage() {
       where: f.claim,
       orderBy: { updatedAt: "desc" },
       take: 200,
-      include: { claimedBy: { select: { name: true } } },
+      include: { claimedBy: { select: { name: true } }, _count: { select: { lines: true } } },
     }),
   ]);
 
@@ -116,7 +116,7 @@ export default async function ApprovalsPage() {
       title: c.note,
       href: "/erp/claims",
       raisedBy: c.claimedBy.name,
-      school: claimCategoryLabel(c.category, c.appCategory),
+      school: c._count.lines > 1 ? `${c._count.lines} expenses` : claimCategoryLabel(c.category, c.appCategory),
       amount: formatINR(c.amount),
       when: c.updatedAt,
       reason: c.rejectedReason,

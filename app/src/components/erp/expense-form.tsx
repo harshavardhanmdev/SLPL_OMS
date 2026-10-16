@@ -147,6 +147,7 @@ export function ExpenseForm() {
               <div className="flex items-center gap-2">
                 <Image
                   src={billImage}
+                  unoptimized
                   alt="Bill"
                   width={44}
                   height={58}

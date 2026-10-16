@@ -574,6 +574,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
               <li key={s.id} className="flex flex-wrap items-start justify-between gap-2 p-4">
                 <div className="min-w-0">
                   <p className="font-medium">{s.description}</p>
+                  {s.contents && <p className="text-xs text-muted-foreground">Includes {s.contents}</p>}
                   <p className="text-sm text-muted-foreground">
                     {[
                       s.givenOn ? `Given ${dateIN(s.givenOn)}` : `Taken ${dateIN(s.issuedOn)}`,

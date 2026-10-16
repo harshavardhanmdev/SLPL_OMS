@@ -17,7 +17,7 @@ import { getStaff, requireCapability, roleCan } from "@/lib/staff-auth";
  * it, so what is still in the bag never gets lost inside a school's row.
  */
 
-type Result = { ok?: boolean; error?: string; id?: string; pending?: boolean };
+type Result = { ok?: boolean; error?: string; id?: string; count?: number; pending?: boolean };
 
 const DENIED: Record<string, string> = {
   UNAUTHORIZED: "Sign in again.",
@@ -38,9 +38,19 @@ function revalidate(organizationId?: string | null) {
 }
 
 const takeSchema = z.object({
-  description: z.string().trim().min(2, "Which title?").max(200),
-  productId: z.string().optional().nullable(),
-  quantity: z.number().int().min(1, "How many?").max(10000),
+  /** Several titles or sets at once, from the samples box; each becomes its own batch */
+  items: z
+    .array(
+      z.object({
+        description: z.string().trim().min(2, "Which title?").max(200),
+        /** The books inside, for a whole set */
+        contents: z.string().trim().max(1000).optional().nullable(),
+        productId: z.string().optional().nullable(),
+        quantity: z.number().int().min(1, "How many?").max(10000),
+      }),
+    )
+    .min(1, "Add at least one title")
+    .max(60, "That is a lot at once. Record it in parts."),
   issuedOn: z.string().min(1, "When were they taken?"),
   /** Who has them. A manager can record on someone's behalf; anyone else records their own. */
   holderId: z.string().optional().nullable(),
@@ -78,39 +88,49 @@ export async function takeSamples(input: z.infer<typeof takeSchema>): Promise<Re
   // An executive's batch waits for the manager; a manager's stands as saved
   const approver = roleCan(staff.role, "crm.manage");
 
-  const row = await db.sampleIssue.create({
-    data: {
-      description: d.description,
-      productId: d.productId || null,
-      quantity: d.quantity,
-      issuedOn,
-      issuedById: holderId,
-      issuedEmail: holderEmail,
-      organizationId: d.organizationId || null,
-      status: d.organizationId ? "WITH_SCHOOL" : "IN_HAND",
-      givenOn: d.organizationId ? issuedOn : null,
-      notes: d.notes || null,
-      approvalStatus: approver ? "APPROVED" : "PENDING",
-      approvedById: approver && !staff.breakGlass ? staff.id : null,
-      approvedAt: approver ? new Date() : null,
-    },
-  });
+  // Only a real store product is linked; price list books are named, not linked
+  const askedFor = d.items.map((i) => i.productId).filter((id): id is string => Boolean(id));
+  const known = new Set(
+    (await db.product.findMany({ where: { id: { in: askedFor } }, select: { id: true } })).map((p) => p.id),
+  );
+
+  const rows = await db.$transaction(
+    d.items.map((item) =>
+      db.sampleIssue.create({
+        data: {
+          description: item.description,
+          contents: item.contents || null,
+          productId: item.productId && known.has(item.productId) ? item.productId : null,
+          quantity: item.quantity,
+          issuedOn,
+          issuedById: holderId,
+          issuedEmail: holderEmail,
+          organizationId: d.organizationId || null,
+          status: d.organizationId ? "WITH_SCHOOL" : "IN_HAND",
+          givenOn: d.organizationId ? issuedOn : null,
+          notes: d.notes || null,
+          approvalStatus: approver ? "APPROVED" : "PENDING",
+          approvedById: approver && !staff.breakGlass ? staff.id : null,
+          approvedAt: approver ? new Date() : null,
+        },
+      }),
+    ),
+  );
 
   await audit({
     action: "sample.take",
     entityType: "SampleIssue",
-    entityId: row.id,
+    entityId: rows[0].id,
     after: {
-      description: row.description,
-      quantity: row.quantity,
+      items: rows.map((r) => `${r.quantity} x ${r.description}`),
       holder: holderEmail,
-      organizationId: row.organizationId,
-      approvalStatus: row.approvalStatus,
+      organizationId: d.organizationId || null,
+      approvalStatus: rows[0].approvalStatus,
     },
   });
-  revalidate(row.organizationId);
+  revalidate(d.organizationId || null);
   revalidatePath("/erp/approvals");
-  return { ok: true, id: row.id, pending: row.approvalStatus === "PENDING" };
+  return { ok: true, id: rows[0].id, count: rows.length, pending: rows[0].approvalStatus === "PENDING" };
 }
 
 const giveSchema = z.object({

@@ -9,7 +9,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { SchoolPicker } from "@/components/erp/school-picker";
+import { VoiceButton } from "@/components/erp/voice-button";
 import { decideSamples, giveSamples, settleSamples, takeSamples } from "@/lib/sample-actions";
+import { parseSamples, type SampleBook } from "@/lib/sample-parse";
 import { todayLocalIso } from "@/lib/utils";
 
 const selectClass =
@@ -25,31 +29,58 @@ function todayIso(): string {
 /**
  * Copies leaving the office. They go into someone's bag first; naming a school
  * here is only for the times they were handed straight over.
+ *
+ * One box takes the lot, typed or spoken: "grade 5 all books, upsc 6 to 10,
+ * 2 copies of genz". What it understood is listed before anything is saved,
+ * to adjust or remove; each row becomes its own batch.
  */
 export function SampleTaker({
   organizations,
   holders,
-  titles,
+  books,
   meId,
+  canAddSchool,
 }: {
   organizations: Option[];
   /** Empty for anyone who can only record their own. */
   holders: Option[];
-  titles: string[];
+  books: SampleBook[];
   meId: string | null;
+  canAddSchool: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [text, setText] = React.useState("");
+  // Changes to what the box understood: a different quantity, or taken off
+  // The quantity is kept as typed, so it can be cleared and retyped on a phone
+  const [edits, setEdits] = React.useState<Record<string, { quantity?: string; removed?: boolean }>>({});
+  // Phrases it could not place, kept as typed when asked
+  const [typed, setTyped] = React.useState<string[]>([]);
   const [v, setV] = React.useState(() => ({
-    description: "",
-    quantity: "1",
     issuedOn: todayIso(),
     holderId: meId ?? holders[0]?.id ?? "",
     organizationId: "",
     notes: "",
   }));
   const set = (k: keyof typeof v, value: string) => setV((old) => ({ ...old, [k]: value }));
+
+  const parsed = React.useMemo(() => parseSamples(text, books), [text, books]);
+  const picks = parsed.picks
+    .filter((p) => !edits[p.key]?.removed)
+    .map((p) => ({ ...p, typedQuantity: edits[p.key]?.quantity, quantity: Number(edits[p.key]?.quantity) || p.quantity }));
+  const unknown = parsed.unknown.filter((u) => !typed.includes(u));
+  const items = [
+    ...picks.map((p) => ({ description: p.title, contents: p.contents, productId: p.productId, quantity: p.quantity })),
+    ...typed.map((t) => ({ description: t, contents: null, productId: null, quantity: 1 })),
+  ];
+
+  function reset() {
+    setText("");
+    setEdits({});
+    setTyped([]);
+    setV((old) => ({ ...old, organizationId: "", notes: "" }));
+  }
 
   if (!open) {
     return (
@@ -63,10 +94,13 @@ export function SampleTaker({
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        if (items.length === 0) {
+          toast.error("Say or type what you took first.");
+          return;
+        }
         setBusy(true);
         void takeSamples({
-          description: v.description,
-          quantity: Number(v.quantity) || 1,
+          items,
           issuedOn: v.issuedOn,
           holderId: v.holderId || null,
           organizationId: v.organizationId || null,
@@ -75,14 +109,15 @@ export function SampleTaker({
           .then((res) => {
             if (res.error) toast.error(res.error);
             else {
+              const what = res.count === 1 ? "1 item" : `${res.count} items`;
               toast.success(
                 res.pending
-                  ? "Recorded. It now waits for your manager to approve."
+                  ? `${what} recorded. They now wait for your manager to approve.`
                   : v.organizationId
-                    ? "Recorded as given to the school."
-                    : "Recorded as in hand.",
+                    ? `${what} recorded as given to the school.`
+                    : `${what} recorded as in hand.`,
               );
-              setV((old) => ({ ...old, description: "", quantity: "1", organizationId: "", notes: "" }));
+              reset();
               setOpen(false);
               router.refresh();
             }
@@ -92,34 +127,102 @@ export function SampleTaker({
       className="space-y-3 rounded-2xl border bg-card p-4 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 sm:p-5"
     >
       <h2 className="font-heading font-semibold">Samples taken</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="sa-desc">Which title</Label>
-          <Input
-            id="sa-desc"
-            list="sa-titles"
-            value={v.description}
-            onChange={(e) => set("description", e.target.value)}
-            className="h-11"
-            placeholder="Start typing, or describe a set"
-            required
+      <div className="space-y-1.5">
+        <Label htmlFor="sa-what">What did you take?</Label>
+        <div className="flex gap-2">
+          <Textarea
+            id="sa-what"
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setEdits({});
+            }}
+            rows={2}
+            placeholder="grade 5 all books, upsc 6 to 10, 2 copies of grade 3 english"
           />
-          <datalist id="sa-titles">
-            {titles.map((t) => (
-              <option key={t} value={t} />
+          <VoiceButton
+            label="Say what you took"
+            onText={(said) => {
+              setText((old) => (old.trim() ? `${old.trim()}, ${said}` : said));
+              setEdits({});
+            }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          A grade, a range of grades, a series or single titles, with how many if more than one. Separate them with
+          commas.
+        </p>
+      </div>
+
+      {(picks.length > 0 || typed.length > 0 || unknown.length > 0 || parsed.notes.length > 0) && (
+        <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
+          {picks.length + typed.length > 0 && (
+            <p className="text-xs font-semibold uppercase text-muted-foreground">
+              {picks.length + typed.length} to record
+            </p>
+          )}
+          <ul className="space-y-2">
+            {picks.map((p) => (
+              <li key={p.key} className="flex items-start justify-between gap-2 rounded-lg bg-card p-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{p.title}</p>
+                  {p.contents && <p className="text-xs text-muted-foreground">Includes {p.contents}</p>}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Input
+                    aria-label={`How many of ${p.title}`}
+                    inputMode="numeric"
+                    value={p.typedQuantity ?? String(p.quantity)}
+                    onChange={(e) => {
+                      const typedNow = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      setEdits((old) => ({ ...old, [p.key]: { ...old[p.key], quantity: typedNow } }));
+                    }}
+                    className="h-9 w-14 text-center"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    aria-label={`Leave out ${p.title}`}
+                    onClick={() => setEdits((old) => ({ ...old, [p.key]: { ...old[p.key], removed: true } }))}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              </li>
             ))}
-          </datalist>
+            {typed.map((t) => (
+              <li key={t} className="flex items-center justify-between gap-2 rounded-lg bg-card p-2">
+                <p className="text-sm font-medium">{t}</p>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  aria-label={`Leave out ${t}`}
+                  onClick={() => setTyped((old) => old.filter((x) => x !== t))}
+                >
+                  <X className="size-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {unknown.map((u) => (
+            <div key={u} className="flex flex-wrap items-center justify-between gap-2 text-sm text-saffron-deep">
+              <span>Not sure what &ldquo;{u}&rdquo; is.</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => setTyped((old) => [...old, u])}>
+                Record it as typed
+              </Button>
+            </div>
+          ))}
+          {parsed.notes.map((n) => (
+            <p key={n} className="text-xs text-muted-foreground">
+              {n}
+            </p>
+          ))}
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="sa-qty">How many copies</Label>
-          <Input
-            id="sa-qty"
-            inputMode="numeric"
-            value={v.quantity}
-            onChange={(e) => set("quantity", e.target.value.replace(/\D/g, ""))}
-            className="h-11"
-          />
-        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="sa-date">Taken on</Label>
           <Input
@@ -147,21 +250,16 @@ export function SampleTaker({
             </select>
           </div>
         )}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="sa-org">Already given to a school?</Label>
-          <select
+          <SchoolPicker
             id="sa-org"
-            className={selectClass}
             value={v.organizationId}
-            onChange={(e) => set("organizationId", e.target.value)}
-          >
-            <option value="">No, still in hand</option>
-            {organizations.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
+            onChange={(id) => set("organizationId", id)}
+            organizations={organizations}
+            noneLabel="No, still in hand"
+            canAdd={canAddSchool}
+          />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="sa-notes">Note</Label>
@@ -174,11 +272,18 @@ export function SampleTaker({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={busy} className="gap-2">
+        <Button type="submit" disabled={busy || items.length === 0} className="gap-2">
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-          Record
+          {items.length > 1 ? `Record ${items.length} items` : "Record"}
         </Button>
-        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+        >
           Cancel
         </Button>
       </div>
@@ -196,12 +301,14 @@ export function SampleActions({
   status,
   quantity,
   organizations,
+  canAddSchool = false,
   approval = "APPROVED",
 }: {
   id: string;
   status: string;
   quantity: number;
   organizations: Option[];
+  canAddSchool?: boolean;
   /** Only an approved batch can go to a school. */
   approval?: string;
 }) {
@@ -262,18 +369,13 @@ export function SampleActions({
         }}
         className="grid w-full gap-2 rounded-xl bg-muted/50 p-3 motion-safe:animate-in motion-safe:fade-in-0 sm:grid-cols-[1fr_6rem_9rem_auto]"
       >
-        <select
-          aria-label="School"
-          className={selectClass}
+        <SchoolPicker
+          id={`give-${id}`}
           value={give.organizationId}
-          onChange={(e) => setGive((g) => ({ ...g, organizationId: e.target.value }))}
-        >
-          {organizations.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </select>
+          onChange={(organizationId) => setGive((g) => ({ ...g, organizationId }))}
+          organizations={organizations}
+          canAdd={canAddSchool}
+        />
         <Input
           aria-label={`How many, up to ${quantity}`}
           inputMode="numeric"

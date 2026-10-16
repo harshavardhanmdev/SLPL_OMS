@@ -5,8 +5,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
-import { appCategoryFor, ledgerFor } from "@/lib/claims";
+import { appCategoryFor, claimCategoryLabel, ledgerFor } from "@/lib/claims";
 import { db } from "@/lib/db";
+import { formatINR } from "@/lib/money";
 
 /**
  * Two-way sync with the Team Expenses app (expenses.theslpl.in), the phone app
@@ -226,7 +227,10 @@ async function push(linked: Linked[]): Promise<number> {
 
   const pending = await db.expenseClaim.findMany({
     where: { syncPending: true },
-    include: { claimedBy: { select: { expensesAppName: true, isActive: true } } },
+    include: {
+      claimedBy: { select: { expensesAppName: true, isActive: true } },
+      lines: { orderBy: { sortOrder: "asc" } },
+    },
   });
   const sent: { id: string; updatedAt: Date; externalId: string; data: Record<string, unknown> }[] = [];
   for (const c of pending) {
@@ -255,7 +259,14 @@ async function push(linked: Linked[]): Promise<number> {
         category: c.appCategory ?? appCategoryFor(c.category),
         paymentMode: c.paymentMode ?? base.paymentMode ?? "OTHER",
         date: dayMs(c.spentOn),
-        notes: base.notes ?? "",
+        // A day's claim is one bill in the app, its lines spelled out in the notes
+        notes:
+          base.notes ??
+          (c.lines.length > 1
+            ? c.lines
+                .map((l) => `${claimCategoryLabel("", l.category)}${l.description ? ` (${l.description})` : ""} ${formatINR(l.amount)}`)
+                .join(" · ")
+            : (c.lines[0]?.description ?? "")),
         employeeName: name,
         status: c.status,
         managerComment: c.status === "REJECTED" ? (c.rejectedReason ?? "") : (base.managerComment ?? ""),

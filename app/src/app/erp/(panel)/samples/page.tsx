@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { SampleActions, SampleDecision, SampleTaker } from "@/components/erp/sample-board";
 import { db } from "@/lib/db";
 import { SCHOOLS_ONLY } from "@/lib/money-scope";
+import { sampleBooks } from "@/lib/sample-catalog";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 
 export const metadata: Metadata = { title: "Samples", robots: { index: false } };
@@ -82,7 +83,7 @@ export default async function SamplesPage() {
   const canManage = roleCan(staff.role, "crm.manage");
   const mine = canManage ? {} : { issuedById: staff.id };
 
-  const [samples, organizations, holders, products, me, manager] = await Promise.all([
+  const [samples, organizations, holders, books, me, manager] = await Promise.all([
     db.sampleIssue.findMany({
       where: mine,
       orderBy: [{ issuedOn: "desc" }, { createdAt: "desc" }],
@@ -100,11 +101,7 @@ export default async function SamplesPage() {
           select: { id: true, name: true },
         })
       : [],
-    db.product.findMany({
-      where: { isActive: true, kind: { not: "DIGITAL" } },
-      orderBy: [{ series: "asc" }, { title: "asc" }],
-      select: { title: true },
-    }),
+    sampleBooks(),
     // Named on a waiting row, so the executive knows whose desk it is on: the
     // person they report to, or else the sales manager
     db.adminUser.findFirst({
@@ -217,7 +214,8 @@ export default async function SamplesPage() {
         <SampleTaker
           organizations={organizations}
           holders={holders}
-          titles={products.map((p) => p.title)}
+          books={books}
+          canAddSchool={canWrite}
           meId={meId}
         />
       )}
@@ -249,6 +247,7 @@ export default async function SamplesPage() {
                       <p className="font-medium">
                         <span className="tabular-nums">{s.quantity}</span> x {s.description}
                       </p>
+                      {s.contents && <p className="text-xs text-muted-foreground">Includes {s.contents}</p>}
                       <p className="text-sm text-muted-foreground">
                         Taken {dateIN(s.issuedOn)}
                         {s.notes ? ` · ${s.notes}` : ""}
@@ -268,6 +267,7 @@ export default async function SamplesPage() {
                           status={s.status}
                           quantity={s.quantity}
                           organizations={organizations}
+                          canAddSchool={canWrite}
                           approval={s.approvalStatus}
                         />
                       )}
@@ -300,6 +300,7 @@ export default async function SamplesPage() {
                   <p className="font-medium">
                     <span className="tabular-nums">{s.quantity}</span> x {s.description}
                   </p>
+                  {s.contents && <p className="text-xs text-muted-foreground">Includes {s.contents}</p>}
                   <p className="text-sm text-muted-foreground">
                     {s.organization && (
                       <Link
@@ -326,6 +327,7 @@ export default async function SamplesPage() {
                       status={s.status}
                       quantity={s.quantity}
                       organizations={organizations}
+                      canAddSchool={canWrite}
                       approval={s.approvalStatus}
                     />
                   )}
@@ -353,6 +355,7 @@ export default async function SamplesPage() {
                   <p className="font-medium">
                     {s.quantity} x {s.description}
                   </p>
+                  {s.contents && <p className="text-xs text-muted-foreground">Includes {s.contents}</p>}
                   <p className="text-sm text-muted-foreground">
                     {s.organization ? `${s.organization.name} · ` : ""}
                     taken {dateIN(s.issuedOn)}
@@ -373,6 +376,7 @@ export default async function SamplesPage() {
                       status={s.status}
                       quantity={s.quantity}
                       organizations={organizations}
+                      canAddSchool={canWrite}
                       approval={s.approvalStatus}
                     />
                   )}

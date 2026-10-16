@@ -33,6 +33,8 @@ type Claim = {
   appData: unknown;
   note: string;
   billImage: string | null;
+  photos: string[];
+  lines: { id: string; category: string; description: string | null; amount: number }[];
   status: string;
   decidedByName: string | null;
   rejectedReason: string | null;
@@ -68,10 +70,23 @@ function ClaimRow({ c, children }: { c: Claim; children?: React.ReactNode }) {
       <div className="min-w-0 flex-1">
         <p className="font-medium">
           {c.claimedBy ? `${c.claimedBy.name} · ` : ""}
-          {claimCategoryLabel(c.category, c.appCategory)}
+          {c.lines.length > 1 ? `${c.lines.length} expenses` : claimCategoryLabel(c.category, c.appCategory)}
           <span className="font-normal text-muted-foreground"> · {dateIN(c.spentOn)}</span>
         </p>
         <p className="text-sm text-muted-foreground">{c.note}</p>
+        {c.lines.length > 1 && (
+          <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+            {c.lines.map((l) => (
+              <li key={l.id} className="flex justify-between gap-3">
+                <span>
+                  {claimCategoryLabel("", l.category)}
+                  {l.description ? `: ${l.description}` : ""}
+                </span>
+                <span className="tabular-nums">{formatINR(l.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         {(c.externalId || c.paymentMode) && (
           <p className="text-xs text-muted-foreground">
             {[
@@ -86,11 +101,11 @@ function ClaimRow({ c, children }: { c: Claim; children?: React.ReactNode }) {
         )}
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <StatusNote c={c} />
-          {c.billImage && (
-            <a href={c.billImage} target="_blank" rel="noreferrer" className="text-xs underline">
-              Bill photo
+          {(c.photos.length ? c.photos : c.billImage ? [c.billImage] : []).map((src, i, all) => (
+            <a key={src} href={src} target="_blank" rel="noreferrer" className="text-xs underline">
+              {all.length > 1 ? `Photo ${i + 1}` : "Bill photo"}
             </a>
-          )}
+          ))}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1.5">
@@ -121,12 +136,13 @@ export default async function ClaimsPage() {
           where: { claimedById: staff.id },
           orderBy: { spentOn: "desc" },
           take: 100,
+          include: { lines: { orderBy: { sortOrder: "asc" } } },
         }),
     owner
       ? db.expenseClaim.findMany({
           where: { status: "PENDING", NOT: { claimedById: staff.id } },
           orderBy: { createdAt: "asc" },
-          include: { claimedBy: { select: { name: true } } },
+          include: { claimedBy: { select: { name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
         })
       : [],
     owner
@@ -134,7 +150,7 @@ export default async function ClaimsPage() {
           where: { status: { in: ["APPROVED", "PAID"] } },
           orderBy: { decidedAt: "desc" },
           take: 30,
-          include: { claimedBy: { select: { name: true } } },
+          include: { claimedBy: { select: { name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
         })
       : [],
   ]);

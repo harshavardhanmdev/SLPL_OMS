@@ -16,16 +16,22 @@ import { getStaff, roleCan } from "@/lib/staff-auth";
 
 type Result = { ok?: boolean; error?: string };
 
+const lineSchema = z.object({
+  category: z.enum(CLAIM_CATEGORIES.map((c) => c.value) as [string, ...string[]], {
+    message: "Pick what each one was for",
+  }),
+  /** Rupees as typed. */
+  amount: z.number().positive("Enter every amount").max(1_000_000, "Check the amounts"),
+  description: z.string().trim().max(120).optional().or(z.literal("")),
+});
+
+/** A day's spending in one claim: every line, one total, every photo. */
 const claimSchema = z.object({
   spentOn: z.string().min(1, "Pick the date you spent it"),
-  /** Rupees as typed. */
-  amount: z.number().positive("Enter the amount").max(1_000_000, "Check the amount"),
-  category: z.enum(CLAIM_CATEGORIES.map((c) => c.value) as [string, ...string[]], {
-    message: "Pick what it was for",
-  }),
   paymentMode: z.enum(PAYMENT_MODES.map((m) => m.value) as [string, ...string[]]).optional(),
-  note: z.string().trim().min(3, "Say what it was for").max(300),
-  billImage: z.string().max(300).nullable().optional(),
+  note: z.string().trim().min(3, "Say where and why").max(300),
+  lines: z.array(lineSchema).min(1, "Add at least one expense").max(30, "Split it into two claims"),
+  photos: z.array(z.string().max(300)).max(10, "Up to 10 photos").optional(),
 });
 
 /** A claim row for the audit trail: JSON has no BigInt. */
@@ -51,9 +57,20 @@ export async function submitClaim(input: z.infer<typeof claimSchema>): Promise<R
   const spentOn = new Date(d.spentOn);
   if (Number.isNaN(spentOn.getTime())) return { error: "That date is not valid." };
   if (spentOn.getTime() > Date.now() + 24 * 60 * 60 * 1000) return { error: "That date is in the future." };
-  // Only a receipt photo uploaded here, never an address from elsewhere
-  if (d.billImage && !d.billImage.startsWith("/media/receipt-"))
-    return { error: "Upload the bill photo again." };
+  // Only receipt photos uploaded here, never an address from elsewhere
+  const photos = d.photos ?? [];
+  if (photos.some((p) => !p.startsWith("/media/receipt-"))) return { error: "Upload the bill photos again." };
+
+  const lines = d.lines.map((l, i) => ({
+    category: l.category,
+    description: l.description || null,
+    amount: Math.round(l.amount * 100),
+    sortOrder: i,
+  }));
+  const total = lines.reduce((s, l) => s + l.amount, 0);
+  if (total > 100_000_000) return { error: "Check the amounts." };
+  // The claim is counted under its biggest line
+  const main = lines.reduce((a, b) => (b.amount > a.amount ? b : a));
 
   // Someone linked to the Team Expenses app gets the claim there too
   const me = await db.adminUser.findUnique({ where: { id: staff.id }, select: { expensesAppName: true } });
@@ -61,12 +78,14 @@ export async function submitClaim(input: z.infer<typeof claimSchema>): Promise<R
     data: {
       claimedById: staff.id,
       spentOn,
-      amount: Math.round(d.amount * 100),
-      category: ledgerFor(d.category) as never,
-      appCategory: d.category,
+      amount: total,
+      category: ledgerFor(main.category) as never,
+      appCategory: main.category,
       paymentMode: d.paymentMode ?? null,
       note: d.note,
-      billImage: d.billImage || null,
+      billImage: photos[0] ?? null,
+      photos,
+      lines: { create: lines },
       syncPending: Boolean(me?.expensesAppName),
     },
   });

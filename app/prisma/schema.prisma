@@ -774,8 +774,13 @@ model ExpenseClaim {
   category       ExpenseCategory
   /// Where and what for, such as "Bus to Uppal and back, Sunrise visit"
   note           String
-  /// Photo of the bill, served to staff only
+  /// Photo of the bill, served to staff only. The first of photos, kept for
+  /// older screens and the Team Expenses app, which takes one photo per bill
   billImage      String?
+  /// Every photo sent with the claim
+  photos         String[]        @default([])
+  /// What the day was made of; empty for claims from before, and from the app
+  lines          ExpenseClaimLine[]
   status         ClaimStatus     @default(PENDING)
   decidedByName  String?
   decidedAt      DateTime?
@@ -1349,6 +1354,20 @@ model Organization {
   @@index([name])
 }
 
+/// One item in a day's claim: auto 120, lunch 250, hotel 1,200.
+model ExpenseClaimLine {
+  id          String       @id @default(cuid())
+  claimId     String
+  claim       ExpenseClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  /// The Team Expenses app's category (TRAVEL, HOTEL, FOOD ...)
+  category    String
+  description String?
+  amount      Int // paise
+  sortOrder   Int          @default(0)
+
+  @@index([claimId])
+}
+
 /// A claim taken back here after it reached the Team Expenses app: the next
 /// sync tells the app to delete it, then this row goes.
 model TeamExpenseDeletion {
@@ -1693,6 +1712,8 @@ model SampleIssue {
 
   productId   String?
   description String
+  /// The books inside, when the batch is a whole set ("Grade 5 full set")
+  contents    String?
   quantity    Int     @default(1)
 
   /// Who has them: the salesperson who took them from the office

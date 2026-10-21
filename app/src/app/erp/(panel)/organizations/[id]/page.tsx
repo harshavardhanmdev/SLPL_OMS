@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { accountPosition, BILLED_STATUSES } from "@/lib/ledger";
 import { formatINR } from "@/lib/money";
-import { ownsSchool, salesTeam } from "@/lib/money-scope";
+import { KIND_LABEL, ownsSchool, salesTeam } from "@/lib/money-scope";
 import { PAYMENT_MODE_LABEL } from "@/lib/payment-modes";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 import { dateTimeIN } from "@/lib/utils";
@@ -209,6 +209,11 @@ export default async function OrganizationPage({ params }: { params: Promise<{ i
             <span className="ml-2 font-mono text-sm font-normal text-muted-foreground">
               {org.code}
             </span>
+            {org.kind !== "SCHOOL" && (
+              <Badge variant="outline" className="ml-2 align-middle">
+                {KIND_LABEL[org.kind] ?? org.kind}
+              </Badge>
+            )}
           </h1>
           <p className="text-sm text-muted-foreground">
             {[org.contactPerson && `${org.contactPerson}${org.designation ? `, ${org.designation}` : ""}`, org.phone, org.email]

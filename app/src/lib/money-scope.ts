@@ -36,3 +36,29 @@ export const ownsSchool = (team: string[] | null, ownerId: string | null) =>
  * sales never see them.
  */
 export const SCHOOLS_ONLY = { kind: { not: "INDIVIDUAL" as const } };
+
+/**
+ * The Organisations type filter: schools (with colleges and institutions),
+ * distributors, or people billed directly, which only those who see every
+ * bill are offered. Anything else is everyone but those people.
+ */
+export const ORG_TYPES = ["schools", "distributors", "people"] as const;
+
+export function orgTypeWhere(type: string | null | undefined, team: string[] | null) {
+  if (type === "schools") return { kind: { in: ["SCHOOL" as const, "COLLEGE" as const, "INSTITUTION" as const] } };
+  if (type === "distributors") return { kind: "DISTRIBUTOR" as const };
+  if (type === "people" && team === null) return { kind: "INDIVIDUAL" as const };
+  return SCHOOLS_ONLY;
+}
+
+/** The type a request may filter by: individuals only for those who see every bill. */
+export const orgType = (type: string | null | undefined, team: string[] | null) =>
+  type === "schools" || type === "distributors" || (type === "people" && team === null) ? type : "";
+
+export const KIND_LABEL: Record<string, string> = {
+  SCHOOL: "School",
+  COLLEGE: "College",
+  DISTRIBUTOR: "Distributor",
+  INSTITUTION: "Institution",
+  INDIVIDUAL: "Person",
+};

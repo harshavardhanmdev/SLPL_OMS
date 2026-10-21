@@ -221,8 +221,8 @@ export function parseSamples(text: string, books: SampleBook[]): ParseResult {
   const picks: SamplePick[] = [];
   const unknown: string[] = [];
   const notes: string[] = [];
-  const add = (b: SampleBook, quantity: number, override?: { title: string; contents: string }) => {
-    const key = override ? `${b.key}:all` : b.key;
+  const add = (b: SampleBook, quantity: number, override?: { title: string; contents: string; key: string }) => {
+    const key = override ? `${b.key}:${override.key}` : b.key;
     const found = picks.find((p) => p.key === key);
     if (found) found.quantity += quantity;
     else
@@ -240,9 +240,11 @@ export function parseSamples(text: string, books: SampleBook[]): ParseResult {
     if (!t0) continue;
     const { quantity, rest: t } = quantityIn(t0);
     const named = seriesIn(t);
-    const grades = gradesIn(t, named);
+    // "term 1" and "first term" are not grade 1 (number words are digits by now)
+    const grades = gradesIn(t.replace(/\bterm [123]\b|\b[123](?:st|nd|rd) term\b|\bt[123]\b/g, " "), named);
     const subjects = SUBJECTS.filter(([re]) => re.test(t)).map(([, s]) => s);
-    const term2 = /\bterm 2\b|\bterm two\b|\bt2\b|\bsecond term\b/.test(t);
+    const term1 = /\bterm 1\b|\b1st term\b|\bt1\b/.test(t);
+    const term2 = /\bterm 2\b|\b2nd term\b|\bt2\b/.test(t);
     const each =
       /\beach book\b|\bseparately\b|\bevery (?:book|title)\b|\bindividual\b|\ball titles\b|\bone by one\b/.test(
         t,
@@ -299,6 +301,19 @@ export function parseSamples(text: string, books: SampleBook[]): ParseResult {
         continue;
       }
       const titles = inGrade.filter((b) => !b.isSet);
+      // "Little Leaps Grade 5 English" reads "English" inside its set
+      const prefix = `${SERIES_NAME[series]} ${label(g)} `;
+      const short = (b: SampleBook) => (b.title.startsWith(prefix) ? b.title.slice(prefix.length) : b.title);
+      // A Term 1 set: the books without Term 2, for a series that has terms
+      if (term1 && subjects.length === 0 && !each && titles.some((b) => b.term2)) {
+        const list = titles.filter((b) => !b.term2);
+        add(list[0], quantity, {
+          key: "term1",
+          title: `${SERIES_NAME[series]} ${label(g)} Term 1 set`,
+          contents: list.map(short).join(" · "),
+        });
+        continue;
+      }
       if (subjects.length > 0 || term2) {
         const wanted = titles.filter((b) => {
           const tt = norm(b.title);
@@ -319,8 +334,9 @@ export function parseSamples(text: string, books: SampleBook[]): ParseResult {
         // No set on the books for it (Skill Builders): one row holding every title
         const list = titles.filter((b) => !b.term2);
         add(list[0], quantity, {
+          key: "all",
           title: `${SERIES_NAME[series]} ${label(g)}, all ${list.length} books`,
-          contents: list.map((b) => b.title).join(" · "),
+          contents: list.map(short).join(" · "),
         });
       }
       if (series === "UPSC" && !named && Number(g) >= 6) {

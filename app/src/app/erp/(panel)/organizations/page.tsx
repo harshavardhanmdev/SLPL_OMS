@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { BILLED_STATUSES } from "@/lib/ledger";
-import { ownsSchool, salesTeam, SCHOOLS_ONLY } from "@/lib/money-scope";
+import { KIND_LABEL, orgType, orgTypeWhere, ownsSchool, salesTeam } from "@/lib/money-scope";
 import { getStaff, roleCan } from "@/lib/staff-auth";
 import { monthKey, monthLabel, monthRange } from "@/lib/utils";
 
@@ -35,9 +35,10 @@ export default async function OrganizationsPage({
   const team = await salesTeam(staff);
 
   const { q, status, month: rawMonth, kind } = await searchParams;
-  // People billed directly are listed apart, and only for those who see every bill
-  const people = team === null && kind === "people";
-  const kindWhere = people ? { kind: "INDIVIDUAL" as const } : SCHOOLS_ONLY;
+  // Schools, distributors, or people billed directly (those only for whoever sees every bill)
+  const type = orgType(kind, team);
+  const people = type === "people";
+  const kindWhere = orgTypeWhere(type, team);
   const range = monthRange(rawMonth);
   const month = range ? rawMonth : undefined;
   const where = {
@@ -55,7 +56,16 @@ export default async function OrganizationsPage({
   }
   const months = [...added.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
-  const peopleCount = team === null && !people ? await db.organization.count({ where: { kind: "INDIVIDUAL" } }) : 0;
+  // How many of each type, for the filter
+  const byKind = new Map(
+    (await db.organization.groupBy({ by: ["kind"], _count: { _all: true } })).map((k) => [k.kind, k._count._all]),
+  );
+  const count = (...kinds: string[]) => kinds.reduce((s, k) => s + (byKind.get(k as never) ?? 0), 0);
+  const types = [
+    ["schools", "Schools and colleges", count("SCHOOL", "COLLEGE", "INSTITUTION")],
+    ["distributors", "Distributors", count("DISTRIBUTOR")],
+    ...(team === null ? [["people", "People billed directly", count("INDIVIDUAL")] as const] : []),
+  ] as const;
 
   const organizations = await db.organization.findMany({
     where,
@@ -103,7 +113,7 @@ export default async function OrganizationsPage({
   if (q) params.set("q", q);
   if (status) params.set("status", status);
   if (month) params.set("month", month);
-  if (people) params.set("kind", "people");
+  if (type) params.set("kind", type);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -115,14 +125,6 @@ export default async function OrganizationsPage({
               ? "Customers billed as individuals, not schools. Sales do not see them."
               : "One record per school. Everything hangs off it: visits, quotations, bills, payments, samples and gifts."}
           </p>
-          {(people || peopleCount > 0) && (
-            <Link
-              href={people ? "/erp/organizations" : "/erp/organizations?kind=people"}
-              className="text-sm font-medium underline"
-            >
-              {people ? "Back to schools" : `People billed directly (${peopleCount})`}
-            </Link>
-          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="gap-2" asChild>
@@ -148,13 +150,25 @@ export default async function OrganizationsPage({
       </div>
 
       <form className="flex flex-wrap gap-2" action="/erp/organizations">
-        {people && <input type="hidden" name="kind" value="people" />}
         <Input
           name="q"
           defaultValue={q ?? ""}
           placeholder="Search by name"
           className="h-11 max-w-xs"
         />
+        <select
+          name="kind"
+          aria-label="Type"
+          defaultValue={type}
+          className="flex h-11 rounded-md border border-input bg-transparent px-3 text-sm"
+        >
+          <option value="">{team === null ? "Schools and distributors" : "Every type"}</option>
+          {types.map(([value, label, n]) => (
+            <option key={value} value={value}>
+              {label} ({n})
+            </option>
+          ))}
+        </select>
         <select
           name="status"
           defaultValue={status ?? "all"}
@@ -187,7 +201,7 @@ export default async function OrganizationsPage({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           [
-            people ? "People" : "Organisations",
+            people ? "People" : type === "distributors" ? "Distributors" : type === "schools" ? "Schools" : "Organisations",
             String(rows.length),
             month ? `added in ${monthLabel(month)}` : q || status ? "matching" : "on the books",
           ],
@@ -266,6 +280,11 @@ export default async function OrganizationsPage({
                         )}
                       </div>
                       <div className="text-right">
+                        {o.kind !== "SCHOOL" && (
+                          <Badge variant="outline" className="mr-1">
+                            {KIND_LABEL[o.kind] ?? o.kind}
+                          </Badge>
+                        )}
                         <Badge className={tone[o.status]}>{o.status.toLowerCase()}</Badge>
                         {o.billed > 0 && (
                           <p className="mt-1 text-sm">

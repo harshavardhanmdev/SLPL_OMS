@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Mail, Newspaper, Phone, Printer } from "lucide-react";
+import { Mail, Newspaper, Phone, Printer, ScanBarcode } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,11 +74,20 @@ export default async function SubscriptionsPage() {
             The GenZ Times, and who is owed the {issue} issue.
           </p>
         </div>
-        <Button variant="outline" className="gap-2" asChild>
-          <Link href="/erp/subscriptions/posting">
-            <Printer className="size-4" /> Posting list
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {roleCan(staff.role, "shipments.manage") && (
+            <Button variant="outline" className="gap-2" asChild>
+              <Link href="/erp/labels">
+                <ScanBarcode className="size-4" /> Parcel labels
+              </Link>
+            </Button>
+          )}
+          <Button variant="outline" className="gap-2" asChild>
+            <Link href="/erp/subscriptions/posting">
+              <Printer className="size-4" /> Posting list
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

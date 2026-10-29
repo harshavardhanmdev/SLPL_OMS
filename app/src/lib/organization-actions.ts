@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { audit } from "@/lib/audit";
+import { allocateCustomerCode } from "@/lib/customer-code";
 import { db } from "@/lib/db";
 import { getStaff, requireCapability } from "@/lib/staff-auth";
 import { dateTimeIN } from "@/lib/utils";
@@ -32,16 +33,7 @@ const DENIED: Record<string, string> = {
  * letter, GLOWAR1026B, so nobody adding one has to think about numbering.
  */
 export async function suggestCode(name: string, city?: string | null, added?: Date): Promise<string> {
-  const letters = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
-  const now = added ?? new Date();
-  const month = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getFullYear()).slice(2)}`;
-  const stem = `${(letters(name).slice(0, 3) || "ORG").padEnd(3, "X")}${letters(city ?? "").slice(0, 3)}${month}`;
-  for (const extra of ["", ..."BCDEFGHJKLMNPQRSTUVWXYZ"]) {
-    const candidate = stem + extra;
-    const clash = await db.organization.findFirst({ where: { code: candidate }, select: { id: true } });
-    if (!clash) return candidate;
-  }
-  throw new Error("Could not allocate a customer code - set one by hand.");
+  return allocateCustomerCode(name, city, added);
 }
 
 const schema = z.object({

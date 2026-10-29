@@ -22,6 +22,9 @@ model User {
   image             String?
   lastLoginAt       DateTime?
   notificationPrefs Json?
+  /// Printed as the customer ID on parcel labels: name, city and month, as a
+  /// school's code is, given the first time one of their parcels is labelled
+  customerCode      String?   @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -246,6 +249,7 @@ model Order {
   kitPurchases  KitPurchase[]
   subscriptions Subscription[]
   entitlements  DigitalEntitlement[]
+  parcelLabel   ParcelLabel?
 
   @@index([userId])
   @@index([status])
@@ -1017,7 +1021,8 @@ model Subscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  dispatches SubscriptionDispatch[]
+  dispatches   SubscriptionDispatch[]
+  parcelLabels ParcelLabel[]
 
   @@index([status, endsAt])
   @@index([email])
@@ -1036,6 +1041,26 @@ model SubscriptionDispatch {
 
   @@unique([subscriptionId, issueLabel])
   @@index([subscriptionId])
+}
+
+/// One printed parcel label: a store order, or one issue of a subscription.
+/// Its number is what the barcode carries. Printing it again reuses the
+/// number, so one parcel never carries two.
+model ParcelLabel {
+  id             String        @id @default(cuid())
+  /// SL2610-00001: the year and month it was first printed, then a serial
+  number         String        @unique
+  orderId        String?       @unique
+  order          Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  /// The issue a subscription's label is for, "November 2026"
+  issueLabel     String?
+  createdEmail   String
+  createdAt      DateTime      @default(now())
+
+  @@unique([subscriptionId, issueLabel])
+  @@index([createdAt])
 }
 
 // ─── Digital editions ─────────────────────────────────────────────────────────

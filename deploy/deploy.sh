@@ -4,8 +4,8 @@
 #   ./deploy/deploy.sh --seed     → additionally run the catalog seed once
 set -euo pipefail
 
-SERVER="${OMS_SERVER:-slplserver@100.109.145.97}"
-REMOTE_DIR="~/oms"
+SERVER="${OMS_SERVER:-saaradaa_server@100.110.176.31}"
+REMOTE_DIR="/srv/slpl/oms"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "── Syncing code to $SERVER:$REMOTE_DIR (tar over ssh - server has no rsync)"
@@ -36,5 +36,5 @@ fi
 echo "── Status"
 ssh "$SERVER" "docker ps --filter name=oms- --format '{{.Names}}\t{{.Status}}'"
 echo
-echo "Store:   http://100.109.145.97:4300  (LAN/Tailscale)"
+echo "Store:   http://100.110.176.31:4300  (LAN/Tailscale)"
 echo "Next:    add Cloudflare tunnel route <subdomain> → http://localhost:4300"

@@ -106,3 +106,9 @@ export async function nextReceiptNumber(tx: Tx, on: Date): Promise<string> {
   const fy = financialYearLabel(on);
   return `SLPL/R/${fy}/${pad(await allocateSerial(tx, `receipt:${fy}`), 4)}`;
 }
+
+/** `SL2610-00001`, a parcel label: what its barcode carries */
+export async function nextParcelNumber(tx: Tx, on: Date): Promise<string> {
+  const yymm = `${String(on.getFullYear()).slice(2)}${String(on.getMonth() + 1).padStart(2, "0")}`;
+  return `SL${yymm}-${pad(await allocateSerial(tx, `parcel:${yymm}`), 5)}`;
+}

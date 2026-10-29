@@ -25,6 +25,15 @@ const ORDER_STAGE: Record<string, string> = {
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
+ * The issue the screen opens on: this month's, but never before November 2026,
+ * the owner's word, as October went out without labels. Outside render, which
+ * the purity rule asks for.
+ */
+function defaultIssue(): string {
+  return issueLabelFor(new Date(Math.max(Date.now(), new Date(2026, 10, 1).getTime())));
+}
+
+/**
  * Labels for everything that goes out by post or courier: GenZ Times issues
  * and store orders. Tick, print four to an A4 sheet, cut and paste on. The
  * barcode carries the label number, which the box at the top finds again.
@@ -38,7 +47,7 @@ export default async function ParcelLabelsPage({
   // Readers' and customers' addresses: whoever ships, which is the owners
   if (!staff || !roleCan(staff.role, "shipments.manage")) redirect("/erp");
   const { issue: rawIssue, find: rawFind } = await searchParams;
-  const issue = rawIssue?.trim() || issueLabelFor();
+  const issue = rawIssue?.trim() || defaultIssue();
   const find = rawFind?.trim().toUpperCase() || "";
 
   const [{ subs, orders, recent }, found] = await Promise.all([

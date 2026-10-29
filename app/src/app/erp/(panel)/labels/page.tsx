@@ -5,13 +5,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Printer, ScanBarcode } from "lucide-react";
 
+import { IssuePicker } from "@/components/erp/issue-picker";
 import { LabelPicker, type PickGroup } from "@/components/erp/label-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/db";
 import { labelQueue } from "@/lib/parcel-labels";
 import { getStaff, roleCan } from "@/lib/staff-auth";
-import { issueLabelFor } from "@/lib/subscription-plans";
+import { issueChoices, normalizeIssue, postingIssue } from "@/lib/subscription-plans";
 import { dateTimeIN } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Parcel labels", robots: { index: false } };
@@ -23,15 +24,7 @@ const ORDER_STAGE: Record<string, string> = {
 };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-/**
- * The issue the screen opens on: this month's, but never before November 2026,
- * the owner's word, as October went out without labels. Outside render, which
- * the purity rule asks for.
- */
-function defaultIssue(): string {
-  return issueLabelFor(new Date(Math.max(Date.now(), new Date(2026, 10, 1).getTime())));
-}
+const dayMonth = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
 /**
  * Labels for everything that goes out by post or courier: GenZ Times issues
@@ -47,7 +40,9 @@ export default async function ParcelLabelsPage({
   // Readers' and customers' addresses: whoever ships, which is the owners
   if (!staff || !roleCan(staff.role, "shipments.manage")) redirect("/erp");
   const { issue: rawIssue, find: rawFind } = await searchParams;
-  const issue = rawIssue?.trim() || defaultIssue();
+  const issue = (rawIssue && normalizeIssue(rawIssue)) || postingIssue();
+  const choices = issueChoices();
+  if (!choices.includes(issue)) choices.unshift(issue);
   const find = rawFind?.trim().toUpperCase() || "";
 
   const [{ subs, orders, recent }, found] = await Promise.all([
@@ -71,7 +66,7 @@ export default async function ParcelLabelsPage({
     {
       key: "subs",
       title: `The GenZ Times, ${issue} issue`,
-      empty: `Nobody is owed the ${issue} issue, or every one is recorded as posted.`,
+      empty: `Nobody gets the ${issue} issue.`,
       rows: subs.map((s) => ({
         kind: "subscription",
         id: s.id,
@@ -79,6 +74,7 @@ export default async function ParcelLabelsPage({
         detail: `${s.city} ${s.pincode} · ${plural(s.copies, "copy", "copies")}`,
         reference: s.code,
         number: s.parcelLabels[0]?.number ?? null,
+        status: s.dispatches[0] ? `Marked as posted on ${dayMonth(s.dispatches[0].sentAt)}` : null,
       })),
     },
     {
@@ -97,6 +93,7 @@ export default async function ParcelLabelsPage({
           detail: `${a.city ?? ""} ${a.pincode ?? ""} · ${plural(items, "item", "items")} · ${ORDER_STAGE[o.status] ?? o.status}`,
           reference: o.orderNumber,
           number: o.parcelLabel?.number ?? null,
+          status: null,
         };
       }),
     },
@@ -113,6 +110,7 @@ export default async function ParcelLabelsPage({
           detail: `${l.order ? `Order ${l.order.orderNumber}` : `GenZ Times, ${l.issueLabel}`} · printed ${dateTimeIN(l.createdAt)}`,
           reference: l.number,
           number: l.number,
+          status: null,
         })),
     },
   ];
@@ -121,13 +119,31 @@ export default async function ParcelLabelsPage({
     <div className="mx-auto max-w-3xl space-y-5">
       <div>
         <h1 className="font-heading text-2xl font-bold">Parcel labels</h1>
-        <p className="text-sm text-muted-foreground">
-          Four to an A4 sheet: tick who to send to, print, cut along the dashed lines and paste one on each
-          parcel. A label printed again keeps its number.
-        </p>
+        <ol className="mt-2 grid gap-1.5 text-sm text-muted-foreground sm:grid-cols-3">
+          {[
+            "Pick the GenZ Times issue",
+            "Tick who to send to",
+            "Print, cut on the dashed lines, paste on",
+          ].map((step, i) => (
+            <li key={step} className="flex items-center gap-2">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-semibold text-white">
+                {i + 1}
+              </span>
+              {step}
+            </li>
+          ))}
+        </ol>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <IssuePicker
+        issue={issue}
+        choices={choices}
+        href="/erp/labels"
+        question="Which GenZ Times issue are you sending?"
+        hint="Four labels fit on one A4 sheet. A label printed again keeps its number. Store orders below are the same whichever issue you pick."
+      />
+
+      <div>
         <form className="rounded-2xl border bg-card p-4" action="/erp/labels">
           <label htmlFor="find" className="flex items-center gap-1.5 text-sm font-medium">
             <ScanBarcode className="size-4" /> Scan or type a label number
@@ -143,17 +159,6 @@ export default async function ParcelLabelsPage({
             {rawIssue && <input type="hidden" name="issue" value={issue} />}
             <Button type="submit" variant="outline">
               Find
-            </Button>
-          </div>
-        </form>
-        <form className="rounded-2xl border bg-card p-4" action="/erp/labels">
-          <label htmlFor="issue" className="text-sm font-medium">
-            GenZ Times issue
-          </label>
-          <div className="mt-2 flex gap-2">
-            <Input id="issue" name="issue" defaultValue={issue} placeholder="November 2026" />
-            <Button type="submit" variant="outline">
-              Show
             </Button>
           </div>
         </form>

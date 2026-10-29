@@ -6,7 +6,7 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { requireCapability } from "@/lib/staff-auth";
-import { isOwed } from "@/lib/subscription-plans";
+import { isOwed, normalizeIssue } from "@/lib/subscription-plans";
 
 /**
  * Recording that an issue went into the post.
@@ -19,11 +19,15 @@ import { isOwed } from "@/lib/subscription-plans";
 
 type Result = { ok?: boolean; error?: string; sent?: number; already?: number };
 
-const issueSchema = z
-  .string()
-  .trim()
-  .min(3, "Name the issue, for example October 2026")
-  .max(40);
+// One spelling for every issue, so "November2026" cannot become an issue of its own
+const issueSchema = z.string().transform((text, ctx) => {
+  const issue = normalizeIssue(text);
+  if (!issue) {
+    ctx.addIssue({ code: "custom", message: "Pick the issue, for example November 2026" });
+    return z.NEVER;
+  }
+  return issue;
+});
 
 const DENIED: Record<string, string> = {
   UNAUTHORIZED: "Sign in again to record a dispatch.",

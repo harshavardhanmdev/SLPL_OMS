@@ -33,13 +33,23 @@ export function cityCode(city: string, pincode: string): string {
     .slice(0, 3);
 }
 
-/** Everything the labels screen offers: who is owed this issue, orders to send, recent labels. */
+/** Everything the labels screen offers: who gets this issue, orders to send, recent labels. */
 export async function labelQueue(issue: string) {
   const since = new Date(Date.now() - 30 * 86_400_000);
   const [subs, orders, recent] = await Promise.all([
     db.subscription.findMany({
-      where: { status: "ACTIVE", dispatches: { none: { issueLabel: issue } } },
-      include: { parcelLabels: { where: { issueLabel: issue }, select: { number: true } } },
+      // Owed the issue, or already marked as posted for it: a label can be
+      // printed before the posting is recorded or after
+      where: {
+        OR: [
+          { status: "ACTIVE", dispatches: { none: { issueLabel: issue } } },
+          { status: { in: ["ACTIVE", "COMPLETED"] }, dispatches: { some: { issueLabel: issue } } },
+        ],
+      },
+      include: {
+        parcelLabels: { where: { issueLabel: issue }, select: { number: true } },
+        dispatches: { where: { issueLabel: issue }, select: { sentAt: true } },
+      },
       orderBy: [{ city: "asc" }, { pincode: "asc" }, { subscriberName: "asc" }],
     }),
     db.order.findMany({
@@ -60,7 +70,7 @@ export async function labelQueue(issue: string) {
       take: 100,
     }),
   ]);
-  return { subs: subs.filter((s) => isOwed(s, issue)), orders, recent };
+  return { subs: subs.filter((s) => s.dispatches.length > 0 || isOwed(s, issue)), orders, recent };
 }
 
 type AddressSnapshot = {

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Mail, Newspaper, Phone, Printer, ScanBarcode } from "lucide-react";
 
+import { IssuePicker } from "@/components/erp/issue-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,7 @@ import {
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/money";
 import { getStaff, roleCan } from "@/lib/staff-auth";
-import { endsWithin, isOwed, issueLabelFor } from "@/lib/subscription-plans";
+import { endsWithin, isOwed, issueChoices, normalizeIssue, postingIssue } from "@/lib/subscription-plans";
 
 export const metadata: Metadata = { title: "Subscriptions", robots: { index: false } };
 
@@ -40,11 +41,19 @@ const rank: Record<string, number> = { ACTIVE: 0, PENDING: 1, COMPLETED: 2, CANC
 
 const monthYear = (d: Date) => d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 
-export default async function SubscriptionsPage() {
+export default async function SubscriptionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ issue?: string }>;
+}) {
   const staff = await getStaff();
   // Readers' addresses and the posting run: owners, the manager and accounts
   if (!staff || !roleCan(staff.role, "orders.manage")) redirect("/erp");
-  const issue = issueLabelFor();
+  const { issue: rawIssue } = await searchParams;
+  const issue = (rawIssue && normalizeIssue(rawIssue)) || postingIssue();
+  const choices = issueChoices();
+  if (!choices.includes(issue)) choices.unshift(issue);
+  const query = `?issue=${encodeURIComponent(issue)}`;
 
   const subs = await db.subscription.findMany({
     include: {
@@ -77,13 +86,13 @@ export default async function SubscriptionsPage() {
         <div className="flex flex-wrap gap-2">
           {roleCan(staff.role, "shipments.manage") && (
             <Button variant="outline" className="gap-2" asChild>
-              <Link href="/erp/labels">
+              <Link href={`/erp/labels${query}`}>
                 <ScanBarcode className="size-4" /> Parcel labels
               </Link>
             </Button>
           )}
           <Button variant="outline" className="gap-2" asChild>
-            <Link href="/erp/subscriptions/posting">
+            <Link href={`/erp/subscriptions/posting${query}`}>
               <Printer className="size-4" /> Posting list
             </Link>
           </Button>
@@ -104,6 +113,14 @@ export default async function SubscriptionsPage() {
           </div>
         ))}
       </div>
+
+      <IssuePicker
+        issue={issue}
+        choices={choices}
+        href="/erp/subscriptions"
+        question="Which GenZ Times issue are you working on?"
+        hint="Everything below, the labels and the posting list follow the issue picked here."
+      />
 
       <PostingRun issue={issue} due={due.length} />
 
@@ -172,7 +189,13 @@ export default async function SubscriptionsPage() {
 
               {s.status === "ACTIVE" && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-                  <DispatchOne id={s.id} issue={issue} code={s.code} />
+                  {s.dispatches.some((d) => d.issueLabel === issue) ? (
+                    <span className="rounded border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+                      {issue} marked as posted
+                    </span>
+                  ) : (
+                    <DispatchOne id={s.id} issue={issue} code={s.code} />
+                  )}
                   <EditAddress
                     address={{
                       id: s.id,

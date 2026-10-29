@@ -10,7 +10,7 @@ import { financialYearOf } from "@/lib/expense-constants";
 import { hasPin, isRememberedDevice } from "@/lib/expense-pin";
 import { formatINR } from "@/lib/money";
 import { getStaff, roleCan } from "@/lib/staff-auth";
-import { issueLabelFor } from "@/lib/subscription-plans";
+import { postingIssue } from "@/lib/subscription-plans";
 
 export const metadata: Metadata = { title: "Back office", robots: { index: false } };
 
@@ -24,7 +24,7 @@ export default async function ErpHome() {
   const canQuote = staff ? roleCan(staff.role, "quotes.read") : false;
   const canSubs = staff ? roleCan(staff.role, "orders.manage") : false;
   const year = financialYearOf(new Date());
-  const issue = issueLabelFor();
+  const issue = postingIssue();
 
   const [spend, activeSubs, dueSubs, openQuotes, quoteValue, trusted, pinSet] = await Promise.all([
     canFinance

@@ -16,6 +16,8 @@ export type PickRow = {
   reference: string;
   /** The label number, once one has been printed */
   number: string | null;
+  /** Shown as a green note, such as "Marked as posted on 29 Oct" */
+  status: string | null;
 };
 
 export type PickGroup = { key: string; title: string; empty: string; rows: PickRow[] };
@@ -127,11 +129,18 @@ export function LabelPicker({ issue, groups }: { issue: string; groups: PickGrou
                             <span className="font-mono text-xs text-muted-foreground">{r.reference}</span>
                           </span>
                           <span className="block text-sm text-muted-foreground">{r.detail}</span>
-                          {r.number && r.kind !== "label" && (
-                            <span className="mt-1 inline-block rounded border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                              Label {r.number} printed, reprints keep it
-                            </span>
-                          )}
+                          <span className="flex flex-wrap gap-1.5">
+                            {r.status && (
+                              <span className="mt-1 inline-block rounded border border-green-300 bg-green-50 px-1.5 py-0.5 text-[11px] text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+                                {r.status}
+                              </span>
+                            )}
+                            {r.number && r.kind !== "label" && (
+                              <span className="mt-1 inline-block rounded border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                                Label {r.number} printed, reprints keep it
+                              </span>
+                            )}
+                          </span>
                         </span>
                       </label>
                     </li>

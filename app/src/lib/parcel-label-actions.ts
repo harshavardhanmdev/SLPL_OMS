@@ -7,6 +7,7 @@ import { allocateCustomerCode } from "@/lib/customer-code";
 import { db } from "@/lib/db";
 import { nextParcelNumber } from "@/lib/number-series";
 import { getStaff, requireCapability } from "@/lib/staff-auth";
+import { normalizeIssue } from "@/lib/subscription-plans";
 
 /**
  * Turning a selection into labels. A pick without a label gets one, with the
@@ -23,7 +24,11 @@ const DENIED: Record<string, string> = {
 };
 
 const schema = z.object({
-  issue: z.string().trim().min(3).max(40),
+  issue: z.string().transform((text, ctx) => {
+    const issue = normalizeIssue(text);
+    if (!issue) ctx.addIssue({ code: "custom", message: "Pick the issue first." });
+    return issue ?? z.NEVER;
+  }),
   picks: z
     .array(z.object({ kind: z.enum(["order", "subscription", "label"]), id: z.string().min(1).max(40) }))
     .min(1, "Tick at least one to print.")
@@ -63,7 +68,8 @@ export async function prepareLabels(input: z.infer<typeof schema>): Promise<Resu
   }
   if (orders.some((o) => o.fulfilment !== "SHIP"))
     return { error: "A kit is collected at the school, not posted." };
-  const stopped = subs.find((s) => s.status !== "ACTIVE");
+  // A term that has just finished still gets the label for its last issue
+  const stopped = subs.find((s) => s.status !== "ACTIVE" && s.status !== "COMPLETED");
   if (stopped) return { error: `${stopped.code} is not running, so nothing is posted to it.` };
 
   // A school's subscription carries the school's code; a reader needs their own

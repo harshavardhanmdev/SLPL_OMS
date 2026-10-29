@@ -77,6 +77,39 @@ export function issueLabelFor(d = new Date()): string {
   return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 }
 
+/** Posting is worked from the November 2026 issue on, the owner's word: October went out before. */
+const FIRST_WORKED_ISSUE = new Date(2026, 10, 1);
+
+/** The issue being posted now: this month's, never one before November 2026. */
+export function postingIssue(now = new Date()): string {
+  return issueLabelFor(now < FIRST_WORKED_ISSUE ? FIRST_WORKED_ISSUE : now);
+}
+
+/**
+ * The issues a screen offers, so nobody types one: last month's (for a late
+ * copy), this one and next month's, never before November 2026.
+ */
+export function issueChoices(now = new Date()): string[] {
+  const base = now < FIRST_WORKED_ISSUE ? FIRST_WORKED_ISSUE : now;
+  return [-1, 0, 1]
+    .map((m) => new Date(base.getFullYear(), base.getMonth() + m, 1))
+    .filter((d) => d >= FIRST_WORKED_ISSUE)
+    .map((d) => issueLabelFor(d));
+}
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/**
+ * An issue as typed, in the one spelling: "November2026", "nov 2026" and
+ * "November 2026" are all "November 2026". Null when it names no month, so a
+ * slip of the keyboard cannot start an issue nobody will ever post.
+ */
+export function normalizeIssue(text: string): string | null {
+  const m = /^\s*([a-z]+)\.?\s*(\d{4})\s*$/i.exec(text);
+  const month = m ? MONTHS.indexOf(m[1].slice(0, 3).toLowerCase()) : -1;
+  return m && month >= 0 ? issueLabelFor(new Date(Number(m[2]), month, 1)) : null;
+}
+
 /**
  * The issue a subscription starting today should begin with.
  *

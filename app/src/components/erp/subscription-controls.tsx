@@ -38,88 +38,69 @@ function useAction() {
   return { busy, run };
 }
 
-/** The whole posting run: one issue, everyone who is owed it. */
+/** The whole posting run: the issue picked at the top, everyone who is owed it. */
 export function PostingRun({ issue, due }: { issue: string; due: number }) {
-  const [label, setLabel] = React.useState(issue);
   const { busy, run } = useAction();
 
   return (
     <div className="rounded-2xl border bg-card p-4">
-      <h2 className="font-heading font-semibold">Record a posting run</h2>
+      <h2 className="font-heading font-semibold">Mark the {issue} issue as posted</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Marks one issue as posted for every active subscriber who is owed it. Anyone already
-        recorded is skipped, so pressing it twice is safe.
+        Once the copies are in the post, mark everyone owed {issue} in one go. Anyone already marked is
+        skipped, so pressing it twice is safe.
       </p>
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="min-w-48 flex-1">
-          <Label htmlFor="run-issue" className="mb-1.5 block text-xs">
-            Issue
-          </Label>
-          <Input
-            id="run-issue"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="October 2026"
-          />
-        </div>
-        <Button
-          className="gap-2"
-          disabled={busy || due === 0}
-          onClick={() =>
-            void run(
-              () => recordIssueForAll(label),
-              (r) =>
-                r.sent === 0
-                  ? "Everyone had already been recorded for that issue."
-                  : `${r.sent} subscriber${r.sent === 1 ? "" : "s"} recorded as posted.`,
-            )
-          }
-        >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-          {due === 0 ? "Nobody is due" : `Record for ${due} due`}
-        </Button>
-      </div>
+      <Button
+        className="mt-3 gap-2"
+        disabled={busy || due === 0}
+        onClick={() =>
+          void run(
+            () => recordIssueForAll(issue),
+            (r) =>
+              r.sent === 0
+                ? "Everyone had already been marked for that issue."
+                : `${r.sent} subscriber${r.sent === 1 ? "" : "s"} marked as posted for ${issue}.`,
+          )
+        }
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+        {due === 0 ? "Nobody is due" : `Mark ${due} as posted`}
+      </Button>
     </div>
   );
 }
 
-/** One subscriber, one issue, for the copy that goes out late or on its own. */
+/** One subscriber, the issue picked at the top: the copy that goes out late or on its own. */
 export function DispatchOne({ id, issue, code }: { id: string; issue: string; code: string }) {
   const [open, setOpen] = React.useState(false);
-  const [label, setLabel] = React.useState(issue);
   const { busy, run } = useAction();
 
   if (!open) {
     return (
       <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
-        <Send className="size-3.5" /> Record a dispatch
+        <Send className="size-3.5" /> Mark {issue} as posted
       </Button>
     );
   }
 
+  // A posting cannot be taken back, so it asks once
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Input
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        className="h-9 w-40"
-        aria-label={`Issue posted to ${code}`}
-      />
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span>{issue} is in the post for this one?</span>
       <Button
         size="sm"
         className="gap-1.5"
         disabled={busy}
         onClick={() =>
           void run(
-            () => recordDispatch({ subscriptionId: id, issue: label }),
-            () => `${label} recorded for ${code}.`,
+            () => recordDispatch({ subscriptionId: id, issue }),
+            () => `${issue} marked as posted for ${code}.`,
           ).then((r) => {
             if (r.ok) setOpen(false);
           })
         }
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-        Posted
+        Yes, posted
       </Button>
       <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
         Cancel
